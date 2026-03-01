@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monies | Smart Mobile Money Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #09090b; color: #ffffff; }
+        .font-mono-custom { font-family: 'JetBrains Mono', monospace; }
+        
+        .text-gradient {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-image: linear-gradient(to right, #10b981, #0ea5e9);
+        }
+        
+        /* Dark mode grid */
+        .bg-grid {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        }
+        
+        /* Phone mockup adjusted for dark mode */
+        .phone-mockup {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(16, 185, 129, 0.1);
+            border: 12px solid #18181b;
+            border-radius: 2.5rem;
+            overflow: hidden;
+            background-color: #000;
+            position: relative;
+        }
+        .phone-mockup::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30%;
+            height: 24px;
+            background-color: #18181b;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+            z-index: 10;
+        }
+        
+        /* Chic gradient animation for features */
+        .gradient-border-card {
+            position: relative;
+            background: #18181b;
+            border-radius: 1.5rem;
+            z-index: 1;
+        }
+        .gradient-border-card::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            border-radius: 1.6rem;
+            background: linear-gradient(45deg, #10b981, #0ea5e9, #3b82f6);
+            z-index: -1;
+            opacity: 0.3;
+            transition: opacity 0.3s ease;
+        }
+        .gradient-border-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Funky Checklist Glow Effects */
+        .glow-check-done {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+        .glow-check-progress {
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
+
+    <!-- Top Disclaimer Banner -->
+    <div class="bg-zinc-900/50 border-b border-zinc-800 text-zinc-300 text-sm py-2.5 text-center px-4 font-medium relative z-[60] backdrop-blur-md">
+        <span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded mr-2 uppercase tracking-wide border border-emerald-500/30">Beta</span>
+        Monies is currently in active development and exclusively available via GitHub.
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 top-[40px] bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800 transition-all">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center max-w-7xl">
+            <div class="flex items-center space-x-2 text-2xl font-extrabold tracking-tight text-white">
+                <div class="h-8 w-8 bg-gradient-to-tr from-emerald-500 to-sky-500 rounded-full flex items-center justify-center text-white text-sm shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                    <i class="fa-solid fa-m"></i>
+                </div>
+                <span>Monies</span>
+            </div>
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#how-it-works" class="text-zinc-400 hover:text-white font-medium transition">How it works</a>
+                <a href="#features" class="text-zinc-400 hover:text-white font-medium transition">Features</a>
+                <a href="#privacy" class="text-zinc-400 hover:text-white font-medium transition">Privacy</a>
+                <a href="#roadmap" class="text-zinc-400 hover:text-white font-medium transition">Roadmap</a>
+            </div>
+            <div>
+                <a href="https://github.com" target="_blank" class="flex items-center space-x-2 bg-white text-zinc-900 px-5 py-2.5 rounded-full font-bold hover:bg-zinc-200 hover:scale-105 transition shadow-lg">
+                    <i class="fa-brands fa-github text-lg"></i>
+                    <span class="hidden sm:inline">DOWNLOAD APK</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden bg-grid mt-[40px]">
+        <!-- Ambient Background Glows -->
+        <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-sky-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <div class="container mx-auto px-6 max-w-7xl relative">
+            <div class="flex flex-col lg:flex-row items-center gap-16">
+                
+                <!-- Hero Copy -->
+                <div class="lg:w-1/2 text-center lg:text-left z-10">
+                    <div class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
+                        <i class="fa-solid fa-shield-check"></i>
+                        <span>100% Offline • Built for Mobile Money</span>
+                    </div>
+                    <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]">
+                        Make sense of <br>
+                        your <span class="text-gradient">finances.</span>
+                    </h1>
+                    <p class="text-lg lg:text-xl text-zinc-400 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                        Monies turns your SMS inbox into a powerful financial dashboard. Track your mobile money spending, organize by category, and visualize your habits—entirely on your device.
+                    </p>
+                    
+                    <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                        <a href="https://github.com" target="_blank" class="w-full sm:w-auto flex items-center justify-center bg-white text-zinc-900 px-8 py-4 rounded-full font-bold text-lg hover:bg-zinc-200 transition hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.15)]">
+                            <i class="fa-brands fa-github mr-3 text-2xl"></i>
+                            <span>DOWNLOAD APK</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Hero Screenshot Provision -->
+                <div class="lg:w-1/2 flex justify-center lg:justify-end relative w-full mt-10 lg:mt-0">
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-gradient-to-r from-emerald-500 to-sky-500 rounded-full blur-[100px] opacity-20"></div>
+                    
+                    <!-- REPLACE THIS IMAGE SRC WITH YOUR APP'S MAIN DASHBOARD SCREENSHOT -->
+                    <div class="phone-mockup w-64 md:w-80 aspect-[9/19.5] rotate-[-2deg] transition-transform hover:rotate-0 duration-500">
+                        <img src="https://placehold.co/800x1600/18181b/ffffff?text=Main+Dashboard\nScreenshot" alt="Monies App Dashboard" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Visualizations (Left Text, Right Image) -->
+    <section id="how-it-works" class="py-24 relative border-t border-zinc-900 bg-zinc-950/50">
+        <div class="container mx-auto px-6 max-w-7xl relative z-10">
+            <div class="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+                <div class="lg:w-1/2 order-2 lg:order-1">
+                    <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-6 text-white">See exactly where your money goes.</h2>
+                    <p class="text-lg text-zinc-400 mb-8 leading-relaxed">
+                        Monies automatically reads standard mobile money transaction messages and generates beautiful, easy-to-understand visualizations. 
+                    </p>
+                    <ul class="space-y-6">
+                        <li class="flex items-start bg-zinc-900/40 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-900/60 transition">
+                            <div class="mt-1 bg-emerald-500/10 p-3 rounded-xl text-emerald-400 mr-4 shadow-sm border border-emerald-500/20">
+                                <i class="fa-solid fa-tags"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-white">Custom Categories</h4>
+                                <p class="text-zinc-400 mt-1">Assign labels like 'Groceries', 'Transport', or 'Rent'. Monies groups them beautifully.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start bg-zinc-900/40 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-900/60 transition">
+                            <div class="mt-1 bg-sky-500/10 p-3 rounded-xl text-sky-400 mr-4 shadow-sm border border-sky-500/20">
+                                <i class="fa-solid fa-chart-pie"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-white">Summary Statistics</h4>
+                                <p class="text-zinc-400 mt-1">View your spending and inflow grouped by week, month, or specific categories.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="lg:w-1/2 order-1 lg:order-2 flex justify-center relative w-full">
+                    <!-- REPLACE THIS IMAGE SRC WITH YOUR APP'S CHARTS/CATEGORIES SCREENSHOT -->
+                    <div class="phone-mockup w-64 md:w-72 aspect-[9/19.5]">
+                        <img src="https://placehold.co/800x1600/18181b/ffffff?text=Charts+%26+Stats\nScreenshot" alt="Monies App Analytics" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Search & Filter (Left Image, Right Text) -->
+    <section class="py-24 relative border-t border-zinc-900">
+        <div class="container mx-auto px-6 max-w-7xl">
+            <div class="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+                
+                <div class="lg:w-1/2 flex justify-center relative w-full">
+                    <!-- REPLACE THIS IMAGE SRC WITH YOUR APP'S SEARCH/FILTER SCREENSHOT -->
+                    <div class="phone-mockup w-64 md:w-72 aspect-[9/19.5]">
+                        <img src="https://placehold.co/800x1600/18181b/ffffff?text=Search+%26+Filter\nScreenshot" alt="Monies Search Interface" class="w-full h-full object-cover">
+                    </div>
+                </div>
+
+                <div class="lg:w-1/2">
+                    <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-6 text-white">Find any transaction in seconds.</h2>
+                    <p class="text-lg text-zinc-400 mb-8 leading-relaxed">
+                        Stop endlessly scrolling through your messages. Search, sort, and filter your entire financial history with powerful on-device queries.
+                    </p>
+                    
+                    <div class="space-y-8">
+                        <div class="group border-l-2 border-zinc-800 hover:border-emerald-500 pl-6 transition-all">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i class="fa-solid fa-bolt text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 mr-3 group-hover:scale-110 transition-transform"></i> Filter by Type
+                            </h4>
+                            <p class="text-zinc-400 mt-2">Instantly isolate merchant payments, peer-to-peer transfers, and withdrawals.</p>
+                        </div>
+                        <div class="group border-l-2 border-zinc-800 hover:border-emerald-500 pl-6 transition-all">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i class="fa-solid fa-magnifying-glass text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 mr-3 group-hover:scale-110 transition-transform"></i> Subject & Direction
+                            </h4>
+                            <p class="text-zinc-400 mt-2">Search by sender or recipient name. Toggle between Money In and Money Out instantly.</p>
+                        </div>
+                        <div class="group border-l-2 border-zinc-800 hover:border-emerald-500 pl-6 transition-all">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i class="fa-solid fa-file-export text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 mr-3 group-hover:scale-110 transition-transform"></i> CSV Export
+                            </h4>
+                            <p class="text-zinc-400 mt-2">Need it in Excel? Export your filtered searches directly to a CSV file to share or archive.</p>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </section>
+
+    <!-- CHIC & MODERN FEATURES SECTION -->
+    <section id="features" class="py-32 relative overflow-hidden bg-zinc-950/80 border-y border-zinc-900">
+        <!-- Abstract neon glows -->
+        <div class="absolute top-0 left-0 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2"></div>
+        <div class="absolute bottom-0 right-0 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3"></div>
+
+        <div class="container mx-auto px-6 max-w-7xl relative z-10">
+            <div class="text-center max-w-3xl mx-auto mb-20">
+                <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-6">Engineered for clarity.</h2>
+                <p class="text-lg text-zinc-400">A clean, distraction-free architecture designed specifically for seamless mobile money tracking. No clutter, just insights.</p>
+            </div>
+
+            <!-- Bento-style Grid -->
+            <div class="grid md:grid-cols-3 gap-6">
+                
+                <!-- Card 1 -->
+                <div class="gradient-border-card group h-full">
+                    <div class="bg-[#121214] backdrop-blur-xl p-8 rounded-[1.4rem] h-full relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
+                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-2xl text-white mb-8 shadow-lg shadow-emerald-500/20">
+                            <i class="fa-solid fa-microchip"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-3 text-white">Instant Parsing</h3>
+                        <p class="text-zinc-400 leading-relaxed">Retrieves your messages and parses transaction amounts, dates, balances, and subjects in milliseconds entirely offline.</p>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="gradient-border-card group h-full">
+                    <div class="bg-[#121214] backdrop-blur-xl p-8 rounded-[1.4rem] h-full relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl group-hover:bg-sky-500/20 transition-all"></div>
+                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-2xl text-white mb-8 shadow-lg shadow-sky-500/20">
+                            <i class="fa-solid fa-layer-group"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-3 text-white">Smart Grouping</h3>
+                        <p class="text-zinc-400 leading-relaxed">Transactions are organized effortlessly. Assign a category once, and easily see visual breakdowns of where you spend the most.</p>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="gradient-border-card group h-full">
+                    <div class="bg-[#121214] backdrop-blur-xl p-8 rounded-[1.4rem] h-full relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
+                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center text-2xl text-white mb-8 shadow-lg shadow-purple-500/20">
+                            <i class="fa-solid fa-unlock-keyhole"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-3 text-white">Data Portability</h3>
+                        <p class="text-zinc-400 leading-relaxed">Your data isn't locked in our ecosystem. Export your entire transaction history, or just a filtered view, straight to CSV.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Privacy Section -->
+    <section id="privacy" class="py-32 relative border-b border-zinc-900">
+        <div class="container mx-auto px-6 max-w-5xl text-center relative z-10">
+            <div class="inline-flex items-center justify-center h-24 w-24 rounded-full bg-emerald-500/10 text-emerald-400 mb-8 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                <i class="fa-solid fa-lock text-4xl"></i>
+            </div>
+            <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-8 text-white">
+                Your finances are <br>your business.
+            </h2>
+            <p class="text-xl text-zinc-400 mb-16 max-w-2xl mx-auto leading-relaxed">
+                Reading SMS data is highly sensitive. That is why Monies is built on a strict zero-data policy. We don't want your data, and we can't see it.
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-10 text-left border-t border-zinc-800 pt-16">
+                <div class="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
+                    <h4 class="text-xl font-bold mb-3 text-white flex items-center gap-2"><i class="fa-solid fa-wifi text-emerald-400"></i> No Internet Needed</h4>
+                    <p class="text-zinc-400">Every calculation, search, and parse happens on your device's processor. No connection required.</p>
+                </div>
+                <div class="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
+                    <h4 class="text-xl font-bold mb-3 text-white flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-down text-sky-400"></i> No Cloud Servers</h4>
+                    <p class="text-zinc-400">We do not sync your transactions to the cloud. What happens on your phone, stays on your phone.</p>
+                </div>
+                <div class="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
+                    <h4 class="text-xl font-bold mb-3 text-white flex items-center gap-2"><i class="fa-solid fa-user-slash text-purple-400"></i> No Accounts</h4>
+                    <p class="text-zinc-400">Skip the sign-up. Just open the app, grant permissions, and start viewing your insights instantly.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/20 to-sky-900/20 pointer-events-none"></div>
+        <div class="container mx-auto px-6 max-w-3xl text-center relative z-10">
+            <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-white">Ready to take control?</h2>
+            <p class="text-xl text-zinc-400 mb-10">
+                Download the open-source Monies APK today and get a clear picture of your spending habits in seconds.
+            </p>
+            <a href="https://github.com" target="_blank" class="inline-flex items-center justify-center bg-white text-zinc-900 px-10 py-5 rounded-full font-bold text-xl hover:bg-zinc-200 hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)]">
+                <i class="fa-brands fa-github mr-4 text-3xl"></i>
+                <span>DOWNLOAD APK</span>
+            </a>
+            <p class="mt-6 text-zinc-500 text-sm">Requires Android 8.0 or higher.</p>
+        </div>
+    </section>
+
+    <!-- FUNKY ROADMAP SECTION (Last Section) -->
+    <section id="roadmap" class="py-32 bg-[#050505] border-t border-zinc-900 relative">
+        <div class="container mx-auto px-6 max-w-4xl relative z-10">
+            <div class="mb-16 border-l-4 border-sky-500 pl-6">
+                <span class="text-sky-400 font-mono-custom font-bold tracking-widest uppercase text-sm mb-2 block">> ./system_roadmap.sh</span>
+                <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight text-white mb-4">Development Pipeline</h2>
+                <p class="text-lg text-zinc-500">Monies is an evolving open-source project. Here is the current status of upcoming features.</p>
+            </div>
+
+            <!-- Funky Checklist -->
+            <ul class="space-y-4">
+                
+                <!-- Completed Item -->
+                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-[#09090b] border border-zinc-800 p-5 rounded-2xl transition duration-300 opacity-70">
+                    <div class="h-10 w-10 rounded-xl bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center shrink-0 text-emerald-400 glow-check-done">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight strike">M-PESA Core Integration</h3>
+                        <p class="text-zinc-500 text-sm mt-1">Full offline parsing and visualizations for Safaricom SMS.</p>
+                    </div>
+                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/30 font-mono-custom">
+                        [ STATUS: DONE ]
+                    </div>
+                </li>
+
+                <!-- In Progress Item -->
+                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-zinc-900/50 border border-amber-500/30 p-5 rounded-2xl hover:border-amber-500/60 transition duration-300 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-amber-500/5 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-700"></div>
+                    <div class="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-500 flex items-center justify-center shrink-0 glow-check-progress relative z-10 bg-[#09090b]">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                    </div>
+                    <div class="flex-1 relative z-10">
+                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight">Airtel Money Integration</h3>
+                        <p class="text-zinc-400 text-sm mt-1">Full parsing and visual support for Airtel Money transactions.</p>
+                    </div>
+                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-widest border border-amber-500/30 font-mono-custom relative z-10">
+                        [ BUILDING... ]
+                    </div>
+                </li>
+
+                <!-- Planned Item 1 -->
+                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-[#09090b] border border-zinc-800 border-dashed p-5 rounded-2xl hover:border-sky-500/50 transition duration-300">
+                    <div class="h-10 w-10 rounded-xl border-2 border-zinc-700 border-dashed flex items-center justify-center shrink-0 text-zinc-700 group-hover:border-sky-500 transition">
+                        <!-- Empty box -->
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight">Multiple Money Accounts</h3>
+                        <p class="text-zinc-500 text-sm mt-1">Switch seamlessly between different SIM cards or mobile money providers.</p>
+                    </div>
+                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-zinc-900 text-zinc-500 text-[10px] font-bold uppercase tracking-widest border border-zinc-800 font-mono-custom">
+                        [ PLANNED ]
+                    </div>
+                </li>
+
+                <!-- Planned Item 2 -->
+                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-[#09090b] border border-zinc-800 border-dashed p-5 rounded-2xl hover:border-sky-500/50 transition duration-300">
+                    <div class="h-10 w-10 rounded-xl border-2 border-zinc-700 border-dashed flex items-center justify-center shrink-0 text-zinc-700 group-hover:border-sky-500 transition">
+                        <!-- Empty box -->
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight">Custom CSV Imports</h3>
+                        <p class="text-zinc-500 text-sm mt-1">Import historical bank statements for holistic net-worth tracking.</p>
+                    </div>
+                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-zinc-900 text-zinc-500 text-[10px] font-bold uppercase tracking-widest border border-zinc-800 font-mono-custom">
+                        [ PLANNED ]
+                    </div>
+                </li>
+
+            </ul>
+            
+            <div class="text-center mt-12">
+                <a href="https://github.com" target="_blank" class="text-sky-400 font-mono-custom text-sm hover:text-sky-300 transition flex items-center justify-center gap-2">
+                    > Suggest_a_feature_on_GitHub() <i class="fa-solid fa-terminal ml-1"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-[#050505] py-12 border-t border-zinc-900">
+        <div class="container mx-auto px-6 max-w-7xl">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+                <div class="flex items-center space-x-2 text-2xl font-extrabold text-white">
+                    <div class="h-8 w-8 bg-zinc-800 rounded-full flex items-center justify-center text-white text-sm">
+                        <i class="fa-solid fa-m"></i>
+                    </div>
+                    <span>Monies</span>
+                </div>
+                <div class="flex space-x-8 text-sm font-medium text-zinc-500">
+                    <a href="https://github.com" target="_blank" class="hover:text-white transition"><i class="fa-brands fa-github text-xl"></i></a>
+                    <a href="#" class="hover:text-white transition">Privacy Policy</a>
+                    <a href="#" class="hover:text-white transition">Report Issue</a>
+                </div>
+            </div>
+            <div class="text-center md:text-left text-xs text-zinc-600 pt-8 border-t border-zinc-900/50">
+                <p>&copy; 2026 Monies App Contributors. Released under Open Source License.</p>
+                <p class="mt-2">"M-PESA" and "Airtel Money" are trademarks of their respective owners. Monies is an independent, open-source application and is not affiliated with, endorsed, or sponsored by any mobile network operator.</p>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
