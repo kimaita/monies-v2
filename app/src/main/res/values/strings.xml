@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Monies</string>
+    <string name="phone_perm_rationale"> "The Phone permission is needed to detect your phone number and network. This is useful where you have multiple SIM cards with transactions.\nWould you like to grant it?"</string>
+</resources>
