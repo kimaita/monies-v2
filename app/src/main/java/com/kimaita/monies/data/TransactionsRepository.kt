@@ -69,15 +69,6 @@ interface TransactionsRepository {
         subjectId: List<Long>? = null, categoryId: List<Int>? = null, natureFilter: Boolean? = null
     ): Flow<List<CategorySpending>>
 
-    fun getTopSubjects(
-        startDate: String?,
-        endDate: String?,
-        categoryId: List<Int>? = null,
-        transactionType: List<Int>? = null,
-        natureFilter: Boolean? = null,
-        limit: Int = 5
-    ): Flow<List<SubjectAmount>>
-
     fun getActivityByTimeOfDay(
         startDate: String?,
         endDate: String?,
@@ -99,24 +90,7 @@ interface TransactionsRepository {
      */
     fun getSubjects(subjectID: Long): Flow<List<Subject>>
 
-    /**
-     * Get category spending for a given time period.
-     *
-     * @param startDate The start date for filtering transactions.
-     * @param endDate The end date for filtering transactions.
-     * @param transactionCategory The ID of the category to filter transactions by.
-     */
-    fun getCategorySpending(
-        startDate: String? = null, endDate: String? = null, transactionCategory: Int? = null
-    ): Flow<List<CategorySpending>>
-
-    /**
-     * Get a list of transaction providers.
-     */
-    fun getTransactionProviders(): List<String>
     fun getTypeSpending(startDate: String?, endDate: String?): Flow<List<CategorySpending>>
-    fun getTransactionStatsByDay(startDate: String?, endDate: String?): Flow<List<DailyTotal>>
-    fun getTopSubjectPerType(startDate: String?, endDate: String?): Flow<List<TopSubject>>
     fun getLargestTransaction(
         isInc: Boolean,
         startDate: String? = null,

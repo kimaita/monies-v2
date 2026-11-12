@@ -54,10 +54,10 @@ class SmsParser @Inject constructor() {
                         )
                         transactionList.add(Pair(transaction, newSubject))
                     } catch (e: Exception) {
-                        Timber.e(e, "Failed to parse message: %s", message.toString())
+                        Timber.e(e, "Failed to parse message id %d", message.id)
                     }
                 } else {
-                    Timber.e("Failed to parse message: %s", message.toString())
+                    Timber.e("Failed to parse message id %d", message.id)
 
                 }
             }

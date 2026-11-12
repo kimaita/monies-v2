@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -98,7 +99,7 @@ fun OnboardingScreen(
                         Text(
                             "Skip",
                             color = OnbColors.Muted,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -142,8 +143,8 @@ fun OnboardingScreen(
                 ) {
                     Text(
                         if (isLast) "Get started" else "Next",
-                        fontFamily = Bricolage,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 17.sp
                     )
                 }
@@ -233,7 +234,7 @@ private fun SmsBubble() {
                 .background(OnbColors.Emerald))
             Text(
                 "M-PESA · TODAY 2:02 PM",
-                fontFamily = SpaceMono,
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 9.5.sp,
                 letterSpacing = 1.2.sp,
                 color = OnbColors.Muted
@@ -245,7 +246,7 @@ private fun SmsBubble() {
                 withStyle(SpanStyle(color = OnbColors.Coral)) { append("WEF6X3K9LM") }
                 append(" Confirmed. Ksh1,500.00 paid to NAIVAS LIMITED. New M-PESA balance is Ksh8,420.00.")
             },
-            fontFamily = SpaceMono, fontSize = 12.sp, lineHeight = 18.sp, color = Color(0xFF34302A),
+            fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, lineHeight = 18.sp, color = Color(0xFF34302A),
         )
     }
 }
@@ -259,7 +260,7 @@ private fun ArrowBadge(modifier: Modifier = Modifier) {
     ) {
         Text(
             "Monies reads it",
-            fontFamily = SpaceMono,
+            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 10.5.sp,
             color = OnbColors.EmeraldDeep,
@@ -301,8 +302,8 @@ private fun RecordCard() {
         ) {
             Text(
                 "N",
-                fontFamily = Bricolage,
-                fontWeight = FontWeight.ExtraBold,
+                fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = OnbColors.EmeraldDeep
             )
@@ -316,15 +317,15 @@ private fun RecordCard() {
             )
             Text(
                 "Pay bill · 14:02",
-                fontFamily = SpaceMono,
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 11.5.sp,
                 color = OnbColors.Muted
             )
         }
         Text(
             "−1,500",
-            fontFamily = Bricolage,
-            fontWeight = FontWeight.ExtraBold,
+            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+            fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
             color = OnbColors.Neg
         )
@@ -386,7 +387,7 @@ private fun AutoPage(active: Boolean) {
         ) {
             PulseDot(); Text(
             "LIVE",
-            fontFamily = SpaceMono,
+            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             letterSpacing = 1.sp,
@@ -439,8 +440,8 @@ private fun AutoRow(r: AutoRowData) {
         ) {
             Text(
                 r.glyph,
-                fontFamily = Bricolage,
-                fontWeight = FontWeight.ExtraBold,
+                fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
                 color = Color.White
             )
@@ -452,7 +453,7 @@ private fun AutoRow(r: AutoRowData) {
             ) {
                 Text(
                     r.tag,
-                    fontFamily = SpaceMono,
+                    fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                     fontSize = 9.5.sp,
                     letterSpacing = 0.8.sp,
                     color = OnbColors.EmeraldDeep,
@@ -469,12 +470,12 @@ private fun AutoRow(r: AutoRowData) {
                 )
             }
             Spacer(Modifier.height(2.dp))
-            Text(r.sub, fontFamily = SpaceMono, fontSize = 11.sp, color = OnbColors.Muted)
+            Text(r.sub, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 11.sp, color = OnbColors.Muted)
         }
         Text(
             r.amount,
-            fontFamily = Bricolage,
-            fontWeight = FontWeight.ExtraBold,
+            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+            fontWeight = FontWeight.Bold,
             fontSize = 16.sp,
             color = r.amountColor
         )
@@ -563,9 +564,9 @@ private fun LegendItem(color: Color, label: String, pct: String) {
             .clip(RoundedCornerShape(4.dp))
             .background(color))
         Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = OnbColors.Ink)
+        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnbColors.Ink)
         Spacer(Modifier.weight(1f))
-        Text(pct, fontFamily = SpaceMono, fontSize = 12.sp, color = OnbColors.Muted)
+        Text(pct, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, color = OnbColors.Muted)
     }
 }
 
@@ -611,7 +612,7 @@ private fun StatCard(
     Column(modifier.onbCard()) {
         Text(
             label,
-            fontFamily = SpaceMono,
+            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
             fontSize = 10.sp,
             letterSpacing = 1.2.sp,
             color = OnbColors.Muted
@@ -619,8 +620,8 @@ private fun StatCard(
         Spacer(Modifier.height(5.dp))
         Text(
             value,
-            fontFamily = Bricolage,
-            fontWeight = FontWeight.ExtraBold,
+            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+            fontWeight = FontWeight.Bold,
             fontSize = 21.sp,
             letterSpacing = (-0.5).sp,
             color = OnbColors.Ink
@@ -628,7 +629,7 @@ private fun StatCard(
         if (change != null) {
             Spacer(Modifier.height(4.dp)); Text(
                 change,
-                fontFamily = SpaceMono,
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 color = OnbColors.Neg
@@ -637,7 +638,7 @@ private fun StatCard(
         if (sub != null) {
             Spacer(Modifier.height(4.dp)); Text(
                 sub,
-                fontFamily = SpaceMono,
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 11.sp,
                 color = OnbColors.Muted
             )
@@ -657,7 +658,7 @@ private fun CashFlowCard() {
         ) {
             Text(
                 "CASH FLOW · 6 WEEKS",
-                fontFamily = SpaceMono,
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 10.sp,
                 letterSpacing = 1.2.sp,
                 color = OnbColors.Muted
@@ -684,7 +685,7 @@ private fun FlowLegend(color: Color, label: String) {
             .size(9.dp)
             .clip(RoundedCornerShape(3.dp))
             .background(color))
-        Text(label, fontFamily = SpaceMono, fontSize = 10.sp, color = OnbColors.Muted)
+        Text(label, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 10.sp, color = OnbColors.Muted)
     }
 }
 
@@ -740,7 +741,7 @@ private fun ExportChips() {
         listOf("CSV", "Excel", "PDF").forEach {
             Text(
                 it,
-                fontFamily = SpaceMono,
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
                 color = OnbColors.EmeraldDeep,
@@ -840,7 +841,7 @@ private fun OnbPermissionRow(item: PermissionRationale) {
 private fun OnbMarker(required: Boolean) {
     Text(
         if (required) "REQUIRED" else "OPTIONAL",
-        fontFamily = SpaceMono,
+        fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 9.5.sp,
         letterSpacing = 0.6.sp,

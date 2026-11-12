@@ -33,18 +33,3 @@ data class ExportUiState(
     val loadingOptions: Boolean = true,
     val optionsError: String? = null
 )
-
-fun TransactionFilters.toExportFilters(): ExportFilters {
-    val (start, end) = getDatesForFilter(timeFilter)
-    return ExportFilters(
-        startDate = start?.format(isoDateTimeFormatter),
-        endDate = end?.format(isoDateTimeFormatter),
-        subjectId = (subjectFilters + listOfNotNull(subjectFilter)).distinct().takeIf { it.isNotEmpty() },
-        categoryId = (categoryFilters + listOfNotNull(categoryFilter)).distinct()
-            .takeIf { it.isNotEmpty() },
-        transactionType = (typeFilters + listOfNotNull(typeFilter)).distinct()
-            .takeIf { it.isNotEmpty() },
-        account = accountFilter,
-        natureFilter = natureFilter,
-    )
-}

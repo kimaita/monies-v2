@@ -41,5 +41,4 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun subjectDao(): SubjectDao
     abstract fun settingsDao(): SettingsDao
     abstract fun accountDao(): AccountDao
-//    abstract fun transactionRunnerDao(): TransactionRunnerDao
 }

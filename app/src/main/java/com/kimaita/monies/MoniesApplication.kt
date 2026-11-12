@@ -1,6 +1,7 @@
 package com.kimaita.monies
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
@@ -20,7 +21,8 @@ class MoniesApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        Timber.plant(Timber.DebugTree())
-        Timber.d("Timber has been planted.")
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            Timber.plant(Timber.DebugTree())
+        }
     }
 }

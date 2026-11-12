@@ -68,23 +68,6 @@ interface TransactionsDao : BaseDao<Transaction> {
     fun getLatestTransactions(limit: Int): Flow<List<TransactionWithDetails>>
 
 
-    @androidx.room.Transaction
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE id IN (
-            SELECT rowid FROM transactions_fts
-            WHERE transactions_fts MATCH :searchQuery
-        )
-        """
-    )
-    fun performSearch(searchQuery: String): Flow<List<TransactionWithDetails>>
-
-    fun searchTransactions(searchQuery: String): Flow<List<TransactionWithDetails>> {
-        val ftsQuery = "$searchQuery*"
-        return performSearch(ftsQuery)
-    }
-
     @Query(
         """
         SELECT
@@ -111,24 +94,6 @@ interface TransactionsDao : BaseDao<Transaction> {
         transactionType: List<Int>? = null
     ): Flow<IncExp>
 
-    /**
-     * Gets the total expense amount for each day within a given date range.
-     * The date is formatted to 'YYYY-MM-DD' for grouping.
-     */
-    @Query(
-        """
-        SELECT DATE(transactionTime) as day, SUM(amount) as total, COUNT(id) as count
-        FROM transactions
-        WHERE (:startDate IS NULL OR transactionTime >= :startDate)
-        AND (:endDate IS NULL OR transactionTime <= :endDate)
-        GROUP BY day
-        ORDER BY day ASC
-        """
-    )
-    fun getSpendingTotalsByDay(
-        startDate: String?, endDate: String?
-    ): Flow<List<DailyTotal>>
-
     @androidx.room.Transaction
     @Query(
         """
@@ -144,17 +109,6 @@ interface TransactionsDao : BaseDao<Transaction> {
         isInc: Boolean, startDate: String? = null, endDate: String? = null
     ): Flow<TransactionWithDetails?>
 
-
-    @androidx.room.Transaction
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE transactionType IN (:types)
-        ORDER BY transactionTime DESC
-        LIMIT 1
-    """
-    )
-    fun getLatestTypeTransaction(types: List<Int>): Flow<TransactionWithDetails>
 
     @Query(
         """
@@ -365,12 +319,6 @@ interface TransactionsDao : BaseDao<Transaction> {
 """
     )
     suspend fun getSubjectOccurrences(since: String): List<SubjectOccurrence>
-
-    @Query("SELECT id, message, transactionType FROM transactions WHERE balance IS NULL AND id > :afterId ORDER BY id ASC LIMIT :limit")
-    suspend fun balanceBackfillBatch(afterId: Long, limit: Int): List<BalanceRow>
-
-    @Query("UPDATE transactions SET balance = :balance WHERE id = :id")
-    suspend fun updateBalance(id: Long, balance: Double)
 
     @Query("SELECT MIN(transactionTime) FROM transactions")
     suspend fun getEarliestTransactionTime(): String?

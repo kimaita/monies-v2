@@ -92,14 +92,6 @@ class TransactionsViewModel @Inject constructor(
         _filters.value = _filters.value.copy(timeFilter = timeFilter)
     }
 
-    fun setTypeFilter(typeId: Int?) {
-        _filters.value = _filters.value.copy(typeFilter = typeId)
-    }
-
-    fun setCategoryFilter(category: Int?) {
-        _filters.value = _filters.value.copy(categoryFilter = category)
-    }
-
     fun setNatureFilter(isInc: Boolean?) {
         _filters.value = _filters.value.copy(natureFilter = isInc)
     }
@@ -112,68 +104,4 @@ class TransactionsViewModel @Inject constructor(
         _filters.value = TransactionFilters()
     }
 
-//    suspend fun exportToCsv(context: Context) {
-//        withContext(Dispatchers.IO) {
-//            val filters = _filters.value
-//            val (startDate, endDate) = getDatesForFilter(filters.timeFilter)
-//            val transactions = repository.getTransactionsForExport(
-//                transactionFilters = filters,
-//                startDate = startDate?.format(isoDateTimeFormatter),
-//                endDate = endDate?.format(isoDateTimeFormatter)
-//            )
-//
-//            if (transactions.isEmpty()) return@withContext
-//
-//            val csvHeader = "Code,Amount,Cost,Date,Time,Subject Name,Subject Number,Type\n"
-//            val csvContent = transactions.joinToString("\n") { t ->
-//                listOf(
-//                    t.code,
-//                    t.amount.toString(),
-//                    t.cost?.toString() ?: "0.0",
-//                    t.transactionTime?.toLocalDate()?.toString() ?: "",
-//                    t.transactionTime?.toLocalTime()?.toString() ?: "",
-//                    t.subject?.name ?: "",
-//                    t.subject?.number ?: "",
-//                    t.type.displayName ?: ""
-//                ).joinToString(",") { "\"${it.replace("\"", "\"\"")}\"" }
-//            }
-//
-//            val fileName = "transactions_${System.currentTimeMillis()}.csv"
-//            var contentUri: Uri? = null
-//
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//                val contentValues = ContentValues().apply {
-//                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-//                    put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
-//                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-//                }
-//                val resolver = context.contentResolver
-//                contentUri =
-//                    resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-//                contentUri?.let { uri ->
-//                    resolver.openOutputStream(uri)?.use { outputStream ->
-//                        outputStream.write((csvHeader + csvContent).toByteArray())
-//                    }
-//                }
-//            } else {
-//                val downloadsDir =
-//                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-//                val file = File(downloadsDir, fileName)
-//                file.writeText(csvHeader + csvContent)
-//                contentUri = Uri.fromFile(file)
-//            }
-//
-//            contentUri?.let { uri ->
-//                val intent = Intent(Intent.ACTION_SEND).apply {
-//                    type = "text/csv"
-//                    putExtra(Intent.EXTRA_STREAM, uri)
-//                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-//                }
-//                val chooser = Intent.createChooser(intent, "Export Transactions").apply {
-//                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//                }
-//                context.startActivity(chooser)
-//            }
-//        }
-//    }
 }

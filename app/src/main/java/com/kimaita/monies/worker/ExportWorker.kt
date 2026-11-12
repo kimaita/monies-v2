@@ -1,5 +1,6 @@
 package com.kimaita.monies.worker
 
+import com.kimaita.monies.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -88,7 +89,7 @@ class ExportWorker @AssistedInject constructor(
         val cancel = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)
         val b = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("Exporting transactions")
-            .setSmallIcon(android.R.drawable.stat_sys_download)   //TODO: swap for app icon
+            .setSmallIcon(R.drawable.download)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .addAction(0, "Cancel", cancel)
@@ -132,7 +133,7 @@ class ExportWorker @AssistedInject constructor(
     companion object {
         const val WORK_NAME = "transaction_export"
         private const val CHANNEL_ID = "exports"
-        private const val NOTIF_ID = 4242
+        private const val NOTIF_ID = 4243
 
         const val KEY_FORMAT = "format"
         const val KEY_PROCESSED = "processed"

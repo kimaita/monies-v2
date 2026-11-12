@@ -1,5 +1,6 @@
 package com.kimaita.monies.data
 
+import com.kimaita.monies.services.SmsSyncer
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -93,21 +94,9 @@ class DefaultTransactionsRepository @Inject constructor(
         subjectDao.getSubjects(subjectID)
 
 
-    override fun getTransactionProviders(): List<String> {
-        return transactionTypeDao.getProviders()
-    }
-
     override fun getTypeSpending(
         startDate: String?, endDate: String?
     ): Flow<List<CategorySpending>> = transactionTypeDao.getTypeSpending(startDate, endDate)
-
-    override fun getTransactionStatsByDay(
-        startDate: String?, endDate: String?
-    ): Flow<List<DailyTotal>> = transactionsDao.getSpendingTotalsByDay(startDate, endDate)
-
-    override fun getTopSubjectPerType(
-        startDate: String?, endDate: String?
-    ): Flow<List<TopSubject>> = subjectDao.getTopSubjectPerType(startDate, endDate)
 
 
     override fun getLargestTransaction(
@@ -235,23 +224,6 @@ class DefaultTransactionsRepository @Inject constructor(
     ) =
         transactionTypeDao.getTypeSpending(startDate, endDate, subjectId, categoryId, natureFilter)
 
-    override fun getTopSubjects(
-        startDate: String?,
-        endDate: String?,
-        categoryId: List<Int>?,
-        transactionType: List<Int>?,
-        natureFilter: Boolean?,
-        limit: Int
-    ) =
-        subjectDao.getTopSubjects(
-            startDate,
-            endDate,
-            categoryId,
-            transactionType,
-            natureFilter,
-            limit
-        )
-
     override fun getActivityByTimeOfDay(
         startDate: String?,
         endDate: String?,
@@ -274,7 +246,7 @@ class DefaultTransactionsRepository @Inject constructor(
      * @return true if the sync timestamp does not exist, indicating a first run.
      */
     suspend fun isFirstRun(): Boolean {
-        return settingsDao.getSetting(LAST_SMS_SYNC_ID_KEY) == null
+        return settingsDao.getSetting(SmsSyncer.LAST_SMS_SYNC_ID_KEY) == null
     }
 
     override suspend fun isOnboardingComplete(): Boolean = withContext(Dispatchers.IO) {
@@ -284,10 +256,6 @@ class DefaultTransactionsRepository @Inject constructor(
     override suspend fun setOnboardingComplete() = withContext(Dispatchers.IO) {
         settingsDao.saveSetting(Setting(ONBOARDING_COMPLETE_KEY, "true"))
     }
-
-    override fun getCategorySpending(
-        startDate: String?, endDate: String?, transactionCategory: Int?
-    ): Flow<List<CategorySpending>> = categoryDao.getCategorySpending(startDate, endDate)
 
 
     override suspend fun searchSubjects(trim: String) =
@@ -401,7 +369,6 @@ class DefaultTransactionsRepository @Inject constructor(
         }
 
     companion object {
-        const val LAST_SMS_SYNC_ID_KEY = "last_sms_sync_id"
         const val ONBOARDING_COMPLETE_KEY = "onboarding_complete"
         const val EXPORT_PAGE_SIZE = 500
         private val BALANCE_REGEX_OPTIONS =

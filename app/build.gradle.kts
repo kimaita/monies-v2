@@ -79,15 +79,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.core.i18n)
     implementation(libs.androidx.paging.common)
-    implementation(libs.places)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Compose Navigation
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.navigation.fragment)
-    implementation(libs.androidx.navigation.ui)
-    implementation(libs.androidx.navigation.dynamic.features.fragment)
     implementation(libs.kotlinx.serialization.json)
 
     // Room Database
@@ -102,13 +98,11 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.ui.text.google.fonts)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.paging.compose)
 
     // Dependency Injection
     implementation(libs.androidx.hilt.navigation.compose)
-    implementation(libs.androidx.hilt.navigation.fragment)
     implementation(libs.androidx.hilt.common)
     implementation(libs.androidx.hilt.work)
     implementation(libs.hilt.android)
@@ -117,9 +111,6 @@ dependencies {
     ksp(libs.kotlinMetadataJvm)
     implementation(libs.androidx.work.runtime.ktx)
 
-    // vico charts
-    implementation(libs.vico.compose)
-    implementation(libs.vico.compose.m3)
 
 
     // Timber Logger

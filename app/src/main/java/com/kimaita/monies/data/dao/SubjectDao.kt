@@ -39,37 +39,6 @@ interface SubjectDao : BaseDao<Subject> {
         }
     }
 
-    /**
-     * Gets the top subject (by total spending) for each expense transaction type.
-     */
-    @Query(
-        """
-        WITH RankedSubjects AS (
-            SELECT
-                t.transactionType,
-                s.name as subjectName,
-                SUM(t.amount) as totalAmount,
-                ROW_NUMBER() OVER(PARTITION BY t.transactionType ORDER BY SUM(t.amount) DESC) as rn
-            FROM transactions AS t
-            JOIN subjects AS s ON t.subject = s.id
-            WHERE t.transactionType IN (SELECT id FROM transaction_types WHERE isInc = 0)
-            AND (:startDate IS NULL OR t.transactionTime >= :startDate)
-            AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-            GROUP BY t.transactionType, s.id
-        )
-        SELECT
-            tt.name as typeName,
-            rs.subjectName,
-            rs.totalAmount
-        FROM RankedSubjects AS rs
-        JOIN transaction_types AS tt ON rs.transactionType = tt.id
-        WHERE rs.rn = 1
-        """
-    )
-    fun getTopSubjectPerType(
-        startDate: String?, endDate: String?
-    ): Flow<List<TopSubject>>
-
     @Query(
         """
     SELECT 
@@ -109,28 +78,6 @@ interface SubjectDao : BaseDao<Subject> {
         """
     )
     suspend fun topSubjects(limit: Int = 15): List<SubjectRef>
-
-    @Query(
-        """
-            SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount
-            FROM transactions AS t
-            JOIN subjects AS s ON t.subject = s.id
-            JOIN transaction_types AS tt ON t.transactionType = tt.id
-            WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-              AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-              AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-              AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
-              AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
-            GROUP BY s.id 
-            ORDER BY amount DESC 
-            LIMIT :limit
-        """
-    )
-    fun getTopSubjects(
-        startDate: String? = null, endDate: String? = null,
-        categoryId: List<Int>? = null, transactionType: List<Int>? = null,
-        natureFilter: Boolean? = null, limit: Int = 5,
-    ): Flow<List<SubjectAmount>>
 
     @Query(
         """
