@@ -35,60 +35,115 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.paging.LoadState
+import androidx.paging.PagingData
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.kimaita.monies.R
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
+import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    viewModel: TransactionsViewModel = hiltViewModel()
+    viewModel: TransactionsViewModel = hiltViewModel(),
+    openSearch: Boolean = false,
 ) {
     val filteredTransactions = viewModel.filteredTransactions.collectAsLazyPagingItems()
     val transactionTypes by viewModel.transactionTypes.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val filters by viewModel.filters.collectAsState()
+    val context = LocalContext.current
 
+    TransactionsScreenContent(
+        modifier = modifier,
+        filteredTransactions = filteredTransactions,
+        transactionTypes = transactionTypes.values.toList(),
+        categories = categories,
+        filters = filters,
+        openSearch = openSearch,
+        onSetSearchQuery = viewModel::setSearchQuery,
+        onSetSortOrder = viewModel::setSortOrder,
+        onUpdateFilters = viewModel::updateFilters,
+//        onExport = { viewModel.exportToCsv(context) },
+        onTransactionClick = { subjectId ->
+            navController.navigate("account/$subjectId")
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TransactionsScreenContent(
+    modifier: Modifier = Modifier,
+    filteredTransactions: LazyPagingItems<Transaction>,
+    transactionTypes: List<TransactionType>,
+    categories: List<Category>,
+    filters: TransactionFilters,
+    openSearch: Boolean = false,
+    onSetSearchQuery: (String) -> Unit,
+    onSetSortOrder: (SortOrder) -> Unit,
+    onUpdateFilters: (TransactionFilters) -> Unit,
+//    onExport: suspend () -> Unit,
+    onTransactionClick: (Long) -> Unit
+) {
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
 
     var showBottomSheet by remember { mutableStateOf(false) }
-    var searchVisible by remember { mutableStateOf(false) }
+    var searchVisible by rememberSaveable { mutableStateOf(openSearch) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
-    Scaffold(topBar = { ->
-        TopAppBar(title = { ->
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(searchVisible) {
+        if (searchVisible) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    Scaffold(topBar = {
+        TopAppBar(title = {
             if (searchVisible) {
                 TextField(
                     value = filters.searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search transactions...") },
+                    onValueChange = onSetSearchQuery,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    placeholder = { Text("Search...") },
                     singleLine = true,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
@@ -102,7 +157,10 @@ fun TransactionsScreen(
             }
         }, navigationIcon = {
             if (searchVisible) {
-                IconButton(onClick = { searchVisible = false }) {
+                IconButton(onClick = {
+                    searchVisible = false
+                    onSetSearchQuery("")
+                }) {
                     Icon(
                         painter = painterResource(id = R.drawable.outline_arrow_back_24),
                         contentDescription = "Close Search"
@@ -120,6 +178,12 @@ fun TransactionsScreen(
                     painter = painterResource(id = R.drawable.filter), contentDescription = "Filter"
                 )
             }
+//            IconButton(onClick = { scope.launch { onExport() } }) {
+//                Icon(
+//                    painter = painterResource(id = R.drawable.csv_export),
+//                    contentDescription = "Export"
+//                )
+//            }
             Box {
                 IconButton(onClick = { sortMenuExpanded = true }) {
                     Icon(
@@ -138,7 +202,7 @@ fun TransactionsScreen(
                             }
                             Text(label)
                         }, onClick = {
-                            viewModel.setSortOrder(order)
+                            onSetSortOrder(order)
                             sortMenuExpanded = false
                         }, trailingIcon = {
                             if (filters.sortOrder == order) {
@@ -160,34 +224,54 @@ fun TransactionsScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            ActiveFiltersGroup(
-                filters = filters,
-                categories = categories,
-                transactionTypes = transactionTypes.values.toList(),
-                onRemoveFilter = { updatedFilters -> viewModel.updateFilters(updatedFilters) })
-            Spacer(modifier = Modifier.height(16.dp))
-            LazyColumn(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    filteredTransactions.itemCount,
-                    key = filteredTransactions.itemKey { it.id }) { index ->
-                    val transaction = filteredTransactions[index]
-                    if (transaction != null) {
-                        TransactionListItem(
-                            transaction = transaction,
-                            style = TransactionItemStyle.TWO_LINE,
-                            onSubjectClick = { subjectId ->
-                                navController.navigate("account/$subjectId")
-                            })
-                    }
+            val hasActiveFilters =
+                filters.natureFilter != null || filters.typeFilters.isNotEmpty() || filters.categoryFilters.isNotEmpty()
 
+            if (hasActiveFilters) {
+                val categoryMap = remember(categories) { categories.associateBy { it.id } }
+                val typeMap = remember(transactionTypes) { transactionTypes.associateBy { it.id } }
+
+                ActiveFiltersGroup(
+                    filters = filters,
+                    categoryMap = categoryMap,
+                    typeMap = typeMap,
+                    onRemoveFilter = onUpdateFilters
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            if (filteredTransactions.itemCount == 0 && filteredTransactions.loadState.refresh is LoadState.NotLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No transactions found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp)
+                    )
                 }
-                when (val state = filteredTransactions.loadState.append) {
-                    is LoadState.Loading -> item { CircularProgressIndicator() }
-                    is LoadState.Error -> item { Text("Error loading more...") }
-                    else -> {}
+            } else {
+                LazyColumn(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        count = filteredTransactions.itemCount,
+                        key = filteredTransactions.itemKey { it.id },
+                        contentType = { "transaction_item" }) { index ->
+                        val transaction = filteredTransactions[index]
+                        if (transaction != null) {
+                            TransactionListItem(
+                                transaction = transaction,
+                                style = TransactionItemStyle.TWO_LINE,
+                                onSubjectClick = onTransactionClick
+                            )
+                        }
+
+                    }
+                    when (val state = filteredTransactions.loadState.append) {
+                        is LoadState.Loading -> item { CircularProgressIndicator() }
+                        is LoadState.Error -> item { Text("Error loading more...") }
+                        else -> {}
+                    }
                 }
             }
         }
@@ -200,10 +284,10 @@ fun TransactionsScreen(
 
                 FilterBottomSheetContent(
                     filters = stagedFilters,
-                    transactionTypes = transactionTypes.values.toList(),
+                    transactionTypes = transactionTypes,
                     categories = categories,
                     onApply = {
-                        viewModel.updateFilters(stagedFilters)
+                        onUpdateFilters(stagedFilters)
                         scope.launch { sheetState.hide() }.invokeOnCompletion {
                             if (!sheetState.isVisible) {
                                 showBottomSheet = false
@@ -227,8 +311,8 @@ fun TransactionsScreen(
 @Composable
 fun ActiveFiltersGroup(
     filters: TransactionFilters,
-    categories: List<Category>,
-    transactionTypes: List<TransactionType>,
+    categoryMap: Map<Int, Category>,
+    typeMap: Map<Int, TransactionType>,
     onRemoveFilter: (TransactionFilters) -> Unit
 ) {
     FlowRow(
@@ -247,7 +331,7 @@ fun ActiveFiltersGroup(
                 })
         }
         filters.typeFilters.forEach { typeId ->
-            val typeName = transactionTypes.find { it.id == typeId }?.finalDisplayName ?: "Type"
+            val typeName = typeMap[typeId]?.finalDisplayName ?: "Type"
             InputChip(
                 selected = true,
                 onClick = { onRemoveFilter(filters.copy(typeFilters = filters.typeFilters - typeId)) },
@@ -259,7 +343,7 @@ fun ActiveFiltersGroup(
                 })
         }
         filters.categoryFilters.forEach { catId ->
-            val catName = categories.find { it.id == catId }?.name ?: "Category"
+            val catName = categoryMap[catId]?.name ?: "Category"
             InputChip(
                 selected = true,
                 onClick = { onRemoveFilter(filters.copy(categoryFilters = filters.categoryFilters - catId)) },
@@ -286,14 +370,13 @@ fun FilterBottomSheetContent(
     val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .weight(1f, fill = false)
                 .verticalScroll(scrollState)
+                .padding(16.dp)
         ) {
             Text("NATURE", style = MaterialTheme.typography.labelMedium)
             FlowRow(
@@ -324,24 +407,27 @@ fun FilterBottomSheetContent(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-//            Text("CATEGORY", style = MaterialTheme.typography.labelMedium)
-//            FlowRow(
-//                horizontalArrangement = Arrangement.spacedBy(8.dp),
-//            ) {
-//                categories.forEach { category ->
-//                    val isSelected = filters.categoryFilters.contains(category.id)
-//                    FilterChip(selected = isSelected, onClick = {
-//                        val newCats =
-//                            if (isSelected) filters.categoryFilters - category.id else filters.categoryFilters + category.id
-//                        onFilterChange(filters.copy(categoryFilters = newCats))
-//                    }, label = { Text(category.name) })
-//                }
-//            }
-//            Spacer(modifier = Modifier.height(16.dp))
+            Text("CATEGORY", style = MaterialTheme.typography.labelMedium)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                categories.forEach { category ->
+                    val isSelected = filters.categoryFilters.contains(category.id)
+                    FilterChip(selected = isSelected, onClick = {
+                        val newCats =
+                            if (isSelected) filters.categoryFilters - category.id else filters.categoryFilters + category.id
+                        onFilterChange(filters.copy(categoryFilters = newCats))
+                    }, label = { Text(category.name) })
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider()
         Row(
-            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.End
         ) {
             Button(onClick = onCancel) { Text("CANCEL") }
             Spacer(modifier = Modifier.width(8.dp))
@@ -357,7 +443,73 @@ fun FilterBottomSheetContent(
 fun TransactionsScreenPreview() {
     AppTheme {
         val navController = rememberNavController()
-        TransactionsScreen(navController = navController)
+        val mockTransactions = listOf<Transaction>(
+            Transaction(
+                id = 1L,
+                message = "Money received from John Doe",
+                amount = 1500.0,
+                cost = 0.0,
+                code = "RKJ82910",
+                transactionTime = LocalDateTime.now(),
+                subject = null,
+                type = com.kimaita.monies.models.TransactionType(
+                    name = "Received",
+                    isInc = true,
+                    id = 1,
+                    displayName = "Received",
+                ),
+                category = com.kimaita.monies.models.Category(id = 1, name = "General"),
+                isInc = true
+            ),
+            Transaction(
+                id = 2L,
+                message = "Paid to Supermarket",
+                amount = 2450.0,
+                cost = 25.0,
+                code = "SPO29102",
+                transactionTime = LocalDateTime.now().minusDays(1),
+                subject = null,
+                type = com.kimaita.monies.models.TransactionType(
+                    name = "Paybill",
+                    isInc = false,
+                    id = 2,
+                    displayName = "Paybill"
+                ),
+                category = com.kimaita.monies.models.Category(id = 2, name = "Groceries"),
+                isInc = false
+            ),
+            Transaction(
+                id = 3L,
+                message = "Sent to Jane Smith",
+                amount = 500.0,
+                cost = 12.0,
+                code = "TRX11022",
+                transactionTime = LocalDateTime.now().minusHours(5),
+                subject = null,
+                type = com.kimaita.monies.models.TransactionType(
+                    name = "Sent",
+                    isInc = false,
+                    id = 3,
+                    displayName = "Send Money"
+                ),
+                category = null,
+                isInc = false
+            )
+        )
+        val pagingData = PagingData.from(mockTransactions)
+        val filteredTransactions =
+            flowOf(pagingData).collectAsLazyPagingItems()
+
+        TransactionsScreenContent(
+            filteredTransactions = filteredTransactions,
+            transactionTypes = emptyList(),
+            categories = emptyList(),
+            filters = TransactionFilters(),
+            onSetSearchQuery = {},
+            onSetSortOrder = {},
+            onUpdateFilters = {},
+//            onExport = {},
+            onTransactionClick = {})
     }
 }
 

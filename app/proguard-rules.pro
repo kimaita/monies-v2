@@ -19,3 +19,6 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep your data/DTO models if anything serializes them reflectively
+-keep class com.kimaita.monies.models.** { *; }

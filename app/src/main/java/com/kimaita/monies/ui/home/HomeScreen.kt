@@ -1,32 +1,42 @@
 package com.kimaita.monies.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,134 +46,291 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.kimaita.monies.R
+import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
-import com.kimaita.monies.ui.components.HighlightsFilter
-import com.kimaita.monies.ui.components.TimeFilter
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.components.TransactionListItem
-import com.kimaita.monies.ui.theme.AppTheme
-import com.kimaita.monies.ui.theme.RedExpense
 import java.text.NumberFormat
-import kotlin.math.absoluteValue
+import kotlin.math.abs
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val filters by viewModel.filters.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
     HomeScreenContent(
         modifier = modifier,
-        onViewAllTransactionsClick = { navController.navigate("transactions") },
-        onViewAnalyticsClick = { navController.navigate("analytics") },
+        onViewAllTransactions = { navController.navigate("transactions") },
+        onSearch = { navController.navigate("transactions?search=true") },
+        onViewAnalytics = { navController.navigate("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
+        onSubjectClick = { subjectId -> navController.navigate("account/$subjectId") },
         uiState = uiState,
-        filters = filters,
-        navController = navController,
-        onMenuClick = { /* TODO: Open drawer */ },
+        filter = filters,
+        isSyncing = isSyncing
 
-        )
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenContent(
     modifier: Modifier = Modifier,
-    onMenuClick: () -> Unit,
-    onViewAllTransactionsClick: () -> Unit,
-    onViewAnalyticsClick: () -> Unit,
-    onTimeFilterChange: (TimeFilter) -> Unit,
-    navController: NavController,
     uiState: HomeUiState,
-    filters: TimeFilter,
+    filter: TimeFilter,
+    isSyncing: Boolean = false,
+    onTimeFilterChange: (TimeFilter) -> Unit,
+    onViewAllTransactions: () -> Unit,
+    onViewAnalytics: () -> Unit,
+    onSubjectClick: (Long) -> Unit,
+    onSearch: () -> Unit = {},
 ) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface, topBar = {
-            TopAppBar(
-                title = {
-                    uiState.phoneNumber?.let {
-                        Text(
-                            it, style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                },
-//                navigationIcon = {
-//                IconButton(onClick = onMenuClick) {
-//                    Icon(
-//                        painter = painterResource(R.drawable.menu), contentDescription = "Menu"
-//                    )
-//                }
-//            },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = {
+                        uiState.phoneNumber?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onSearch) {
+                            Icon(
+                                painter = painterResource(R.drawable.search),
+                                contentDescription = "Search transactions"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
-            )
-        }) { paddingValues ->
+                AnimatedVisibility(visible = isSyncing) { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            }
+        },
+    ) { pad ->
         Column(
-            modifier = modifier
+            modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(pad)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("MPESA BALANCE", style = MaterialTheme.typography.labelSmall)
-            CurrencyText(
-                uiState.mpesaBalance
-            ) { text ->
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                "M-PESA BALANCE",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            CurrencyText(uiState.mpesaBalance) {
                 Text(
-                    text = text,
+                    it,
                     style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
+            Spacer(Modifier.height(12.dp))
+            ChangePill(change = uiState.changeInTotal, filter = filter, onClick = onViewAnalytics)
 
-            Spacer(modifier = Modifier.height(24.dp))
-
+            Spacer(Modifier.height(20.dp))
             OtherBalances(
-                uiState.availableFuliza,
-                uiState.outstandingFuliza,
-                uiState.lockSavings,
-                uiState.mshwariBalance,
-                uiState.mshwariLoan
+                availableFuliza = uiState.availableFuliza,
+                outstandingFuliza = uiState.outstandingFuliza,
+                mshwariBalance = uiState.mshwariBalance,
+                mshwariLoan = uiState.mshwariLoan,
+                lockSavings = uiState.lockSavings,
             )
-            Spacer(modifier = Modifier.height(24.dp))
 
+            Spacer(Modifier.height(20.dp))
+            InOutCard(
+                filter = filter,
+                income = uiState.incomeVsExpense.income,
+                expense = uiState.incomeVsExpense.expense,
+                onPeriod = onTimeFilterChange,
+                onAnalytics = onViewAnalytics,
+            )
+
+            Spacer(Modifier.height(20.dp))
             Transactions(
                 transactions = uiState.recentTransactions,
-                onViewAllClick = onViewAllTransactionsClick,
-                navController = navController
+                onViewAllClick = onViewAllTransactions,
+                onSubjectClick = onSubjectClick,
             )
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(24.dp))
+/* ---------------- change-in-balance pill ---------------- */
 
-            Highlights(
-                filters = filters,
-                onFilterChange = onTimeFilterChange,
-                onViewAnalyticsClick = onViewAnalyticsClick,
-                income = uiState.incomeVsExpense.income.toFloat(),
-                expense = uiState.incomeVsExpense.expense.toFloat(),
-                largestIncome = uiState.largestIncome,
-                largestExpense = uiState.largestExpense,
-                transactionCount = uiState.transactionCount,
-                totalCost = uiState.totalTransactionCost,
-                changeInTotal = uiState.changeInTotal
+@Composable
+private fun ChangePill(change: Double?, filter: TimeFilter, onClick: () -> Unit) {
+    if (change == null) return
+    val up = change >= 0
+    val fg = if (up) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    val bg = fg.copy(alpha = 0.12f)
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(if (up) "▲" else "▼", color = fg, style = MaterialTheme.typography.labelSmall)
+        Text(
+            "${if (up) "+" else "−"}${money(abs(change))} ${periodWord(filter)}",
+            color = fg,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text("›", color = fg.copy(alpha = 0.6f))
+    }
+}
+
+/* ---------------- in & out card ---------------- */
+
+@Composable
+private fun InOutCard(
+    filter: TimeFilter, income: Double, expense: Double,
+    onPeriod: (TimeFilter) -> Unit, onAnalytics: () -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    val net = income - expense
+    val inFraction = (income / (income + expense).coerceAtLeast(1.0)).toFloat()
+
+    Card(
+        Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cs.surfaceContainerLow),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Text(
+                    "IN & OUT",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = cs.onSurfaceVariant
+                )
+                PeriodSegment(filter, onPeriod)
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                IoColumn("IN", income, cs.primary, Modifier.weight(1f))
+                IoColumn("OUT", expense, cs.onSurface, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(14.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(cs.error.copy(alpha = 0.25f))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(inFraction)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(cs.primary)
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Text(
+                    buildString {
+                        append("Net "); append(if (net >= 0) "+" else "−"); append(
+                        money(
+                            abs(net)
+                        )
+                    )
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (net >= 0) cs.primary else cs.error,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                TextButton(
+                    onClick = onAnalytics,
+                    contentPadding = PaddingValues(0.dp)
+                ) { Text("Analytics ›") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IoColumn(label: String, value: Double, color: Color, modifier: Modifier = Modifier) =
+    Column(modifier) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(color)
             )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            money(value),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+    }
 
-            Spacer(modifier = Modifier.height(24.dp))
+@Composable
+private fun PeriodSegment(filter: TimeFilter, onPeriod: (TimeFilter) -> Unit) {
+    val options =
+        listOf("Day" to TimeFilter.DAY, "Week" to TimeFilter.WEEK, "Month" to TimeFilter.MONTH)
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(cs.surfaceVariant.copy(alpha = 0.6f))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        options.forEach { (label, value) ->
+            val on = filter == value
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (on) cs.surface else Color.Transparent)
+                    .clickable { onPeriod(value) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+            ) {
+                Text(
+                    label, style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (on) cs.onSurface else cs.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -172,153 +339,174 @@ fun HomeScreenContent(
 fun OtherBalances(
     availableFuliza: Double?,
     outstandingFuliza: Double?,
-    lockSavings: Double?,
     mshwariBalance: Double?,
-    mshwariLoan: Double?
+    mshwariLoan: Double?,
+    lockSavings: Double?,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val fulizaMax = (availableFuliza ?: 0.0) + (outstandingFuliza ?: 0.0)
+    val hasFuliza = fulizaMax > 0.0
+    val owedFuliza = (outstandingFuliza ?: 0.0) > 0.0
+    val hasLoan = (mshwariLoan ?: 0.0) > 0.0
+
     Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(16.dp)
+        Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+    ) {
+        Text(
+            "OTHER BALANCES",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+        Crossfade(targetState = expanded, label = "balances") { open ->
+            if (!open) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (hasFuliza) Pill {
+                        Svc("Fuliza")
+                        if (owedFuliza) {
+                            Owe(money(outstandingFuliza!!)); Muted("/${money(fulizaMax)}")
+                        } else {
+                            Strong(money(availableFuliza ?: 0.0)); Muted("available")
+                        }
+                    }
+                    mshwariBalance?.let { Pill { Svc("M-Shwari"); Strong(money(it)) } }
+                    if (hasLoan) Pill { Svc("M-Shwari loan"); Owe(money(mshwariLoan!!)) }
+                    lockSavings?.let { Pill { Svc("Lock"); Strong(money(it)) } }
+                    Pill(onClick = { expanded = true }) {
+                        Text(
+                            "More ›",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            } else {
+                OtherBalancesPanel(
+                    availableFuliza,
+                    outstandingFuliza,
+                    fulizaMax,
+                    owedFuliza,
+                    mshwariBalance,
+                    mshwariLoan,
+                    hasLoan,
+                    lockSavings,
+                    onCollapse = { expanded = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun OtherBalancesPanel(
+    availableFuliza: Double?, outstandingFuliza: Double?, fulizaMax: Double, owedFuliza: Boolean,
+    mshwariBalance: Double?, mshwariLoan: Double?, hasLoan: Boolean, lockSavings: Double?,
+    onCollapse: () -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(cs.surfaceContainerLow)
+            .padding(horizontal = 16.dp),
     ) {
         Row(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded },
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .clickable(onClick = onCollapse)
+                .padding(vertical = 12.dp),
+            Arrangement.SpaceBetween, Alignment.CenterVertically
         ) {
             Text(
-                "OTHER BALANCES",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "Balances",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
             )
-            Icon(
-                painter = painterResource(if (expanded) R.drawable.collapse else R.drawable.expand),
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+           Icon(painterResource(R.drawable.collapse), "Expand")
+        }
+        if (fulizaMax > 0.0) PanelRow(divider = false) {
+            RowLine(
+                "Fuliza",
+                if (owedFuliza) "${money(outstandingFuliza ?: 0.0)} used" else "${
+                    money(availableFuliza ?: 0.0)
+                } available",
+                owed = owedFuliza
             )
-        }
-        if (expanded) {
-            Spacer(modifier = Modifier.height(16.dp))
-            MshwariBalance(mshwariBalance, lockSavings, mshwariLoan)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-            FulizaBalance(availableFuliza, outstandingFuliza)
-        }
-    }
-}
-
-@Composable
-fun FulizaBalance(availableFuliza: Double?, outstandingFuliza: Double?) {
-    Column(
-        modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            "FULIZA", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Available",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Spacer(Modifier.height(9.dp))
+            val used = ((outstandingFuliza ?: 0.0) / fulizaMax).toFloat()
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(cs.surfaceVariant)
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(used)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(cs.error)
                 )
-                CurrencyText(
-                    availableFuliza ?: 0.0
-                ) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Borrowed",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                CurrencyText(
-                    outstandingFuliza ?: 0.0
-                ) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = RedExpense
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun MshwariBalance(balance: Double?, lockSavings: Double?, loan: Double?) {
-    Column(
-        modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            "M-SHWARI",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Balance",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                CurrencyText(balance ?: 0.0) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Lock Savings",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                CurrencyText(lockSavings ?: 0.0) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Column {
+            Spacer(Modifier.height(7.dp))
             Text(
-                "Outstanding Loan",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "${money(outstandingFuliza ?: 0.0)} used · ${money(availableFuliza ?: 0.0)} available · ${
+                    money(
+                        fulizaMax
+                    )
+                } limit",
+                style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant
             )
-            CurrencyText(loan ?: 0.0) { text ->
-                Text(
-                    text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = RedExpense
-                )
-            }
         }
+        mshwariBalance?.let { PanelRow { RowLine("M-Shwari balance", money(it)) } }
+        if (hasLoan) PanelRow { RowLine("M-Shwari loan", money(mshwariLoan ?: 0.0), owed = true) }
+        lockSavings?.let { PanelRow { RowLine("Lock savings", money(it)) } }
+        Spacer(Modifier.height(8.dp))
     }
 }
 
+@Composable
+private fun PanelRow(divider: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
+    if (divider) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    Column(Modifier.padding(vertical = 13.dp), content = content)
+}
+
+@Composable
+private fun RowLine(name: String, value: String, owed: Boolean = false) =
+    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Text(
+            value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+            color = if (owed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+        )
+    }
+
+/* pill primitives */
+@Composable
+private fun Pill(onClick: (() -> Unit)? = null, content: @Composable RowScope.() -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, cs.outlineVariant, RoundedCornerShape(50))
+            .background(cs.surface)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        content = content,
+    )
+}
 
 @Composable
 fun Transactions(
-    transactions: List<Transaction?>, onViewAllClick: () -> Unit, navController: NavController
+    transactions: List<Transaction>, onViewAllClick: () -> Unit, onSubjectClick: (Long) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -326,6 +514,7 @@ fun Transactions(
             .clickable { onViewAllClick() },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
+
     ) {
         Text(
             "TRANSACTIONS",
@@ -347,257 +536,58 @@ fun Transactions(
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(16.dp)
     ) {
-        transactions.forEach { transaction ->
-            if (transaction != null) {
+        if (transactions.isEmpty()) {
+            Text(
+                "No transactions yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+            )
+        } else {
+            transactions.forEach { transaction ->
                 TransactionListItem(
                     transaction = transaction,
                     style = TransactionItemStyle.TWO_LINE,
-                    onSubjectClick = { subjectId ->
-                        navController.navigate("account/$subjectId")
-                    })
-
+                    onSubjectClick = onSubjectClick
+                )
             }
         }
     }
 }
 
+@Composable
+private fun Svc(t: String) = Text(
+    t,
+    style = MaterialTheme.typography.labelMedium,
+    color = MaterialTheme.colorScheme.onSurfaceVariant
+)
 
 @Composable
-fun Highlights(
-    filters: TimeFilter,
-    onFilterChange: (TimeFilter) -> Unit,
-    onViewAnalyticsClick: () -> Unit,
-    income: Float,
-    expense: Float,
-    largestIncome: Transaction?,
-    largestExpense: Transaction?,
-    transactionCount: Int,
-    totalCost: Double,
-    changeInTotal: Double,
-) {
-    remember {
-        NumberFormat.getNumberInstance().apply {
-            maximumFractionDigits = 2
-            minimumFractionDigits = 2
-        }
-    }
-    val total = income + expense
+private fun Strong(t: String) =
+    Text(t, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onViewAnalyticsClick() },
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "HIGHLIGHTS",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Icon(
-                painter = painterResource(R.drawable.outline_arrow_forward_24),
-                contentDescription = "View Analytics",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        HighlightsFilter(selectedFilter = filters, onFilterChange = onFilterChange)
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp, 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // INC Column
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painterResource(R.drawable.outline_incoming),
-                        contentDescription = "Income",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "INC",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-
-                CurrencyText(income.toDouble(), modifier = Modifier.fillMaxWidth()) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        autoSize = TextAutoSize.StepBased(maxFontSize = MaterialTheme.typography.titleLarge.fontSize)
-                    )
-                }
-//                Text(
-//                    "KES350 MORE",
-//                    style = MaterialTheme.typography.labelSmall,
-//                    color = MaterialTheme.colorScheme.onSurfaceVariant
-//                )
-
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Largest Transaction",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                CurrencyText(largestIncome?.amount ?: 0.0) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Text(
-                    text = largestIncome?.subject?.name?.uppercase() ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-            }
-            // EXP Column
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painterResource(R.drawable.outline_outgoing),
-                        contentDescription = "Expense",
-                        tint = RedExpense
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "EXP",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = RedExpense,
-
-                        )
-                }
-                Spacer(Modifier.height(8.dp))
-
-                CurrencyText(expense.toDouble()) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        autoSize = TextAutoSize.StepBased(maxFontSize = MaterialTheme.typography.titleLarge.fontSize)
-
-                    )
-                }
-//                Text(
-//                    "KES 500 LESS",
-//                    style = MaterialTheme.typography.labelSmall,
-//                    color = MaterialTheme.colorScheme.onSurfaceVariant
-//                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Largest Transaction",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                CurrencyText(largestExpense?.amount ?: 0.0) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Text(
-                    text = largestExpense?.subject?.name?.uppercase() ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        // Total section
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp, 0.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                "Total Moved",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CurrencyText(total.absoluteValue.toDouble()) { text ->
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .background(
-                            MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 6.dp)
-                ) {
-                    Text(
-                        "$changeInTotal%",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                Text(
-                    "$transactionCount Transactions",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-
-                VerticalDivider(
-                    modifier = Modifier.fillMaxHeight(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    thickness = 1.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-
-                CurrencyText(totalCost) { text ->
-                    Text(
-                        "Cost $text",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-            }
-        }
-    }
-}
-
-
-@Preview(showBackground = true)
 @Composable
-fun DefaultPreview() {
-    AppTheme {
-        val navController = rememberNavController()
-        HomeScreenContent(
-            onMenuClick = {},
-            onViewAllTransactionsClick = {},
-            onViewAnalyticsClick = {},
-            onTimeFilterChange = {},
-            uiState = HomeUiState(),
-            filters = TimeFilter.WEEK,
-            navController = navController
-        )
-    }
+private fun Owe(t: String) = Text(
+    t,
+    style = MaterialTheme.typography.labelMedium,
+    fontWeight = FontWeight.Bold,
+    color = MaterialTheme.colorScheme.error
+)
+
+@Composable
+private fun Muted(t: String) = Text(
+    t,
+    style = MaterialTheme.typography.labelMedium,
+    color = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
+
+private fun money(v: Double): String = NumberFormat.getIntegerInstance().format(v.toLong())
+private fun periodWord(f: TimeFilter): String = when (f) {
+    TimeFilter.DAY -> "today"; TimeFilter.WEEK -> "this week"; TimeFilter.MONTH -> "this month"
+    TimeFilter.QUARTER -> "this quarter"; TimeFilter.SIX_MONTHS -> "last 6 months"
+    TimeFilter.YTD -> "this year"; TimeFilter.ALL -> "all time"; is TimeFilter.CustomRange -> "selected range"
 }

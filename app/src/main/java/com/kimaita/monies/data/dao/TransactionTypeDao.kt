@@ -5,10 +5,11 @@ import androidx.room.Query
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.database.models.TransactionType
 import kotlinx.coroutines.flow.Flow
+
 @Dao
 interface TransactionTypeDao : BaseDao<TransactionType> {
     @Query("SELECT * FROM transaction_types")
-    fun getTransactionTypes(): Flow<List<TransactionType>>
+    fun getAll(): Flow<List<TransactionType>>
 
     @Query("SELECT provider FROM transaction_types")
     fun getProviders(): List<String>
@@ -18,17 +19,20 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
      */
     @Query(
         """
-        SELECT tt.name, SUM(t.amount) as total, SUM(t.cost) as totalCost
-        FROM transactions AS t
-        JOIN transaction_types AS tt ON t.transactionType = tt.id
-        WHERE tt.isInc = 0
-        AND (:startDate IS NULL OR t.transactionTime >= :startDate)
-        AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-        GROUP BY tt.id
+            SELECT tt.name, SUM(t.amount) AS total, SUM(t.cost) AS totalCost
+            FROM transactions AS t
+            JOIN transaction_types AS tt ON t.transactionType = tt.id
+            WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
+              AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+              AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+              AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+              AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
+            GROUP BY tt.id
+            ORDER BY total DESC
         """
     )
     fun getTypeSpending(
-        startDate: String?,
-        endDate: String?
+        startDate: String? = null, endDate: String? = null,
+        subjectId: List<Long>? = null, categoryId: List<Int>? = null, natureFilter: Boolean? = null,
     ): Flow<List<CategorySpending>>
 }

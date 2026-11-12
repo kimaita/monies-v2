@@ -1,7 +1,15 @@
 package com.kimaita.monies.data.dao
 
 import androidx.room.Dao
+import androidx.room.Query
 import com.kimaita.monies.data.database.models.UserAccount
+import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface AccountDao : BaseDao<UserAccount> {}
+interface AccountDao : BaseDao<UserAccount> {
+
+    @Query("""SELECT * FROM accounts""")
+    fun getAll(): Flow<List<UserAccount>>
+
+
+}

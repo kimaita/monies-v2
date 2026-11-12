@@ -2,13 +2,18 @@ package com.kimaita.monies
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,29 +21,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.kimaita.monies.data.DefaultTransactionsRepository
-import com.kimaita.monies.ui.PermissionScreen
-import com.kimaita.monies.ui.account.AccountScreen
-import com.kimaita.monies.ui.analytics.AnalyticsScreen
-import com.kimaita.monies.ui.home.HomeScreen
-import com.kimaita.monies.ui.profile.ProfileScreen
+import com.kimaita.monies.services.SmsContentObserver
+import com.kimaita.monies.services.SmsSyncer
+import com.kimaita.monies.ui.MainScaffold
+import com.kimaita.monies.ui.SmsSyncProgress
+import com.kimaita.monies.ui.onboarding.FirstRunImportScreen
+import com.kimaita.monies.ui.onboarding.OnboardingScreen
+import com.kimaita.monies.ui.permission.PermissionScreen
+import com.kimaita.monies.ui.rememberSmsImportProgress
 import com.kimaita.monies.ui.theme.AppTheme
-import com.kimaita.monies.ui.transactions.TransactionsScreen
 import com.kimaita.monies.worker.SmsSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -46,12 +50,20 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var repository: DefaultTransactionsRepository
-    private val permissionsToRequest = arrayOf(
-        Manifest.permission.READ_SMS,
-        Manifest.permission.RECEIVE_SMS,
-        Manifest.permission.READ_PHONE_NUMBERS,
-        Manifest.permission.READ_PHONE_STATE
-    )
+
+    @Inject
+    lateinit var smsSyncer: SmsSyncer
+
+    @Inject
+    lateinit var smsContentObserver: SmsContentObserver
+    val permissionsToRequest: Array<String> = buildList {
+        add(Manifest.permission.READ_SMS)
+        add(Manifest.permission.RECEIVE_SMS)
+        add(Manifest.permission.READ_PHONE_NUMBERS)
+        add(Manifest.permission.READ_PHONE_STATE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            add(Manifest.permission.POST_NOTIFICATIONS)
+    }.toTypedArray()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,67 +71,98 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AppTheme {
+                val scope = rememberCoroutineScope()
+                var onboardingComplete by remember { mutableStateOf<Boolean?>(null) }
+                var hasRequiredPermissions by remember { mutableStateOf(checkPermissions()) }
 
-                var hasRequiredPermissions by remember {
-                    mutableStateOf(checkPermissions())
-                }
+                LaunchedEffect(Unit) { onboardingComplete = repository.isOnboardingComplete() }
 
-                val coroutineScope = rememberCoroutineScope()
+                val permissionsLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestMultiplePermissions()
+                ) { hasRequiredPermissions = checkPermissions() }
 
-                val permissionsLauncher =
-                    rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.RequestMultiplePermissions()
-                    ) { permissions ->
-                        val smsGranted = permissions[Manifest.permission.READ_SMS] ?: false
-                        hasRequiredPermissions = smsGranted
+                when {
+                    onboardingComplete == null ->
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surface)
+                        )
 
-                        if (smsGranted) {
-                            coroutineScope.launch {
-                                if (repository.isFirstRun()) {
-                                    Timber.i("Prepping FIRST RUN")
-                                    // FIRST RUN: Enqueue the heavy-duty WorkManager job.
-                                    val syncRequest =
-                                        OneTimeWorkRequestBuilder<SmsSyncWorker>().build()
-                                    WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                                        SmsSyncWorker.WORK_NAME,
-                                        ExistingWorkPolicy.KEEP,
-                                        syncRequest
+                    onboardingComplete == false ->
+                        OnboardingScreen(
+                            onSkip = {
+                                scope.launch { repository.setOnboardingComplete() }
+                                onboardingComplete = true
+                            },
+                            onFinish = {
+                                scope.launch { repository.setOnboardingComplete() }
+                                onboardingComplete = true
+                                if (!hasRequiredPermissions) permissionsLauncher.launch(
+                                    permissionsToRequest
+                                )
+                            },
+                        )
+
+                    !hasRequiredPermissions ->
+                        PermissionScreen(onGrantClick = {
+                            permissionsLauncher.launch(
+                                permissionsToRequest
+                            )
+                        })
+
+                    else -> {
+                        val importProgress by rememberSmsImportProgress(applicationContext)
+                        var firstRun by remember { mutableStateOf<Boolean?>(null) }
+
+                        LaunchedEffect(Unit) {
+                            val first = repository.isFirstRun()
+                            firstRun = first
+                            if (first) enqueueSmsImport() else smsSyncer.syncAll()
+                        }
+                        ObserveIncomingSms(smsContentObserver)
+
+                        val showImport = firstRun == true &&
+                                importProgress !is SmsSyncProgress.Done &&
+                                importProgress !is SmsSyncProgress.Failed
+
+                        Crossfade(targetState = showImport, label = "import-handoff") { importing ->
+                            when {
+                                firstRun == null ->
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surface)
+                                    )
+
+                                importing -> {
+                                    val p = importProgress as? SmsSyncProgress.Running
+                                    FirstRunImportScreen(
+                                        processed = p?.processed ?: 0,
+                                        total = p?.total,
+                                        year = p?.year
                                     )
                                 }
+
+                                else -> MainScaffold()
                             }
                         }
                     }
-
-                // --- Main UI Rendering ---
-                if (hasRequiredPermissions) {
-                    LaunchedEffect(Unit) {
-                        if (!repository.isFirstRun()) {
-                            repository.syncAllSms(applicationContext)
-                        }else{
-                            Timber.i("Prepping FIRST RUN")
-                            // FIRST RUN: Enqueue the heavy-duty WorkManager job.
-                            val syncRequest =
-                                OneTimeWorkRequestBuilder<SmsSyncWorker>().build()
-                            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                                SmsSyncWorker.WORK_NAME,
-                                ExistingWorkPolicy.KEEP,
-                                syncRequest
-                            )
-                        }
-                    }
-                    MoniesNavHost()
-                } else {
-                    LaunchedEffect(Unit) {
-                        permissionsLauncher.launch(permissionsToRequest)
-                    }
-                    PermissionScreen {
-                        permissionsLauncher.launch(permissionsToRequest)
-                    }
                 }
+
+
             }
         }
     }
 
+    private fun enqueueSmsImport() {
+        val request = OneTimeWorkRequestBuilder<SmsSyncWorker>().build()
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            SmsSyncWorker.WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
+    }
 
     private fun checkPermissions(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -128,40 +171,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun MoniesNavHost() {
-    val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "home") {
-        composable("home") {
-            HomeScreen(
-                navController = navController,
-//                viewModel = viewModel()
-            )
-        }
-        composable("transactions") {
-            TransactionsScreen(
-                navController = navController,
-                viewModel = hiltViewModel()
-            )
-        }
-        composable("analytics") {
-            AnalyticsScreen(
-                navController = navController,
-                viewModel = hiltViewModel()
-            )
-        }
-        composable("account") {
-            ProfileScreen(
-                navController = navController,
-                viewModel = hiltViewModel()
-            )
-        }
-        composable(
-            route = "account/{subjectId}",
-            arguments = listOf(navArgument("subjectId") { type = NavType.StringType })
-        ) {
-            AccountScreen(navController = navController)
+@Composable
+private fun ObserveIncomingSms(observer: SmsContentObserver) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            observer.start()
+            try {
+                awaitCancellation()
+            } finally {
+                observer.stop()
+            }
         }
     }
 }

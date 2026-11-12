@@ -1,448 +1,670 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monies | Smart Mobile Money Expense Tracker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #09090b; color: #ffffff; }
-        .font-mono-custom { font-family: 'JetBrains Mono', monospace; }
-        
-        .text-gradient {
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-image: linear-gradient(to right, #10b981, #0ea5e9);
-        }
-        
-        /* Dark mode grid */
-        .bg-grid {
-            background-size: 40px 40px;
-            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                              linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-        }
-        
-        /* Phone mockup adjusted for dark mode */
-        .phone-mockup {
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(16, 185, 129, 0.1);
-            border: 12px solid #18181b;
-            border-radius: 2.5rem;
-            overflow: hidden;
-            background-color: #000;
-            position: relative;
-        }
-        .phone-mockup::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 30%;
-            height: 24px;
-            background-color: #18181b;
-            border-bottom-left-radius: 12px;
-            border-bottom-right-radius: 12px;
-            z-index: 10;
-        }
-        
-        /* Chic gradient animation for features */
-        .gradient-border-card {
-            position: relative;
-            background: #18181b;
-            border-radius: 1.5rem;
-            z-index: 1;
-        }
-        .gradient-border-card::before {
-            content: "";
-            position: absolute;
-            inset: -2px;
-            border-radius: 1.6rem;
-            background: linear-gradient(45deg, #10b981, #0ea5e9, #3b82f6);
-            z-index: -1;
-            opacity: 0.3;
-            transition: opacity 0.3s ease;
-        }
-        .gradient-border-card:hover::before {
-            opacity: 1;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monies | Your M-PESA, sorted automatically</title>
+<meta name="description" content="Monies reads your M-PESA messages and shows your balance, Fuliza, M-Shwari and spending. Free, open source, and entirely on your phone.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* Colour tokens mirror the app: ui/theme/Color.kt + ui/onboarding/OnboardingStyle.kt */
+  :root {
+    --paper:#FFFDF6; --ink:#15130D; --body:#3F3A30; --muted:#7A7263;
+    --emerald:#0E8C5A; --emerald-deep:#0A5C3C; --coral:#FF6A45; --mint:#DBF3E5; --gold:#E7C78A;
+    --pos:#1E7F4F; --neg:#C2453A; --card:#FFFFFF; --rule:#ECE4D4; --sms:#F4F0E6; --chip:#EFE8D8;
+    --band:#F8F3E6; --bezel:#15130D; --on-emerald:#FFFFFF; --shadow:0 4px 14px rgba(21,19,13,.07);
+    --phone-shadow:0 30px 60px -20px rgba(21,19,13,.35);
+    --font:'Schibsted Grotesk',system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#000000; --ink:#F2EDE0; --body:#C9C2AF; --muted:#8C8574;
+      --emerald:#2FE08A; --emerald-deep:#9FF0C6; --coral:#FF8A66; --mint:#10241A; --gold:#E7C78A;
+      --pos:#2FE08A; --neg:#FF6F57; --card:#121212; --rule:#262626; --sms:#161616; --chip:#1E1C17;
+      --band:#0C0C0B; --bezel:#2A2825; --on-emerald:#06130D; --shadow:none; --phone-shadow:0 30px 60px -20px rgba(47,224,138,.18);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#000000; --ink:#F2EDE0; --body:#C9C2AF; --muted:#8C8574;
+    --emerald:#2FE08A; --emerald-deep:#9FF0C6; --coral:#FF8A66; --mint:#10241A; --gold:#E7C78A;
+    --pos:#2FE08A; --neg:#FF6F57; --card:#121212; --rule:#262626; --sms:#161616; --chip:#1E1C17;
+    --band:#0C0C0B; --bezel:#2A2825; --on-emerald:#06130D; --shadow:none; --phone-shadow:0 30px 60px -20px rgba(47,224,138,.18);
+  }
 
-        /* Funky Checklist Glow Effects */
-        .glow-check-done {
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
-        }
-        .glow-check-progress {
-            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
-        }
-    </style>
+  @property --sweep { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;scroll-padding-top:72px}
+  body{font-family:var(--font);background:var(--paper);color:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+  @media(min-width:900px){.wrap{padding:0 40px}}
+  .mono{font-family:'Space Mono',monospace}
+  h1,h2,h3{font-family:var(--font);font-weight:800;color:var(--ink);letter-spacing:-.035em;line-height:1.02}
+  h1{font-size:clamp(2.8rem,6.2vw,5.4rem)}
+  h2{font-size:clamp(2rem,4.2vw,3.2rem)}
+  h3{font-size:1.2rem;letter-spacing:-.02em;font-weight:700}
+  .lede{font-size:1.15rem;max-width:36rem;margin-top:18px}
+  section{padding:104px 0}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:18px;padding:14px 16px;box-shadow:var(--shadow)}
+  .k{font-family:'Space Mono';font-size:.6rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+
+  /* soft tinted bands instead of hard rules between sections */
+  .band{background:var(--band);border-radius:44px;margin:0 10px}
+  @media(min-width:1100px){.band{margin:0 24px}}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:10px;background:var(--emerald);color:var(--on-emerald);font-weight:600;padding:14px 26px;border-radius:999px;text-decoration:none;transition:transform .15s}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--rule)}
+  .btn svg{width:20px;height:20px;fill:currentColor}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.4rem;color:var(--ink);text-decoration:none;letter-spacing:-.03em}
+  .mark{width:32px;height:32px;border-radius:10px;background:var(--emerald);color:var(--on-emerald);display:grid;place-items:center;font-size:1.05rem}
+  .links{display:none;gap:30px;font-size:.95rem;font-weight:500}
+  .links a{text-decoration:none;color:var(--muted)} .links a:hover{color:var(--ink)}
+  nav .btn{padding:9px 18px;font-size:.88rem}
+  @media(min-width:860px){.links{display:flex}}
+
+  /* hero */
+  .hero{padding:56px 0 72px}
+  .hero .wrap{display:grid;gap:56px;align-items:center}
+  @media(min-width:960px){.hero{padding:48px 0 64px;min-height:calc(100svh - 64px);display:flex;align-items:center}.hero .wrap{width:100%;grid-template-columns:1.1fr .9fr;gap:40px}}
+  .hero .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+  .hero .cta + small{display:block;margin-top:16px;color:var(--muted);font-size:.88rem}
+  .hero{overflow-x:clip}
+  .hero-visual{position:relative;display:flex;justify-content:center;isolation:isolate}
+  .hero .phone{position:relative;max-width:350px;min-height:0}
+  /* backdrop: a soft drifting glow, with rings that ripple out like a message landing */
+  .glow{position:absolute;inset:-6% -12%;z-index:-2;filter:blur(48px);pointer-events:none}
+  .glow i{position:absolute;border-radius:50%;aspect-ratio:1}
+  .glow i:nth-child(1){width:58%;left:6%;top:8%;background:color-mix(in srgb,var(--emerald) 22%,var(--mint))}
+  .glow i:nth-child(2){width:42%;right:4%;top:42%;background:color-mix(in srgb,var(--gold) 70%,transparent)}
+  .glow i:nth-child(3){width:36%;left:28%;bottom:0;background:color-mix(in srgb,var(--emerald) 30%,transparent)}
+  .ripples{position:absolute;top:46%;left:50%;width:0;height:0;z-index:-1;pointer-events:none}
+  .ripples span{position:absolute;width:320px;height:320px;left:-160px;top:-160px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--emerald) 40%,transparent);opacity:0}
+  @media (prefers-reduced-motion:no-preference){
+    .glow i:nth-child(1){animation:drift1 18s ease-in-out infinite alternate}
+    .glow i:nth-child(2){animation:drift2 22s ease-in-out infinite alternate}
+    .glow i:nth-child(3){animation:drift1 26s ease-in-out infinite alternate-reverse}
+    @keyframes drift1{to{transform:translate(18%,12%) scale(1.12)}}
+    @keyframes drift2{to{transform:translate(-22%,-14%) scale(.9)}}
+    .ripples span{animation:ripple 6s cubic-bezier(.2,.6,.3,1) infinite}
+    .ripples span:nth-child(2){animation-delay:2s}
+    .ripples span:nth-child(3){animation-delay:4s}
+    @keyframes ripple{0%{transform:scale(.75);opacity:0}12%{opacity:.9}100%{transform:scale(1.9);opacity:0}}
+  }
+
+  /* phone frame around each mock screen */
+  .phone{width:100%;max-width:330px;background:var(--paper);border:9px solid var(--bezel);border-radius:38px;box-shadow:var(--phone-shadow);padding:30px 14px 22px;display:flex;flex-direction:column;gap:12px;position:relative;min-height:470px}
+  .phone::before{content:'';position:absolute;top:8px;left:50%;transform:translateX(-50%);width:62px;height:6px;border-radius:6px;background:var(--bezel)}
+  .phone-title{font-weight:800;font-size:1.05rem;color:var(--ink);letter-spacing:-.02em;padding:0 4px}
+  /* the bob lives on a wrapper so it doesn't fight the reveal transform */
+  .bob{width:100%;display:flex;justify-content:center}
+  @media (prefers-reduced-motion:no-preference){
+    .bob{animation:bob 7s ease-in-out infinite}
+    @keyframes bob{50%{transform:translateY(-8px)}}
+    .feature.flip .bob{animation-delay:-3s}
+  }
+
+  /* home screen mock (mirrors ui/home/HomeScreen.kt) */
+  .home{gap:14px}
+  .home .top{display:flex;justify-content:space-between;align-items:center;padding:0 2px}
+  .home .num{font-family:'Space Mono';font-size:.68rem;color:var(--muted)}
+  .syncbar{height:3px;border-radius:3px;background:var(--chip);overflow:hidden;transition:opacity .4s ease 2.2s}
+  .syncbar b{display:block;height:100%;width:0;background:var(--emerald);transition:width 1.6s ease .3s}
+  .in .syncbar b{width:100%}
+  .in .syncbar{opacity:0}
+  .bal{font-weight:800;font-size:2.2rem;white-space:nowrap;color:var(--ink);letter-spacing:-.04em;line-height:1.05;margin-top:2px}
+  .bal small{font-size:.45em;color:var(--muted);letter-spacing:0}
+  .chg{display:inline-flex;gap:6px;align-items:center;background:var(--mint);color:var(--emerald-deep);border-radius:999px;padding:5px 12px;font-size:.76rem;font-weight:600;margin-top:10px}
+  .pills{display:flex;gap:6px;overflow:hidden;margin-top:8px;-webkit-mask-image:linear-gradient(90deg,#000 80%,transparent);mask-image:linear-gradient(90deg,#000 80%,transparent)}
+  .bpill{flex:none;background:var(--card);border:1px solid var(--rule);border-radius:999px;padding:5px 11px;font-size:.72rem;white-space:nowrap;color:var(--muted)}
+  .bpill b{color:var(--ink);font-weight:700;margin-left:3px}
+  .io-head{display:flex;justify-content:space-between;align-items:center}
+  .seg{position:relative;display:flex;background:var(--chip);border-radius:9px;padding:3px;font-size:.68rem}
+  .seg span{position:relative;z-index:1;width:44px;text-align:center;padding:3px 0;color:var(--muted);transition:color .3s ease 1.3s}
+  .seg i{position:absolute;top:3px;bottom:3px;left:3px;width:44px;border-radius:7px;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.1);transition:transform .5s cubic-bezier(.3,.7,.2,1) 1.2s}
+  .seg span:nth-of-type(1){color:var(--ink);font-weight:600}
+  .in .seg i{transform:translateX(44px)}
+  .in .seg span:nth-of-type(1){color:var(--muted);font-weight:400}
+  .in .seg span:nth-of-type(2){color:var(--ink);font-weight:600}
+  .io{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .io .k{display:flex;align-items:center;gap:6px}
+  .io .k::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+  .io .n{font-weight:700;font-size:1.25rem;letter-spacing:-.02em;margin-top:2px}
+  .iobar{height:7px;border-radius:4px;background:color-mix(in srgb,var(--neg) 25%,transparent);overflow:hidden;margin-top:12px}
+  .iobar b{display:block;height:100%;width:0;background:var(--emerald);border-radius:4px;transition:width 1.2s ease 1s}
+  .in .iobar b{width:53%}
+  .io-foot{display:flex;justify-content:space-between;margin-top:10px;font-size:.8rem;font-weight:600;color:var(--emerald)}
+
+  /* scroll reveal: .reveal elements fade up, children with .stg stagger by --i */
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+  .stg{opacity:0;transform:translateY(16px) scale(.97);transition:opacity .5s ease,transform .5s cubic-bezier(.2,.8,.3,1);transition-delay:calc(var(--i,0) * 140ms + 250ms)}
+  .in .stg{opacity:1;transform:none}
+
+  /* how it works */
+  #how{padding:128px 0}
+  .how{display:grid;gap:56px;align-items:center}
+  @media(min-width:960px){.how{grid-template-columns:1fr 1fr;gap:88px}}
+  .steps{list-style:none;counter-reset:s;display:grid;gap:26px;margin-top:40px;max-width:34rem}
+  .steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:18px;align-items:start}
+  .steps li::before{content:counter(s);width:40px;height:40px;border-radius:13px;background:var(--mint);color:var(--emerald-deep);display:grid;place-items:center;font-family:'Space Mono';font-weight:700}
+  .steps .t{display:block;font-weight:700;color:var(--ink);font-size:1.1rem;margin-bottom:2px}
+  .morph{display:flex;flex-direction:column;gap:16px;max-width:440px;margin:0 auto;width:100%}
+  .sms{background:var(--sms);border:1px solid var(--rule);border-radius:16px 16px 16px 5px;padding:16px 18px;font-size:.92rem;line-height:1.7;color:var(--body)}
+  /* each detail lights up in turn, as Monies picks it out of the message */
+  .sms mark{color:inherit;border-radius:5px;padding:1px 3px;margin:0 -1px;background:linear-gradient(var(--mint),var(--mint)) no-repeat 0 0/0% 100%;transition:background-size .45s ease,color .45s ease;transition-delay:calc(var(--d) * 280ms + 700ms)}
+  .in .sms mark{background-size:100% 100%;color:var(--emerald-deep)}
+  .morph .after{transition-delay:2.6s}
+  .morph .after.rec{transition-delay:2.9s}
+  .morph .after.parse-note{transition-delay:3.4s}
+  .parse-note{font-size:.82rem;color:var(--muted);text-align:center}
+  .sms .from{font-family:'Space Mono';font-size:.68rem;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+  .arrow{align-self:center;color:var(--muted);font-size:1.2rem}
+  @media (prefers-reduced-motion:no-preference){ .arrow span{display:inline-block;animation:nudge 1.8s ease-in-out infinite} @keyframes nudge{50%{transform:translateY(4px)}} }
+  .rec{display:flex;flex-direction:column;gap:10px;padding:16px 18px}
+  .rec-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .rec-name{font-weight:600;color:var(--ink)}
+  .rec-meta{font-family:'Space Mono';font-size:.7rem;color:var(--muted)}
+  .amt{font-family:'Space Mono';font-weight:700;color:var(--neg)}
+  .amt.in{color:var(--pos)}
+  .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:.74rem;font-weight:500;background:var(--chip);color:var(--body);border-radius:999px;padding:3px 10px}
+
+  /* feature rows */
+  .feature{display:grid;gap:44px;align-items:center}
+  @media(min-width:900px){.feature{grid-template-columns:1fr 1fr;gap:96px}.feature.flip .visual{order:-1}}
+  .feature + .feature{margin-top:120px}
+  .points{list-style:none;margin-top:26px;display:grid;gap:14px;max-width:34rem}
+  .points li{padding-left:18px;border-left:2px solid var(--rule);transition:border-color .2s}
+  .points li:hover{border-color:var(--emerald)}
+  .visual{display:flex;justify-content:center}
+
+  /* list screen */
+  .row{display:flex;align-items:center;gap:12px}
+  .row .lbl{font-weight:600;color:var(--ink);font-size:.88rem;line-height:1.3}
+  .row .sub{font-size:.72rem;color:var(--muted)}
+  .row .amt{margin-left:auto;font-size:.85rem;white-space:nowrap;padding-left:6px}
+  .row > div{min-width:0}
+  .dot{width:34px;height:34px;border-radius:11px;background:var(--mint);color:var(--emerald-deep);display:grid;place-items:center;font-size:.9rem;flex:none}
+  .newbadge{font-family:'Space Mono';font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;background:var(--coral);color:#fff;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+  .toast{background:var(--ink);color:var(--paper);border-radius:14px;padding:10px 12px;font-size:.74rem;display:flex;gap:8px;align-items:center;opacity:0;transform:translateY(-14px);transition:opacity .4s ease,transform .5s cubic-bezier(.2,.8,.3,1)}
+  .toast::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--emerald);flex:none}
+  .in .toast{opacity:1;transform:none;transition-delay:1.1s}
+  .newrow{max-height:0;overflow:hidden;opacity:0;padding-top:0;padding-bottom:0;transition:max-height .6s ease 1.6s,opacity .6s ease 1.8s,padding .6s ease 1.6s}
+  .in .newrow{max-height:90px;opacity:1;padding-top:14px;padding-bottom:14px}
+
+  /* analytics screen */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:10px 12px}
+  .stat .v{font-weight:800;font-size:1.15rem;color:var(--ink);letter-spacing:-.03em}
+  .stat .s{font-size:.7rem;color:var(--neg)}
+  .donut-row{display:flex;gap:14px;align-items:center}
+  .donut{--sweep:0deg;width:84px;height:84px;border-radius:50%;flex:none;background:conic-gradient(var(--emerald) 0 42%,var(--coral) 0 70%,var(--emerald-deep) 0 88%,var(--gold) 0 100%);
+    -webkit-mask:radial-gradient(circle 26px,transparent 98%,#000 100%),conic-gradient(#000 var(--sweep),transparent 0);-webkit-mask-composite:source-in;
+    mask:radial-gradient(circle 26px,transparent 98%,#000 100%),conic-gradient(#000 var(--sweep),transparent 0);mask-composite:intersect;
+    transition:--sweep 1.4s cubic-bezier(.3,.7,.2,1) .5s}
+  .in .donut{--sweep:360deg}
+  .legend{display:grid;gap:5px;font-size:.76rem;width:100%}
+  .legend div{display:flex;align-items:center;gap:7px}
+  .legend i{width:9px;height:9px;border-radius:3px;flex:none}
+  .legend span:last-child{margin-left:auto;font-family:'Space Mono';color:var(--muted)}
+  .heat{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:8px}
+  .heat u{aspect-ratio:1;border-radius:4px;background:var(--emerald);opacity:0;transition:opacity .5s ease;transition-delay:calc(var(--i) * 60ms + 900ms)}
+  .in .heat u{opacity:var(--o)}
+  .bar{height:6px;border-radius:6px;background:var(--chip);overflow:hidden;margin-top:6px}
+  .bar b{display:block;height:100%;width:0;background:var(--emerald);border-radius:6px;transition:width 1.2s ease 1.6s}
+  .in .bar b{width:var(--w)}
+
+  /* export screen */
+  .fmts{display:flex;gap:5px;margin-top:8px}
+  .fmt{font-family:'Space Mono';font-weight:700;font-size:.7rem;padding:7px 10px;border-radius:11px;background:var(--chip);color:var(--body);border:1.5px solid transparent;transition:background .3s,color .3s,border-color .3s}
+  /* the selection moves from CSV to Excel once the screen is visible */
+  .fmt.csv{background:var(--mint);color:var(--emerald-deep);border-color:var(--emerald)}
+  .in .fmt.csv{background:var(--chip);color:var(--body);border-color:transparent;transition-delay:.9s}
+  .in .fmt.xl{background:var(--mint);color:var(--emerald-deep);border-color:var(--emerald);transition-delay:.9s}
+  .exp-btn{position:relative;overflow:hidden;border-radius:999px;background:var(--emerald);color:var(--on-emerald);font-weight:600;font-size:.85rem;text-align:center;padding:12px}
+  .exp-btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.28);transform:translateX(-101%);transition:transform 1.6s ease 1.5s}
+  .in .exp-btn::after{transform:translateX(0)}
+  .exp-done{font-size:.76rem;color:var(--pos);text-align:center;opacity:0;transition:opacity .5s ease 3.2s}
+  .in .exp-done{opacity:1}
+
+  /* supported types: swipeable row on phones, grid from tablet up */
+  .types{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:20px;margin:32px -20px 0;padding:4px 20px 14px;scrollbar-width:none}
+  .types::-webkit-scrollbar{display:none}
+  .types .card{flex:0 0 80%;scroll-snap-align:start;padding:20px}
+  .types h3{margin-bottom:6px;font-size:1.1rem}
+  .types p{font-size:.9rem;margin-bottom:12px}
+  .swipe{font-size:.82rem;color:var(--muted);margin-top:4px}
+  @media(min-width:760px){
+    .types{display:grid;grid-template-columns:repeat(2,1fr);overflow:visible;margin:40px 0 0;padding:0}
+    .types .card{flex:none}
+    .swipe{display:none}
+  }
+  @media(min-width:1040px){.types{grid-template-columns:repeat(3,1fr)}}
+  .soon{border-style:dashed;background:transparent;box-shadow:none}
+
+  /* privacy + permissions */
+  .priv{display:grid;gap:14px;margin-top:40px}
+  @media(min-width:760px){.priv{grid-template-columns:repeat(3,1fr)}}
+  .priv .card{padding:22px}
+  .priv p{font-size:.95rem;margin-top:6px}
+  .perm-head{margin-top:72px}
+  .perm{display:grid;gap:14px;margin-top:24px}
+  @media(min-width:900px){.perm{grid-template-columns:repeat(3,1fr)}}
+  .perm .card{padding:20px}
+  .perm strong{color:var(--ink);display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+  .perm p{font-size:.92rem;margin-top:6px}
+  .pill{font-family:'Space Mono';font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:2px 9px;border-radius:999px;font-weight:400}
+  .pill.req{background:var(--coral);color:#fff} .pill.opt{background:var(--chip);color:var(--muted)}
+
+  /* faq: heading beside the questions on wide screens */
+  .faq{display:grid;gap:24px}
+  @media(min-width:960px){.faq{grid-template-columns:1fr 2fr;gap:80px}.faq-side{position:sticky;top:96px;align-self:start}}
+  .faq-side p{margin-top:14px}
+  .faq-side a{color:var(--emerald);font-weight:600}
+  details{border-bottom:1px solid var(--rule);padding:20px 0}
+  details:first-child{padding-top:0}
+  summary{cursor:pointer;font-weight:600;font-size:1.05rem;color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:16px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:'+';font-family:'Space Mono';color:var(--coral);font-size:1.2rem;line-height:1}
+  details[open] summary::after{content:'–'}
+  details p{margin-top:10px}
+  details a{color:var(--emerald);font-weight:600}
+
+  /* roadmap */
+  .road{list-style:none;display:grid;gap:14px;margin-top:40px}
+  @media(min-width:900px){.road{grid-template-columns:repeat(3,1fr)}}
+  .road li{display:flex}
+  .road .card{flex:1;display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:12px;align-items:flex-start;padding:20px}
+  .road h3{font-size:1.1rem}
+  .road p{font-size:.92rem;margin-top:4px}
+  .st{font-family:'Space Mono';font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;padding:4px 11px;border-radius:999px;white-space:nowrap}
+  .st.wip{background:var(--gold);color:#15130D}
+  .st.plan{background:var(--chip);color:var(--muted)}
+  .road .plan-card{border-style:dashed}
+
+  /* cta + footer */
+  /* closing band: same tint as the other bands, with the home screen peeking up from the bottom edge */
+  .cta-band{background:var(--band);border-radius:44px;margin:0 10px;padding:0;overflow:hidden}
+  @media(min-width:1100px){.cta-band{margin:0 24px}}
+  .cta-band .wrap{display:grid;gap:8px;align-items:end}
+  .cta-copy{padding:88px 0 24px}
+  .cta-copy p{margin-top:16px;font-size:1.15rem;max-width:30rem}
+  .cta-copy .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+  .cta-copy small{display:block;margin-top:14px;color:var(--muted);font-size:.88rem}
+  .cta-visual{position:relative;display:flex;justify-content:center;isolation:isolate;padding-top:48px}
+  .cta-visual .phone{max-width:310px;min-height:0;margin-bottom:-70px}
+  .cta-visual .ripples{top:62%}
+  @media(min-width:900px){
+    .cta-band .wrap{grid-template-columns:1.1fr .9fr;gap:40px}
+    .cta-copy{padding:112px 0 120px}
+    .cta-visual{padding-top:72px}
+  }
+  footer{padding:48px 0;font-size:.85rem;color:var(--muted)}
+  footer .top{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;margin-bottom:20px}
+  footer .top div a{margin-left:20px;text-decoration:none} footer .top div a:hover{color:var(--ink)}
+
+  @media (prefers-reduced-motion:reduce){
+    .reveal,.stg,.toast,.heat u{opacity:1;transform:none;transition:none}
+    .sms mark{background-size:100% 100%;color:var(--emerald-deep);transition:none} .ripples{display:none}
+    .heat u{opacity:var(--o)}
+    .newrow{max-height:none;opacity:1;padding-top:14px;padding-bottom:14px;transition:none}
+    .donut{--sweep:360deg;transition:none} .bar b{width:var(--w);transition:none}
+    .iobar b{width:53%;transition:none} .syncbar{display:none} .seg i,.seg span{transition:none}
+    .exp-btn::after{transform:none;transition:none} .exp-done{opacity:1;transition:none}
+  }
+</style>
 </head>
-<body class="antialiased overflow-x-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
+<body>
 
-    <!-- Top Disclaimer Banner -->
-    <div class="bg-zinc-900/50 border-b border-zinc-800 text-zinc-300 text-sm py-2.5 text-center px-4 font-medium relative z-[60] backdrop-blur-md">
-        <span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded mr-2 uppercase tracking-wide border border-emerald-500/30">Beta</span>
-        Monies is currently in active development and exclusively available via GitHub.
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="mark">M</span>Monies</a>
+    <div class="links">
+      <a href="#how">How it works</a><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#roadmap">Roadmap</a>
+    </div>
+    <a class="btn" href="https://github.com/kimaita/monies-v2/releases" target="_blank" rel="noopener">Get the APK</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <h1>See where your M-PESA goes.</h1>
+      <p class="lede">Monies reads your M-PESA messages and shows you your balance, your Fuliza and M-Shwari, and what came in and went out. You don't type anything or sign up, and it all stays on your phone.</p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/kimaita/monies-v2/releases" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+          Download APK
+        </a>
+        <a class="btn ghost" href="#how">See how it works</a>
+      </div>
+      <small>Free and open source. Needs Android 8.0 or newer. Still in beta.</small>
     </div>
 
-    <!-- Navigation -->
-    <nav class="fixed w-full z-50 top-[40px] bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800 transition-all">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center max-w-7xl">
-            <div class="flex items-center space-x-2 text-2xl font-extrabold tracking-tight text-white">
-                <div class="h-8 w-8 bg-gradient-to-tr from-emerald-500 to-sky-500 rounded-full flex items-center justify-center text-white text-sm shadow-[0_0_15px_rgba(16,185,129,0.5)]">
-                    <i class="fa-solid fa-m"></i>
-                </div>
-                <span>Monies</span>
-            </div>
-            <div class="hidden md:flex items-center space-x-8">
-                <a href="#how-it-works" class="text-zinc-400 hover:text-white font-medium transition">How it works</a>
-                <a href="#features" class="text-zinc-400 hover:text-white font-medium transition">Features</a>
-                <a href="#privacy" class="text-zinc-400 hover:text-white font-medium transition">Privacy</a>
-                <a href="#roadmap" class="text-zinc-400 hover:text-white font-medium transition">Roadmap</a>
-            </div>
-            <div>
-                <a href="https://github.com" target="_blank" class="flex items-center space-x-2 bg-white text-zinc-900 px-5 py-2.5 rounded-full font-bold hover:bg-zinc-200 hover:scale-105 transition shadow-lg">
-                    <i class="fa-brands fa-github text-lg"></i>
-                    <span class="hidden sm:inline">DOWNLOAD APK</span>
-                </a>
-            </div>
+    <div class="hero-visual">
+      <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="ripples" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="phone home reveal" aria-label="The Monies home screen showing an M-PESA balance, other balances and money in and out this week">
+        <div class="top"><span class="num">0712 ••• 678</span></div>
+        <div class="syncbar"><b></b></div>
+        <div class="stg" style="--i:0">
+          <div class="k">M-PESA balance</div>
+          <div class="bal">Ksh <span data-count="12340">12,340</span><small>.50</small></div>
+          <div class="chg">▲ +2,150 this week <span style="opacity:.6">›</span></div>
         </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <header class="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden bg-grid mt-[40px]">
-        <!-- Ambient Background Glows -->
-        <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-        <div class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-sky-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-
-        <div class="container mx-auto px-6 max-w-7xl relative">
-            <div class="flex flex-col lg:flex-row items-center gap-16">
-                
-                <!-- Hero Copy -->
-                <div class="lg:w-1/2 text-center lg:text-left z-10">
-                    <div class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
-                        <i class="fa-solid fa-shield-check"></i>
-                        <span>100% Offline • Built for Mobile Money</span>
-                    </div>
-                    <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]">
-                        Make sense of <br>
-                        your <span class="text-gradient">finances.</span>
-                    </h1>
-                    <p class="text-lg lg:text-xl text-zinc-400 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                        Monies turns your SMS inbox into a powerful financial dashboard. Track your mobile money spending, organize by category, and visualize your habits—entirely on your device.
-                    </p>
-                    
-                    <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                        <a href="https://github.com" target="_blank" class="w-full sm:w-auto flex items-center justify-center bg-white text-zinc-900 px-8 py-4 rounded-full font-bold text-lg hover:bg-zinc-200 transition hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-                            <i class="fa-brands fa-github mr-3 text-2xl"></i>
-                            <span>DOWNLOAD APK</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Hero Screenshot Provision -->
-                <div class="lg:w-1/2 flex justify-center lg:justify-end relative w-full mt-10 lg:mt-0">
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-gradient-to-r from-emerald-500 to-sky-500 rounded-full blur-[100px] opacity-20"></div>
-                    
-                    <!-- REPLACE THIS IMAGE SRC WITH YOUR APP'S MAIN DASHBOARD SCREENSHOT -->
-                    <div class="phone-mockup w-64 md:w-80 aspect-[9/19.5] rotate-[-2deg] transition-transform hover:rotate-0 duration-500">
-                        <img src="https://placehold.co/800x1600/18181b/ffffff?text=Main+Dashboard\nScreenshot" alt="Monies App Dashboard" class="w-full h-full object-cover">
-                    </div>
-                </div>
-            </div>
+        <div class="stg" style="--i:1">
+          <div class="k">Other balances</div>
+          <div class="pills"><span class="bpill">Fuliza<b>1,500</b> available</span><span class="bpill">M-Shwari<b>4,200</b></span><span class="bpill">Lock<b>10,000</b></span><span class="bpill">More ›</span></div>
         </div>
-    </header>
-
-    <!-- Visualizations (Left Text, Right Image) -->
-    <section id="how-it-works" class="py-24 relative border-t border-zinc-900 bg-zinc-950/50">
-        <div class="container mx-auto px-6 max-w-7xl relative z-10">
-            <div class="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
-                <div class="lg:w-1/2 order-2 lg:order-1">
-                    <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-6 text-white">See exactly where your money goes.</h2>
-                    <p class="text-lg text-zinc-400 mb-8 leading-relaxed">
-                        Monies automatically reads standard mobile money transaction messages and generates beautiful, easy-to-understand visualizations. 
-                    </p>
-                    <ul class="space-y-6">
-                        <li class="flex items-start bg-zinc-900/40 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-900/60 transition">
-                            <div class="mt-1 bg-emerald-500/10 p-3 rounded-xl text-emerald-400 mr-4 shadow-sm border border-emerald-500/20">
-                                <i class="fa-solid fa-tags"></i>
-                            </div>
-                            <div>
-                                <h4 class="text-xl font-bold text-white">Custom Categories</h4>
-                                <p class="text-zinc-400 mt-1">Assign labels like 'Groceries', 'Transport', or 'Rent'. Monies groups them beautifully.</p>
-                            </div>
-                        </li>
-                        <li class="flex items-start bg-zinc-900/40 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-900/60 transition">
-                            <div class="mt-1 bg-sky-500/10 p-3 rounded-xl text-sky-400 mr-4 shadow-sm border border-sky-500/20">
-                                <i class="fa-solid fa-chart-pie"></i>
-                            </div>
-                            <div>
-                                <h4 class="text-xl font-bold text-white">Summary Statistics</h4>
-                                <p class="text-zinc-400 mt-1">View your spending and inflow grouped by week, month, or specific categories.</p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-                
-                <div class="lg:w-1/2 order-1 lg:order-2 flex justify-center relative w-full">
-                    <!-- REPLACE THIS IMAGE SRC WITH YOUR APP'S CHARTS/CATEGORIES SCREENSHOT -->
-                    <div class="phone-mockup w-64 md:w-72 aspect-[9/19.5]">
-                        <img src="https://placehold.co/800x1600/18181b/ffffff?text=Charts+%26+Stats\nScreenshot" alt="Monies App Analytics" class="w-full h-full object-cover">
-                    </div>
-                </div>
-            </div>
+        <div class="card stg" style="--i:2;padding:16px">
+          <div class="io-head"><span class="k">In &amp; out</span><div class="seg"><i></i><span>Day</span><span>Week</span><span>Month</span></div></div>
+          <div class="io">
+            <div style="color:var(--emerald)"><div class="k" style="color:var(--emerald)">In</div><div class="n">18,400</div></div>
+            <div style="color:var(--ink)"><div class="k" style="color:var(--muted)">Out</div><div class="n">16,250</div></div>
+          </div>
+          <div class="iobar"><b></b></div>
+          <div class="io-foot"><span>Net +2,150</span><span>Analytics ›</span></div>
         </div>
-    </section>
-
-    <!-- Search & Filter (Left Image, Right Text) -->
-    <section class="py-24 relative border-t border-zinc-900">
-        <div class="container mx-auto px-6 max-w-7xl">
-            <div class="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
-                
-                <div class="lg:w-1/2 flex justify-center relative w-full">
-                    <!-- REPLACE THIS IMAGE SRC WITH YOUR APP'S SEARCH/FILTER SCREENSHOT -->
-                    <div class="phone-mockup w-64 md:w-72 aspect-[9/19.5]">
-                        <img src="https://placehold.co/800x1600/18181b/ffffff?text=Search+%26+Filter\nScreenshot" alt="Monies Search Interface" class="w-full h-full object-cover">
-                    </div>
-                </div>
-
-                <div class="lg:w-1/2">
-                    <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-6 text-white">Find any transaction in seconds.</h2>
-                    <p class="text-lg text-zinc-400 mb-8 leading-relaxed">
-                        Stop endlessly scrolling through your messages. Search, sort, and filter your entire financial history with powerful on-device queries.
-                    </p>
-                    
-                    <div class="space-y-8">
-                        <div class="group border-l-2 border-zinc-800 hover:border-emerald-500 pl-6 transition-all">
-                            <h4 class="text-lg font-bold text-white flex items-center">
-                                <i class="fa-solid fa-bolt text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 mr-3 group-hover:scale-110 transition-transform"></i> Filter by Type
-                            </h4>
-                            <p class="text-zinc-400 mt-2">Instantly isolate merchant payments, peer-to-peer transfers, and withdrawals.</p>
-                        </div>
-                        <div class="group border-l-2 border-zinc-800 hover:border-emerald-500 pl-6 transition-all">
-                            <h4 class="text-lg font-bold text-white flex items-center">
-                                <i class="fa-solid fa-magnifying-glass text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 mr-3 group-hover:scale-110 transition-transform"></i> Subject & Direction
-                            </h4>
-                            <p class="text-zinc-400 mt-2">Search by sender or recipient name. Toggle between Money In and Money Out instantly.</p>
-                        </div>
-                        <div class="group border-l-2 border-zinc-800 hover:border-emerald-500 pl-6 transition-all">
-                            <h4 class="text-lg font-bold text-white flex items-center">
-                                <i class="fa-solid fa-file-export text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 mr-3 group-hover:scale-110 transition-transform"></i> CSV Export
-                            </h4>
-                            <p class="text-zinc-400 mt-2">Need it in Excel? Export your filtered searches directly to a CSV file to share or archive.</p>
-                        </div>
-                    </div>
-                </div>
-                
-            </div>
+        <div class="stg" style="--i:3">
+          <div class="k" style="margin-bottom:8px">Transactions</div>
+          <div class="card" style="margin-bottom:8px"><div class="row"><span class="dot">↑</span><div><div class="lbl">Naivas Westlands</div><div class="sub">Till · 6:42 PM</div></div><span class="amt">− 1,850</span></div></div>
+          <div class="card"><div class="row"><span class="dot">↓</span><div><div class="lbl">Wanjiru M.</div><div class="sub">Received · Yesterday</div></div><span class="amt in">+ 5,000</span></div></div>
         </div>
-    </section>
+      </div>
+    </div>
+  </div>
+</header>
 
-    <!-- CHIC & MODERN FEATURES SECTION -->
-    <section id="features" class="py-32 relative overflow-hidden bg-zinc-950/80 border-y border-zinc-900">
-        <!-- Abstract neon glows -->
-        <div class="absolute top-0 left-0 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2"></div>
-        <div class="absolute bottom-0 right-0 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3"></div>
+<section id="how" class="band">
+  <div class="wrap how">
+    <div class="reveal">
+      <h2>From text message to tidy record.</h2>
+      <p class="lede">You keep using M-PESA as normal. Monies does the bookkeeping.</p>
+      <ol class="steps">
+        <li><div><span class="t">Install it and allow SMS access</span>Monies only looks at messages from M-PESA. Everything else in your inbox is left alone.</div></li>
+        <li><div><span class="t">It reads each message for you</span>From every M-PESA text, Monies picks out who you paid or who paid you, how much, the fee, the date and your balance afterwards. All of this happens on your phone.</div></li>
+        <li><div><span class="t">Your history fills in</span>It works through the M-PESA messages you already have, so your balances and spending are there from day one.</div></li>
+        <li><div><span class="t">New payments appear by themselves</span>When a new M-PESA message comes in, the transaction is added straight away.</div></li>
+      </ol>
+    </div>
+    <div class="morph reveal" aria-label="An M-PESA text message with its details picked out and turned into a transaction">
+      <div class="sms stg" style="--i:0">
+        <div class="from">MPESA</div>
+        <mark style="--d:0">UE82K4XQ1P</mark> Confirmed. <mark style="--d:1">Ksh1,850.00</mark> paid to <mark style="--d:2">NAIVAS WESTLANDS</mark> on <mark style="--d:3">4/10/26 at 6:42 PM</mark>. New M-PESA balance is <mark style="--d:4">Ksh12,340.50</mark>. Transaction cost, <mark style="--d:5">Ksh0.00</mark>.
+      </div>
+      <span class="arrow stg after"><span>↓</span></span>
+      <div class="card rec stg after">
+        <div class="rec-top"><span class="rec-name">Naivas Westlands</span><span class="amt">− Ksh 1,850</span></div>
+        <div class="rec-meta">UE82K4XQ1P · 4 OCT · 6:42 PM</div>
+        <div class="tags"><span class="tag">Till</span><span class="tag">Fee 0.00</span><span class="tag">Balance 12,340.50</span></div>
+      </div>
+      <p class="parse-note stg after">Worked out on your phone. Nothing is sent anywhere.</p>
+    </div>
+  </div>
+</section>
 
-        <div class="container mx-auto px-6 max-w-7xl relative z-10">
-            <div class="text-center max-w-3xl mx-auto mb-20">
-                <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-6">Engineered for clarity.</h2>
-                <p class="text-lg text-zinc-400">A clean, distraction-free architecture designed specifically for seamless mobile money tracking. No clutter, just insights.</p>
+<section id="features">
+  <div class="wrap">
+
+    <div class="feature">
+      <div class="reveal">
+        <h2>Every transaction, easy to find.</h2>
+        <p class="lede">All your M-PESA history in one place, ready to search.</p>
+        <ul class="points">
+          <li>Look up a person, a business or an amount.</li>
+          <li>Narrow it down by type, category, date, or money in and out.</li>
+          <li>Sort transactions into categories, including ones you make yourself, and the reports follow.</li>
+        </ul>
+      </div>
+      <div class="visual">
+        <div class="bob"><div class="phone reveal">
+          <div class="phone-title">Transactions</div>
+          <div class="toast">M-PESA message received</div>
+          <div class="card newrow"><div class="row"><span class="dot">↑</span><div><div class="lbl">Naivas Westlands<span class="newbadge">New</span></div><div class="sub">Till · just now</div></div><span class="amt">− 1,850</span></div></div>
+          <div class="card stg" style="--i:0"><div class="row"><span class="dot">↑</span><div><div class="lbl">Safaricom Home Fibre</div><div class="sub">Paybill · 2 Oct</div></div><span class="amt">− 3,499</span></div></div>
+          <div class="card stg" style="--i:1"><div class="row"><span class="dot">↓</span><div><div class="lbl">Wanjiru M.</div><div class="sub">Received · 1 Oct</div></div><span class="amt in">+ 5,000</span></div></div>
+          <div class="card stg" style="--i:2"><div class="row"><span class="dot">↑</span><div><div class="lbl">Fuliza M-PESA</div><div class="sub">Loan · 29 Sep</div></div><span class="amt">− 750</span></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="reveal">
+        <h2>Spending, broken down.</h2>
+        <p class="lede">Pick a period and Monies does the maths.</p>
+        <ul class="points">
+          <li>See what went on each category and each kind of payment, by day, week or month.</li>
+          <li>A heatmap shows the times of day you spend the most.</li>
+          <li>Monies spots regular payments such as subscriptions and bills, and tells you roughly when the next one is due.</li>
+        </ul>
+      </div>
+      <div class="visual">
+        <div class="bob"><div class="phone reveal">
+          <div class="phone-title">Insights</div>
+          <div class="stats">
+            <div class="card stat stg" style="--i:0"><div class="k">This month</div><div class="v">Ksh <span data-count="31204">31,204</span></div><div class="s">▲ 12% vs last</div></div>
+            <div class="card stat stg" style="--i:1"><div class="k">Top merchant</div><div class="v">Naivas</div><div class="s" style="color:var(--muted)">Ksh 6,200</div></div>
+          </div>
+          <div class="card donut-row">
+            <div class="donut" role="img" aria-label="Spending split: groceries 42%, transport 28%, bills 18%, other 12%"></div>
+            <div class="legend">
+              <div><i style="background:var(--emerald)"></i><span>Groceries</span><span>42%</span></div>
+              <div><i style="background:var(--coral)"></i><span>Transport</span><span>28%</span></div>
+              <div><i style="background:var(--emerald-deep)"></i><span>Bills</span><span>18%</span></div>
+              <div><i style="background:var(--gold)"></i><span>Other</span><span>12%</span></div>
             </div>
-
-            <!-- Bento-style Grid -->
-            <div class="grid md:grid-cols-3 gap-6">
-                
-                <!-- Card 1 -->
-                <div class="gradient-border-card group h-full">
-                    <div class="bg-[#121214] backdrop-blur-xl p-8 rounded-[1.4rem] h-full relative overflow-hidden">
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
-                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-2xl text-white mb-8 shadow-lg shadow-emerald-500/20">
-                            <i class="fa-solid fa-microchip"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold mb-3 text-white">Instant Parsing</h3>
-                        <p class="text-zinc-400 leading-relaxed">Retrieves your messages and parses transaction amounts, dates, balances, and subjects in milliseconds entirely offline.</p>
-                    </div>
-                </div>
-
-                <!-- Card 2 -->
-                <div class="gradient-border-card group h-full">
-                    <div class="bg-[#121214] backdrop-blur-xl p-8 rounded-[1.4rem] h-full relative overflow-hidden">
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl group-hover:bg-sky-500/20 transition-all"></div>
-                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-2xl text-white mb-8 shadow-lg shadow-sky-500/20">
-                            <i class="fa-solid fa-layer-group"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold mb-3 text-white">Smart Grouping</h3>
-                        <p class="text-zinc-400 leading-relaxed">Transactions are organized effortlessly. Assign a category once, and easily see visual breakdowns of where you spend the most.</p>
-                    </div>
-                </div>
-
-                <!-- Card 3 -->
-                <div class="gradient-border-card group h-full">
-                    <div class="bg-[#121214] backdrop-blur-xl p-8 rounded-[1.4rem] h-full relative overflow-hidden">
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
-                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center text-2xl text-white mb-8 shadow-lg shadow-purple-500/20">
-                            <i class="fa-solid fa-unlock-keyhole"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold mb-3 text-white">Data Portability</h3>
-                        <p class="text-zinc-400 leading-relaxed">Your data isn't locked in our ecosystem. Export your entire transaction history, or just a filtered view, straight to CSV.</p>
-                    </div>
-                </div>
-
+          </div>
+          <div class="card">
+            <div class="k">When you spend</div>
+            <div class="heat" aria-hidden="true">
+              <u style="--i:0;--o:.12"></u><u style="--i:1;--o:.2"></u><u style="--i:2;--o:.15"></u><u style="--i:3;--o:.3"></u><u style="--i:4;--o:.8"></u><u style="--i:5;--o:.55"></u>
+              <u style="--i:6;--o:.4"></u><u style="--i:7;--o:.35"></u><u style="--i:8;--o:.6"></u><u style="--i:9;--o:1"></u><u style="--i:10;--o:.7"></u><u style="--i:11;--o:.25"></u>
             </div>
+          </div>
+          <div class="card">
+            <div class="row"><div class="lbl" style="font-size:.8rem">Home Fibre</div><span class="sub" style="margin-left:auto">Monthly · next 2 Nov</span></div>
+            <div class="bar"><b style="--w:78%"></b></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="reveal">
+        <h2>Take your data with you.</h2>
+        <p class="lede">Save your transactions as CSV, JSON, Excel or PDF. Big exports carry on in the background, and you'll get a notification when they're ready.</p>
+        <ul class="points">
+          <li>Only need some of it? Choose a date range, money in or out, a type of payment, or one person or business first.</li>
+        </ul>
+      </div>
+      <div class="visual">
+        <div class="bob"><div class="phone reveal">
+          <div class="phone-title">Export</div>
+          <div class="card stg" style="--i:0">
+            <div class="k">Format</div>
+            <div class="fmts"><span class="fmt csv">CSV</span><span class="fmt">JSON</span><span class="fmt xl">Excel</span><span class="fmt">PDF</span></div>
+          </div>
+          <div class="card stg" style="--i:1">
+            <div class="row"><span class="lbl">From</span><span class="amt" style="color:var(--body)">1 Jan 2026</span></div>
+            <div class="row" style="margin-top:8px"><span class="lbl">To</span><span class="amt" style="color:var(--body)">Any</span></div>
+          </div>
+          <div class="card stg" style="--i:2">
+            <div class="row"><span class="lbl">Money in and out</span><span class="amt" style="color:var(--body)">Both</span></div>
+          </div>
+          <div class="exp-btn stg" style="--i:3">Export 1,284 · .XLSX</div>
+          <div class="exp-done">Saved 1,284 transactions</div>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section id="supported" class="band">
+  <div class="wrap">
+    <div class="reveal">
+      <h2>Understands your M-PESA messages.</h2>
+      <p class="lede">Monies recognises all of these today.</p>
+    </div>
+    <div class="types reveal">
+      <div class="card"><h3>Pay and send</h3><p>Who you paid, the account or till, and what it cost.</p><div class="tags"><span class="tag">Paybill</span><span class="tag">Till (Buy Goods)</span><span class="tag">Send money</span><span class="tag">Pochi la Biashara</span></div></div>
+      <div class="card"><h3>Money in</h3><p>Money from people and banks, so nothing coming in gets missed or counted twice.</p><div class="tags"><span class="tag">Received from person</span><span class="tag">Received from bank</span><span class="tag">Cash deposit</span></div></div>
+      <div class="card"><h3>Cash and airtime</h3><p>Cash withdrawals and airtime, kept separate from the rest of your spending.</p><div class="tags"><span class="tag">Agent withdrawal</span><span class="tag">ATM withdrawal</span><span class="tag">Airtime</span></div></div>
+      <div class="card"><h3>M-Shwari</h3><p>Deposits, withdrawals and Lock Savings, each with its own balance.</p><div class="tags"><span class="tag">Deposit</span><span class="tag">Withdrawal</span><span class="tag">Lock Savings</span></div></div>
+      <div class="card"><h3>Fuliza</h3><p>Loans and repayments, plus how much you can still borrow and what you owe.</p><div class="tags"><span class="tag">Loan</span><span class="tag">Partial repayment</span><span class="tag">Final repayment</span></div></div>
+      <div class="card soon"><h3>Airtel Money</h3><p>Coming soon. <a href="#roadmap" style="color:var(--emerald);font-weight:600">See what's planned</a>.</p></div>
+    </div>
+    <p class="swipe">Swipe for more →</p>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <div class="reveal">
+      <h2>Your finances are your business.</h2>
+      <p class="lede">Your messages are private, so Monies works entirely on your phone. We never see any of it.</p>
+    </div>
+    <div class="priv">
+      <div class="card reveal"><h3>Nothing is uploaded</h3><p>Monies doesn't send your messages or transactions anywhere.</p></div>
+      <div class="card reveal"><h3>No sign-up</h3><p>Open the app, allow access to your messages and your history appears.</p></div>
+      <div class="card reveal"><h3>Open source</h3><p>Anyone can read the code and see exactly what Monies does with your messages.</p></div>
+    </div>
+
+    <div class="perm-head reveal">
+      <h3 style="font-size:1.5rem">Permissions, and why</h3>
+      <p style="margin-top:6px">Monies asks for three things when you set it up.</p>
+    </div>
+    <div class="perm">
+      <div class="card reveal"><strong>Read and receive SMS <span class="pill req">Required</span></strong><p>So Monies can read your M-PESA messages. The app can't work without it.</p></div>
+      <div class="card reveal"><strong>Phone number and carrier <span class="pill opt">Optional</span></strong><p>Helps Monies tell your SIM cards apart if you have more than one number.</p></div>
+      <div class="card reveal"><strong>Notifications <span class="pill opt">Optional</span></strong><p>Lets Monies show progress while it imports your history or exports a file.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="band">
+  <div class="wrap faq">
+    <div class="faq-side reveal">
+      <h2>Questions</h2>
+      <p>Can't find what you're after? Ask on <a href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">GitHub</a>.</p>
+    </div>
+    <div>
+      <details><summary>How much does Monies cost?</summary><p>Nothing. It's a free, open-source hobby project. There are no ads and no subscription.</p></details>
+      <details><summary>Do I need to enter anything myself?</summary><p>No. Everything comes from the M-PESA messages already on your phone. You can add categories if you like, but you don't have to. <a href="#how">See how it works</a>.</p></details>
+      <details><summary>Does it work with Airtel Money?</summary><p>Not yet. Monies works with M-PESA today, and Airtel Money is <a href="#roadmap">next on the list</a>.</p></details>
+      <details><summary>I have two SIM cards. Will that work?</summary><p>Monies reads M-PESA messages from both lines, but for now it shows them together. Keeping each number separate is <a href="#roadmap">in progress</a>.</p></details>
+      <details><summary>A transaction is missing. What do I do?</summary><p>M-PESA changes how its messages are worded now and then, so a new format can slip through. Tell us on <a href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">GitHub</a> and paste in the message, with your personal details removed. We'll add it in a later update.</p></details>
+      <details><summary>Will there be an iPhone version?</summary><p>No. iPhones don't let apps read your text messages, and that's how Monies gets its data.</p></details>
+      <details><summary>How can I help?</summary><p>Monies is open source. You can report a bug, suggest a feature or contribute code on <a href="https://github.com/kimaita/monies-v2" target="_blank" rel="noopener">GitHub</a>.</p></details>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="wrap">
+    <div class="reveal">
+      <h2>What's coming</h2>
+      <p class="lede">Monies is a side project, so there are no release dates. This is what's planned.</p>
+    </div>
+
+    <ul class="road">
+      <li class="reveal"><div class="card"><div><h3>Dual SIM support</h3><p>Use M-PESA on two lines? Monies will keep each number's transactions and balance separate.</p></div><span class="st wip">In progress</span></div></li>
+      <li class="reveal"><div class="card plan-card"><div><h3>Airtel Money</h3><p>Track Airtel Money alongside M-PESA, in the same reports. If you use it, sharing a few sample messages will help get it built sooner.</p></div><span class="st plan">Next</span></div></li>
+      <li class="reveal"><div class="card plan-card"><div><h3>Report a missed message</h3><p>If Monies doesn't pick up a transaction, you'll be able to see it in the app and send it in with one tap.</p></div><span class="st plan">Later</span></div></li>
+    </ul>
+
+    <p style="margin-top:32px"><a class="mono" style="color:var(--emerald);font-size:.88rem" href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">Suggest a feature on GitHub →</a></p>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="wrap">
+    <div class="cta-copy reveal">
+      <h2>Try it on your own messages.</h2>
+      <p>Download the APK from GitHub, allow access to your messages and Monies does the rest.</p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/kimaita/monies-v2/releases" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+          Download APK
+        </a>
+        <a class="btn ghost" href="https://github.com/kimaita/monies-v2" target="_blank" rel="noopener">View the code</a>
+      </div>
+      <small>Free and open source. Needs Android 8.0 or newer.</small>
+    </div>
+    <div class="cta-visual" aria-hidden="true">
+      <div class="glow"><i></i><i></i><i></i></div>
+      <div class="ripples"><span></span><span></span><span></span></div>
+      <div class="phone home reveal">
+        <div class="top"><span class="num">0712 ••• 678</span></div>
+        <div class="stg" style="--i:0">
+          <div class="k">M-PESA balance</div>
+          <div class="bal">Ksh <span data-count="12340">12,340</span><small>.50</small></div>
+          <div class="chg">▲ +2,150 this week <span style="opacity:.6">›</span></div>
         </div>
-    </section>
-
-    <!-- Privacy Section -->
-    <section id="privacy" class="py-32 relative border-b border-zinc-900">
-        <div class="container mx-auto px-6 max-w-5xl text-center relative z-10">
-            <div class="inline-flex items-center justify-center h-24 w-24 rounded-full bg-emerald-500/10 text-emerald-400 mb-8 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
-                <i class="fa-solid fa-lock text-4xl"></i>
-            </div>
-            <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-8 text-white">
-                Your finances are <br>your business.
-            </h2>
-            <p class="text-xl text-zinc-400 mb-16 max-w-2xl mx-auto leading-relaxed">
-                Reading SMS data is highly sensitive. That is why Monies is built on a strict zero-data policy. We don't want your data, and we can't see it.
-            </p>
-
-            <div class="grid md:grid-cols-3 gap-10 text-left border-t border-zinc-800 pt-16">
-                <div class="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
-                    <h4 class="text-xl font-bold mb-3 text-white flex items-center gap-2"><i class="fa-solid fa-wifi text-emerald-400"></i> No Internet Needed</h4>
-                    <p class="text-zinc-400">Every calculation, search, and parse happens on your device's processor. No connection required.</p>
-                </div>
-                <div class="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
-                    <h4 class="text-xl font-bold mb-3 text-white flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-down text-sky-400"></i> No Cloud Servers</h4>
-                    <p class="text-zinc-400">We do not sync your transactions to the cloud. What happens on your phone, stays on your phone.</p>
-                </div>
-                <div class="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
-                    <h4 class="text-xl font-bold mb-3 text-white flex items-center gap-2"><i class="fa-solid fa-user-slash text-purple-400"></i> No Accounts</h4>
-                    <p class="text-zinc-400">Skip the sign-up. Just open the app, grant permissions, and start viewing your insights instantly.</p>
-                </div>
-            </div>
+        <div class="stg" style="--i:1">
+          <div class="k">Other balances</div>
+          <div class="pills"><span class="bpill">Fuliza<b>1,500</b> available</span><span class="bpill">M-Shwari<b>4,200</b></span><span class="bpill">Lock<b>10,000</b></span></div>
         </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="py-24 relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/20 to-sky-900/20 pointer-events-none"></div>
-        <div class="container mx-auto px-6 max-w-3xl text-center relative z-10">
-            <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-white">Ready to take control?</h2>
-            <p class="text-xl text-zinc-400 mb-10">
-                Download the open-source Monies APK today and get a clear picture of your spending habits in seconds.
-            </p>
-            <a href="https://github.com" target="_blank" class="inline-flex items-center justify-center bg-white text-zinc-900 px-10 py-5 rounded-full font-bold text-xl hover:bg-zinc-200 hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)]">
-                <i class="fa-brands fa-github mr-4 text-3xl"></i>
-                <span>DOWNLOAD APK</span>
-            </a>
-            <p class="mt-6 text-zinc-500 text-sm">Requires Android 8.0 or higher.</p>
+        <div class="card stg" style="--i:2;padding:16px">
+          <div class="io">
+            <div><div class="k" style="color:var(--emerald)">In</div><div class="n" style="color:var(--emerald)">18,400</div></div>
+            <div><div class="k" style="color:var(--muted)">Out</div><div class="n" style="color:var(--ink)">16,250</div></div>
+          </div>
+          <div class="iobar"><b></b></div>
         </div>
-    </section>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <!-- FUNKY ROADMAP SECTION (Last Section) -->
-    <section id="roadmap" class="py-32 bg-[#050505] border-t border-zinc-900 relative">
-        <div class="container mx-auto px-6 max-w-4xl relative z-10">
-            <div class="mb-16 border-l-4 border-sky-500 pl-6">
-                <span class="text-sky-400 font-mono-custom font-bold tracking-widest uppercase text-sm mb-2 block">> ./system_roadmap.sh</span>
-                <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight text-white mb-4">Development Pipeline</h2>
-                <p class="text-lg text-zinc-500">Monies is an evolving open-source project. Here is the current status of upcoming features.</p>
-            </div>
+<footer>
+  <div class="wrap">
+    <div class="top">
+      <a class="brand" href="#top"><span class="mark">M</span>Monies</a>
+      <div><a href="https://github.com/kimaita/monies-v2" target="_blank" rel="noopener">GitHub</a><a href="#privacy">Privacy</a><a href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">Report an issue</a></div>
+    </div>
+    <p>&copy; 2026 Monies contributors. Open source.</p>
+    <p style="margin-top:8px">"M-PESA" and "Airtel Money" are trademarks of their respective owners. Monies is an independent app and is not affiliated with, endorsed or sponsored by any mobile network operator.</p>
+  </div>
+</footer>
 
-            <!-- Funky Checklist -->
-            <ul class="space-y-4">
-                
-                <!-- Completed Item -->
-                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-[#09090b] border border-zinc-800 p-5 rounded-2xl transition duration-300 opacity-70">
-                    <div class="h-10 w-10 rounded-xl bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center shrink-0 text-emerald-400 glow-check-done">
-                        <i class="fa-solid fa-check"></i>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight strike">M-PESA Core Integration</h3>
-                        <p class="text-zinc-500 text-sm mt-1">Full offline parsing and visualizations for Safaricom SMS.</p>
-                    </div>
-                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/30 font-mono-custom">
-                        [ STATUS: DONE ]
-                    </div>
-                </li>
+<script>
+  // Reveal on scroll. Without IntersectionObserver (or with reduced motion) everything just shows.
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!('IntersectionObserver' in window) || reduce) { els.forEach(function (e) { e.classList.add('in'); }); return; }
 
-                <!-- In Progress Item -->
-                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-zinc-900/50 border border-amber-500/30 p-5 rounded-2xl hover:border-amber-500/60 transition duration-300 relative overflow-hidden group">
-                    <div class="absolute inset-0 bg-amber-500/5 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-700"></div>
-                    <div class="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-500 flex items-center justify-center shrink-0 glow-check-progress relative z-10 bg-[#09090b]">
-                        <i class="fa-solid fa-spinner fa-spin"></i>
-                    </div>
-                    <div class="flex-1 relative z-10">
-                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight">Airtel Money Integration</h3>
-                        <p class="text-zinc-400 text-sm mt-1">Full parsing and visual support for Airtel Money transactions.</p>
-                    </div>
-                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-widest border border-amber-500/30 font-mono-custom relative z-10">
-                        [ BUILDING... ]
-                    </div>
-                </li>
+    function countUp(el) {
+      var target = parseInt(el.getAttribute('data-count'), 10), start = null, dur = 1400;
+      function step(t) {
+        if (start === null) start = t;
+        var p = Math.min((t - start) / dur, 1), eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * eased).toLocaleString('en-US');
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
 
-                <!-- Planned Item 1 -->
-                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-[#09090b] border border-zinc-800 border-dashed p-5 rounded-2xl hover:border-sky-500/50 transition duration-300">
-                    <div class="h-10 w-10 rounded-xl border-2 border-zinc-700 border-dashed flex items-center justify-center shrink-0 text-zinc-700 group-hover:border-sky-500 transition">
-                        <!-- Empty box -->
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight">Multiple Money Accounts</h3>
-                        <p class="text-zinc-500 text-sm mt-1">Switch seamlessly between different SIM cards or mobile money providers.</p>
-                    </div>
-                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-zinc-900 text-zinc-500 text-[10px] font-bold uppercase tracking-widest border border-zinc-800 font-mono-custom">
-                        [ PLANNED ]
-                    </div>
-                </li>
-
-                <!-- Planned Item 2 -->
-                <li class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 bg-[#09090b] border border-zinc-800 border-dashed p-5 rounded-2xl hover:border-sky-500/50 transition duration-300">
-                    <div class="h-10 w-10 rounded-xl border-2 border-zinc-700 border-dashed flex items-center justify-center shrink-0 text-zinc-700 group-hover:border-sky-500 transition">
-                        <!-- Empty box -->
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="text-xl font-bold text-white font-mono-custom tracking-tight">Custom CSV Imports</h3>
-                        <p class="text-zinc-500 text-sm mt-1">Import historical bank statements for holistic net-worth tracking.</p>
-                    </div>
-                    <div class="shrink-0 px-4 py-1.5 rounded-full bg-zinc-900 text-zinc-500 text-[10px] font-bold uppercase tracking-widest border border-zinc-800 font-mono-custom">
-                        [ PLANNED ]
-                    </div>
-                </li>
-
-            </ul>
-            
-            <div class="text-center mt-12">
-                <a href="https://github.com" target="_blank" class="text-sky-400 font-mono-custom text-sm hover:text-sky-300 transition flex items-center justify-center gap-2">
-                    > Suggest_a_feature_on_GitHub() <i class="fa-solid fa-terminal ml-1"></i>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="bg-[#050505] py-12 border-t border-zinc-900">
-        <div class="container mx-auto px-6 max-w-7xl">
-            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
-                <div class="flex items-center space-x-2 text-2xl font-extrabold text-white">
-                    <div class="h-8 w-8 bg-zinc-800 rounded-full flex items-center justify-center text-white text-sm">
-                        <i class="fa-solid fa-m"></i>
-                    </div>
-                    <span>Monies</span>
-                </div>
-                <div class="flex space-x-8 text-sm font-medium text-zinc-500">
-                    <a href="https://github.com" target="_blank" class="hover:text-white transition"><i class="fa-brands fa-github text-xl"></i></a>
-                    <a href="#" class="hover:text-white transition">Privacy Policy</a>
-                    <a href="#" class="hover:text-white transition">Report Issue</a>
-                </div>
-            </div>
-            <div class="text-center md:text-left text-xs text-zinc-600 pt-8 border-t border-zinc-900/50">
-                <p>&copy; 2026 Monies App Contributors. Released under Open Source License.</p>
-                <p class="mt-2">"M-PESA" and "Airtel Money" are trademarks of their respective owners. Monies is an independent, open-source application and is not affiliated with, endorsed, or sponsored by any mobile network operator.</p>
-            </div>
-        </div>
-    </footer>
-
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        en.target.classList.add('in');
+        en.target.querySelectorAll('[data-count]').forEach(countUp);
+        io.unobserve(en.target);
+      });
+    }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
 </body>
 </html>

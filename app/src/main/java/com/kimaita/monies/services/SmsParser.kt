@@ -104,6 +104,4 @@ class SmsParser @Inject constructor() {
         )
         return Pair(transaction, newSubject)
     }
-
-
 }

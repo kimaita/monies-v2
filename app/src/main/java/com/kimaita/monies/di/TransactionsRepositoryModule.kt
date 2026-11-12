@@ -1,4 +1,4 @@
-package com.kimaita.monies.data.di
+package com.kimaita.monies.di
 
 import com.kimaita.monies.data.DefaultTransactionsRepository
 import com.kimaita.monies.data.TransactionsRepository

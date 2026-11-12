@@ -1,11 +1,10 @@
 package com.kimaita.monies.data
 
-import android.content.Context
-import android.provider.Telephony
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.kimaita.monies.data.dao.AccountDao
 import com.kimaita.monies.data.dao.CategoryDao
 import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
@@ -13,24 +12,37 @@ import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
-import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.Setting
 import com.kimaita.monies.data.database.models.Subject
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.data.database.models.TransactionWithDetails
 import com.kimaita.monies.data.database.toDomainModel
+import com.kimaita.monies.models.BalanceField
+import com.kimaita.monies.models.OtherBalances
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
-import com.kimaita.monies.services.SmsParser
+import com.kimaita.monies.models.export.ExportFilters
+import com.kimaita.monies.models.export.FilterOptions
+import com.kimaita.monies.models.export.NamedRef
+import com.kimaita.monies.models.isoDateTimeFormatter
+import com.kimaita.monies.services.RecurringDetector
+import com.kimaita.monies.utils.getSafeValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import timber.log.Timber
-import java.util.Date
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 class DefaultTransactionsRepository @Inject constructor(
@@ -38,18 +50,14 @@ class DefaultTransactionsRepository @Inject constructor(
     private val categoryDao: CategoryDao,
     private val transactionTypeDao: TransactionTypeDao,
     private val subjectDao: SubjectDao,
+    private val accountDao: AccountDao,
     private val settingsDao: SettingsDao,
-    private val smsParser: SmsParser
+    private val recurringDetector: RecurringDetector
 ) : TransactionsRepository {
 
-    companion object {
-        const val LAST_SMS_SYNC_TIMESTAMP_KEY = "last_sms_sync_timestamp"
-    }
-
-    override fun getRecentTransactions(limit: Int?): Flow<List<Transaction?>> =
+    override fun getRecentTransactions(limit: Int): Flow<List<Transaction>> =
         transactionsDao.getLatestTransactions(limit)
-            .map { list -> list.map { it?.toDomainModel() } }
-
+            .map { list -> list.map { it.toDomainModel() } }
 
     override fun getTransactions(
         transactionFilters: TransactionFilters?,
@@ -69,21 +77,17 @@ class DefaultTransactionsRepository @Inject constructor(
                     transactionFilters?.accountFilter,
                     transactionFilters?.natureFilter,
                     transactionFilters?.sortOrder,
+                    transactionFilters?.searchQuery
                 )
             }).flow.map { list -> list.map { it.toDomainModel() } }
     }
 
 
     override fun getTransactionTypes(): Flow<List<TransactionType>> =
-        transactionTypeDao.getTransactionTypes()
-
-
-    override fun getIncomeVsExpense(startDate: String?, endDate: String?): Flow<IncExp> =
-        transactionsDao.getIncomeVsExpense(startDate, endDate)
-
+        transactionTypeDao.getAll()
 
     override fun getCategories(searchQuery: String?): Flow<List<Category>> =
-        categoryDao.getCategories(searchQuery)
+        categoryDao.getAll(searchQuery)
 
     override fun getSubjects(subjectID: Long): Flow<List<Subject>> =
         subjectDao.getSubjects(subjectID)
@@ -115,7 +119,7 @@ class DefaultTransactionsRepository @Inject constructor(
     override fun getMpesaBalance(): Flow<Double> {
         return transactionsDao.getLatestTransactions(3).map { latestTransactions ->
             if (latestTransactions.isNotEmpty()) {
-                val transaction = latestTransactions.first()!!
+                val transaction = latestTransactions.first()
                 val regex = transaction.type.pattern?.toRegex(RegexOption.DOT_MATCHES_ALL)
                 val results = regex?.find(transaction.transaction.message)
                 try {
@@ -129,37 +133,6 @@ class DefaultTransactionsRepository @Inject constructor(
             }
         }
     }
-//
-//    fun getBalance(type: String? = "mpesa"): Flow<Double> {
-////        val bal: Flow<Double> = 0.0
-//        when (type) {
-//            "mpesa" -> {
-//                return getMpesaBalance()
-//            }
-//            "mshwari" -> {
-//
-//            }
-//            "lockSaving" -> {
-//
-//            }
-//            "fuliza" -> {
-//
-//            }
-//        }
-////        return bal
-//        return TODO("Provide the return value")
-//    }
-//
-//    fun getOutstandingLoan(account: String): Flow<Double> {
-//
-//        if (account == "fuliza") {
-//            transactionsDao.getLatestTypeTransaction()
-//        } else if (account == "mshwari") {
-//
-//        }
-//
-//        return TODO("Provide the return value")
-//    }
 
 
     override fun getSubjectStats(
@@ -169,163 +142,270 @@ class DefaultTransactionsRepository @Inject constructor(
     ): Flow<SubjectStats> = subjectDao.getSubjectStats(subjectId, startDate, endDate)
 
 
+    override suspend fun forEachExportBatch(
+        filters: ExportFilters,
+        onPage: suspend (List<TransactionWithDetails>) -> Unit,
+    ) {
+        var afterId: Long? = null
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val batch = transactionsDao.getExportBatch(
+                afterId = afterId,
+                limit = EXPORT_PAGE_SIZE,
+                startDate = filters.startDate,
+                endDate = filters.endDate,
+                subjectId = filters.subjectId,
+                categoryId = filters.categoryId?.takeIf { it.isNotEmpty() },
+                transactionType = filters.transactionType?.takeIf { it.isNotEmpty() },
+                account = filters.account,
+                natureFilter = filters.natureFilter,
+            )
+            if (batch.isEmpty()) break
+            onPage(batch)
+            afterId =
+                batch.last().transaction.id
+            if (batch.size < EXPORT_PAGE_SIZE) break
+        }
+    }
+
+    override suspend fun countForExport(filters: ExportFilters): Int =
+        transactionsDao.countForExport(
+            startDate = filters.startDate,
+            endDate = filters.endDate,
+            subjectId = filters.subjectId?.takeIf { it.isNotEmpty() },
+            categoryId = filters.categoryId?.takeIf { it.isNotEmpty() },
+            transactionType = filters.transactionType?.takeIf { it.isNotEmpty() },
+            account = filters.account,
+            natureFilter = filters.natureFilter,
+        )
+
+    override fun getIncomeVsExpense(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?
+    ) =
+        transactionsDao.getIncomeVsExpense(
+            startDate,
+            endDate,
+            subjectId,
+            categoryId,
+            transactionType
+        )
+
+    override fun getCashFlow(
+        bucketFormat: String,
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?
+    ) =
+        transactionsDao.getCashFlow(
+            bucketFormat,
+            startDate,
+            endDate,
+            subjectId,
+            categoryId,
+            transactionType
+        )
+
+    override fun getCategorySpending(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?
+    ) =
+        categoryDao.getCategorySpending(
+            startDate,
+            endDate,
+            subjectId,
+            transactionType,
+            natureFilter
+        )
+
+    override fun getTypeSpending(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        natureFilter: Boolean?
+    ) =
+        transactionTypeDao.getTypeSpending(startDate, endDate, subjectId, categoryId, natureFilter)
+
+    override fun getTopSubjects(
+        startDate: String?,
+        endDate: String?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?,
+        limit: Int
+    ) =
+        subjectDao.getTopSubjects(
+            startDate,
+            endDate,
+            categoryId,
+            transactionType,
+            natureFilter,
+            limit
+        )
+
+    override fun getActivityByTimeOfDay(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?
+    ) =
+        transactionsDao.getActivityByTimeOfDay(
+            startDate,
+            endDate,
+            subjectId,
+            categoryId,
+            transactionType,
+            natureFilter
+        )
+
     /**
      * Checks if the initial sync has been performed.
      * @return true if the sync timestamp does not exist, indicating a first run.
      */
     suspend fun isFirstRun(): Boolean {
-        return settingsDao.getSetting(LAST_SMS_SYNC_TIMESTAMP_KEY) == null
+        return settingsDao.getSetting(LAST_SMS_SYNC_ID_KEY) == null
+    }
+
+    override suspend fun isOnboardingComplete(): Boolean = withContext(Dispatchers.IO) {
+        settingsDao.getSetting(ONBOARDING_COMPLETE_KEY) == "true"
+    }
+
+    override suspend fun setOnboardingComplete() = withContext(Dispatchers.IO) {
+        settingsDao.saveSetting(Setting(ONBOARDING_COMPLETE_KEY, "true"))
     }
 
     override fun getCategorySpending(
         startDate: String?, endDate: String?, transactionCategory: Int?
     ): Flow<List<CategorySpending>> = categoryDao.getCategorySpending(startDate, endDate)
 
-    suspend fun syncAllSms(context: Context) {
-        withContext(Dispatchers.IO) {
-            val lastSyncTimestamp =
-                settingsDao.getSetting(LAST_SMS_SYNC_TIMESTAMP_KEY)?.toLongOrNull() ?: 0L
+
+    override suspend fun searchSubjects(trim: String) =
+        subjectDao.searchSubjects(trim).map { NamedRef(it.id, it.name) }
+
+    override suspend fun getSubjects(ids: List<Long>): List<NamedRef<Long>> =
+        if (ids.isEmpty()) emptyList() else subjectDao.getSubjects(ids)
+            .map { NamedRef(it.id, it.name) }
 
 
-            val transactionProviders = transactionTypeDao.getProviders().toSet()
-            val smsList = mutableListOf<SmsParser.SmsMessage>()
+    override suspend fun topSubjects() = subjectDao.topSubjects().map {
+        NamedRef(
+            it.id,
+            it.name
+        )
+    }
 
-            val selection =
-                "${Telephony.Sms.Inbox.ADDRESS} IN (${transactionProviders.joinToString { "'$it'" }}) AND ${Telephony.Sms.Inbox.DATE} > ?"
-            val selectionArgs = arrayOf(lastSyncTimestamp.toString())
+    override suspend fun getFilterOptions(): FilterOptions = coroutineScope {
 
-            val cursor = context.contentResolver.query(
-                Telephony.Sms.Inbox.CONTENT_URI,
-                null,
-                selection,
-                selectionArgs,
-                "${Telephony.Sms.Inbox.DATE} ASC"
-            )
+        val categories = async { categoryDao.getAll().first() }
+        val accounts = async { accountDao.getAll().first() }
+        val types = async { transactionTypeDao.getAll().first() }
+        FilterOptions(
+            categories = categories.await().map { NamedRef(it.id, it.name) },
+            accounts = accounts.await()
+                .map { NamedRef(it.subscriptionId, it.carrier + ' ' + it.number) },
+            types = types.await().map { NamedRef(it.id, it.name) },
+        )
+    }
 
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val idIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox._ID)
-                    val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox.BODY)
-                    val addressIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox.ADDRESS)
-                    val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox.DATE)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun getOtherBalances(): Flow<OtherBalances> =
+        transactionTypeDao.getAll().flatMapLatest { types ->
 
-                    do {
-                        val body = it.getString(bodyIndex)
-                        val address = it.getString(addressIndex)
-                        val date = it.getLong(dateIndex)
-                        val id = it.getLong(idIndex)
+            val regexByType: Map<Int, Regex> = types.mapNotNull { t ->
+                t.pattern?.let { p -> t.id to p.toRegex(BALANCE_REGEX_OPTIONS) }
+            }.toMap()
 
-                        smsList.add(SmsParser.SmsMessage(body, id, address, date))
-                    } while (it.moveToNext())
+            val balanceTypeIds = types.filter { t ->
+                val p = t.pattern ?: return@filter false
+                BalanceField.entries.any { field -> p.contains("(?<${field.group}>") }
+            }.map { it.id }
+
+            if (balanceTypeIds.isEmpty()) flowOf(OtherBalances())
+            else transactionsDao.getLatestPerType(balanceTypeIds).map { rows ->
+                extractBalances(rows, regexByType)
+            }
+        }
+
+    private fun extractBalances(
+        rows: List<com.kimaita.monies.data.database.models.Transaction>,
+        regexByType: Map<Int, Regex>
+    ): OtherBalances {
+
+        val best = HashMap<BalanceField, Pair<Double, LocalDateTime>>()
+        rows.forEach { row ->
+            val regex = regexByType[row.transactionType] ?: return@forEach
+            val groups =
+                regex.find(row.message)?.groups as? MatchNamedGroupCollection ?: return@forEach
+            BalanceField.entries.forEach { field ->
+                val value = groups.getSafeValue(field.group)?.replace(",", "")?.toDoubleOrNull()
+                    ?: return@forEach
+                val current = best[field]
+                if (current == null || row.transactionTime.isAfter(current.second)) {
+                    best[field] = value to row.transactionTime
                 }
             }
-            if (smsList.isNotEmpty()) {
-                Timber.d("Fetched %d messages", smsList.size)
-                parseAndSaveSms(smsList)
-            }
         }
+        return OtherBalances(
+            mshwariBalance = best[BalanceField.MSHWARI_BALANCE]?.first,
+            lockSavings = best[BalanceField.LOCK_SAVINGS]?.first,
+            availableFuliza = best[BalanceField.AVAILABLE_FULIZA]?.first,
+            outstandingFuliza = best[BalanceField.OUTSTANDING_FULIZA]?.first,
+            mshwariLoan = best[BalanceField.MSHWARI_LOAN]?.first,
+        )
     }
 
-    /**
-     * Processes a single batch of SMS messages from the ContentResolver.
-     * This is designed to be called by a WorkManager.
-     * @return The number of messages processed in this batch.
-     */
-    suspend fun syncSmsBatch(context: Context, limit: Int, offset: Int): Int {
-        val lastSyncTimestamp =
-            settingsDao.getSetting(LAST_SMS_SYNC_TIMESTAMP_KEY)?.toLongOrNull() ?: 0L
+    override fun getBalanceTrend(bucketFormat: String, startDate: String?, endDate: String?) =
+        transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate)
 
-        val transactionProviders = transactionTypeDao.getProviders().toSet()
-        val batchOfSms = mutableListOf<SmsParser.SmsMessage>()
+    override fun getActivityByTimeOfDay(startDate: String?, endDate: String?, natureFilter: Boolean?) =
+        transactionsDao.getActivityByTimeOfDay(startDate, endDate, natureFilter)
 
-        val selection =
-            "${Telephony.Sms.Inbox.ADDRESS} IN (${transactionProviders.joinToString { "'$it'" }}) AND ${Telephony.Sms.Inbox.DATE} > ?"
-        val selectionArgs = arrayOf(lastSyncTimestamp.toString())
+    override fun getWeekdayCounts(startDate: String?, endDate: String?, natureFilter: Boolean?) =
+        transactionsDao.getWeekdayCounts(startDate, endDate, natureFilter)
 
-        Timber.d("Querying ContentResolver with offset: %d, limit: %d", offset, limit)
+    override fun getDailyTotals(startDate: String?, endDate: String?, natureFilter: Boolean?) =
+        transactionsDao.getDailyTotals(startDate, endDate, natureFilter)
 
-        val cursor = context.contentResolver.query(
-            Telephony.Sms.Inbox.CONTENT_URI,
-            null,
-            selection,
-            selectionArgs,
-            "${Telephony.Sms.Inbox.DATE} ASC"
-        )
+    override fun getTopSubjectsByAmount(
+        startDate: String?,
+        endDate: String?,
+        transactionType: List<Int>?,
+        transactionCategory: List<Int>?,
+        natureFilter: Boolean?,
+        limit: Int
+    ) =
+        subjectDao.getTopSubjectsByAmount(startDate, endDate, transactionType, transactionCategory, natureFilter, limit)
 
-        cursor?.use {
-            if (it.moveToFirst()) {
-                val idIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox._ID)
-                val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox.BODY)
-                val addressIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox.ADDRESS)
-                val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.Inbox.DATE)
+    override fun getTopSubjectsByCount(startDate: String?, endDate: String?, limit: Int) =
+        subjectDao.getTopSubjectsByCount(startDate, endDate, limit)
 
-                var count = 0
-                do {
-                    val body = it.getString(bodyIndex)
-                    val address = it.getString(addressIndex)
-                    val date = it.getLong(dateIndex)
-                    val id = it.getLong(idIndex)
+    override fun getIncomeBySource(startDate: String?, endDate: String?, limit: Int) =
+        subjectDao.getIncomeBySource(startDate, endDate, limit)
 
-                    batchOfSms.add(SmsParser.SmsMessage(body, id, address, date))
-                    count++
-                } while (it.moveToNext() && count < limit)
-            }
+    override suspend fun getRecurringPayments() = recurringDetector.detect()
+
+    override suspend fun getEarliestTransactionDate(): LocalDateTime? =
+        transactionsDao.getEarliestTransactionTime()?.let {
+            runCatching { LocalDateTime.parse(it, isoDateTimeFormatter) }.getOrNull()
         }
 
-        Timber.d(
-            "Found %d messages in this batch from ContentResolver. Latest date: %s",
-            batchOfSms.size,
-            Date(lastSyncTimestamp).toString()
-        )
-
-        if (batchOfSms.isNotEmpty()) {
-            parseAndSaveSms(batchOfSms)
-        }
-
-        return batchOfSms.size
-    }
-
-
-    /**
-     * Reusable parsing logic for both initial sync and broadcast receiver
-     */
-    suspend fun parseAndSaveSms(messages: List<SmsParser.SmsMessage>) {
-        val transactionTypes = transactionTypeDao.getTransactionTypes().first()
-
-        val parsedData = smsParser.parse(messages, transactionTypes)
-        if (parsedData.isEmpty()) return
-
-        val transactionsToInsert = parsedData.map { pair ->
-            val transaction = pair.first
-            val parsedSubject = pair.second
-
-            if (parsedSubject != null) {
-                val subjectId = subjectDao.upsertAndGetId(parsedSubject)
-                transaction.copy(subject = subjectId)
-            } else {
-                Timber.d("No subject found for transaction: %s", transaction.message)
-                transaction
-            }
-        }
-
-
-        val latestMessageTimestamp = messages.maxOf { it.timestamp }
-        val currentSyncTimestamp =
-            settingsDao.getSetting(LAST_SMS_SYNC_TIMESTAMP_KEY)?.toLongOrNull() ?: 0L
-
-        if (transactionsToInsert.isNotEmpty() && latestMessageTimestamp > currentSyncTimestamp) {
-            transactionsDao.insertAll(transactionsToInsert)
-            settingsDao.saveSetting(
-                Setting(
-                    LAST_SMS_SYNC_TIMESTAMP_KEY, latestMessageTimestamp.toString()
-                )
-            )
-            Timber.d(
-                "Saved %d transactions to database. Latest at %s.",
-                transactionsToInsert.size,
-                Date(latestMessageTimestamp).toString()
-            )
-        }
+    companion object {
+        const val LAST_SMS_SYNC_ID_KEY = "last_sms_sync_id"
+        const val ONBOARDING_COMPLETE_KEY = "onboarding_complete"
+        const val EXPORT_PAGE_SIZE = 500
+        private val BALANCE_REGEX_OPTIONS =
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
     }
 
 }

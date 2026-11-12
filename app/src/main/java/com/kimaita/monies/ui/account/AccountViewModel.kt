@@ -11,11 +11,11 @@ import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.toDomainModel
 import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Subject
+import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
+import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.models.isoDateTimeFormatter
-import com.kimaita.monies.ui.components.TimeFilter
-import com.kimaita.monies.ui.components.getDatesForFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -87,6 +87,7 @@ class AccountViewModel @Inject constructor(
 
     fun setSortOrder(sortOrder: SortOrder) {
         _filters.value = _filters.value.copy(sortOrder = sortOrder)
+
     }
 }
 

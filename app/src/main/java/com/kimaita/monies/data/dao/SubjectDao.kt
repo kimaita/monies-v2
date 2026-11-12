@@ -3,6 +3,9 @@ package com.kimaita.monies.data.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Transaction
+import com.kimaita.monies.data.dao.dtos.SourceAmount
+import com.kimaita.monies.data.dao.dtos.SubjectAmount
+import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Subject
@@ -18,6 +21,9 @@ interface SubjectDao : BaseDao<Subject> {
         """
     )
     fun getSubjects(id: Long? = null): Flow<List<Subject>>
+
+    @Query("SELECT id, name FROM subjects WHERE id IN (:ids)")
+    suspend fun getSubjects(ids: List<Long>): List<SubjectRef>
 
     @Query("SELECT id FROM subjects WHERE name = :name AND number = :number")
     suspend fun getIdByNameAndNumber(name: String?, number: String?): Long?
@@ -82,6 +88,106 @@ interface SubjectDao : BaseDao<Subject> {
     fun getSubjectStats(
         subjectId: Long, startDate: String? = null, endDate: String? = null
     ): Flow<SubjectStats>
+
+
+    data class SubjectRef(val id: Long, val name: String)
+
+    @Query("SELECT id, name FROM subjects WHERE name LIKE '%' || :q || '%' COLLATE NOCASE ORDER BY name LIMIT :limit")
+    suspend fun searchSubjects(q: String, limit: Int = 30): List<SubjectRef>
+
+    @Query("SELECT id, name FROM subjects WHERE id = :id")
+    suspend fun getSubject(id: Long): SubjectRef?
+
+    @Query(
+        """
+            SELECT s.id, s.name 
+            FROM subjects s
+            LEFT JOIN transactions t ON t.subject = s.id
+            GROUP BY s.id 
+            ORDER BY COUNT(t.id) DESC 
+            LIMIT :limit
+        """
+    )
+    suspend fun topSubjects(limit: Int = 15): List<SubjectRef>
+
+    @Query(
+        """
+            SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount
+            FROM transactions AS t
+            JOIN subjects AS s ON t.subject = s.id
+            JOIN transaction_types AS tt ON t.transactionType = tt.id
+            WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
+              AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+              AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+              AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+              AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
+            GROUP BY s.id 
+            ORDER BY amount DESC 
+            LIMIT :limit
+        """
+    )
+    fun getTopSubjects(
+        startDate: String? = null, endDate: String? = null,
+        categoryId: List<Int>? = null, transactionType: List<Int>? = null,
+        natureFilter: Boolean? = null, limit: Int = 5,
+    ): Flow<List<SubjectAmount>>
+
+    @Query(
+        """
+    SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount
+    FROM transactions t
+    JOIN subjects s ON t.subject = s.id
+    JOIN transaction_types tt ON t.transactionType = tt.id
+    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
+      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (:transactionCategory IS NULL OR t.transactionCategory IN (:transactionCategory))
+      AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
+    GROUP BY s.id ORDER BY amount DESC LIMIT :limit
+"""
+    )
+    fun getTopSubjectsByAmount(
+        startDate: String?,
+        endDate: String?,
+        transactionType: List<Int>?,
+        transactionCategory: List<Int>?,
+        natureFilter: Boolean?,
+        limit: Int,
+    ): Flow<List<SubjectAmount>>
+
+    @Query(
+        """
+    SELECT s.id AS subjectId, s.name AS name, COUNT(*) AS count
+    FROM transactions t
+    JOIN subjects s ON t.subject = s.id
+    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
+      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+    GROUP BY s.id ORDER BY count DESC LIMIT :limit
+"""
+    )
+    fun getTopSubjectsByCount(
+        startDate: String?,
+        endDate: String?,
+        limit: Int
+    ): Flow<List<SubjectCount>>
+
+    @Query(
+        """
+    SELECT s.name AS name, SUM(t.amount) AS amount
+    FROM transactions t
+    JOIN subjects s ON t.subject = s.id
+    JOIN transaction_types tt ON t.transactionType = tt.id
+    WHERE tt.isInc = 1
+      AND (:startDate IS NULL OR t.transactionTime >= :startDate)
+      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+    GROUP BY s.id ORDER BY amount DESC LIMIT :limit
+"""
+    )
+    fun getIncomeBySource(
+        startDate: String?,
+        endDate: String?,
+        limit: Int
+    ): Flow<List<SourceAmount>>
 
 }
 

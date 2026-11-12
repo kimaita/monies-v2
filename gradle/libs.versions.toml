@@ -1,31 +1,44 @@
 [versions]
-agp = "9.0.1"
+agp = "9.3.3"
 composeCharts = "0.2.5"
 desugar_jdk_libs = "2.1.5"
 hilt = "2.59.2"
 hiltNavigationFragment = "1.3.0"
-kotlin = "2.3.10"
-coreKtx = "1.17.0"
+ksp = "2.3.9"
+kotlin = "2.4.0"
+coreKtx = "1.19.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-kotlinxSerializationJson = "1.10.0"
-lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.12.4"
-composeBom = "2026.02.01"
-navigationCompose = "2.9.7"
-pagingCompose = "3.4.1"
+kotlinxSerializationJson = "1.11.0"
+lifecycleRuntimeKtx = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2026.06.00"
+navigationCompose = "2.9.8"
+pagingCompose = "3.5.0"
 roomPaging = "2.8.4"
 timber = "5.0.1"
-uiTextGoogleFonts = "1.10.4"
+uiTextGoogleFonts = "1.11.3"
 window = "1.5.1"
 adaptiveAndroid = "1.2.0"
-vico = "3.0.2"
+vico = "3.2.2"
 coreI18n = "1.0.0"
-workRuntimeKtx = "2.11.1"
+workRuntimeKtx = "2.11.2"
 hiltCommon = "1.3.0"
 hiltWork = "1.3.0"
-pagingCommon = "3.4.1"
+pagingCommon = "3.5.0"
+material3 = "1.4.0"
+foundationLayout = "1.11.3"
+runtime = "1.11.3"
+ui = "1.11.3"
+animationCore = "1.11.3"
+foundation = "1.11.3"
+uiGeometry = "1.11.3"
+uiUnit = "1.11.3"
+runtimeSaveable = "1.11.3"
+uiText = "1.11.3"
+places = "5.2.0"
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,7 +55,9 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version = "2.
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomPaging" }
 androidx-room-paging = { module = "androidx.room:room-paging", version.ref = "roomPaging" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomPaging" }
-compose-charts = { module = "io.github.ehsannarmani:compose-charts", version.ref = "composeCharts" }
+kotlinMetadataJvm = { module = "org.jetbrains.kotlin:kotlin-metadata-jvm", version.ref = "kotlin" }
+
+
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
@@ -71,9 +86,22 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 androidx-hilt-common = { group = "androidx.hilt", name = "hilt-common", version.ref = "hiltCommon" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "hiltWork" }
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "pagingCommon" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
+androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCore" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
+androidx-compose-ui-unit = { group = "androidx.compose.ui", name = "ui-unit", version.ref = "uiUnit" }
+androidx-compose-runtime-saveable = { group = "androidx.compose.runtime", name = "runtime-saveable", version.ref = "runtimeSaveable" }
+androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
+places = { group = "com.google.android.libraries.places", name = "places", version.ref = "places" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+googleHilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+googleKsp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 

@@ -12,7 +12,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import com.kimaita.monies.ui.theme.GreenIncome
 import com.kimaita.monies.ui.theme.RedExpense
-import com.kimaita.monies.ui.theme.currencyFontFamily
 import java.text.NumberFormat
 import java.util.Currency
 import kotlin.math.absoluteValue

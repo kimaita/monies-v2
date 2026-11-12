@@ -21,137 +21,109 @@ data class TransactionType(
             .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
 
-fun getDefaultTransactionTypes(): List<TransactionType> {
-    return listOf(
-        TransactionType(
-            name = "paybill",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) for account (?<Number>.*)on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\.? New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
-            isInc = false,
-            provider = "MPESA",
-            displayName = "Paybill"
-        ),
-        TransactionType(
-            name = "till",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) paid to (?<Name>.*) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\.New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Till"
-        ),
-        TransactionType(
-            name = "send_money",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Send Money"
-        ),
-        TransactionType(
-            name = "pochi",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Pochi La Biashara"
-        ),
-        TransactionType(
-            name = "received.person",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
-            provider = "MPESA",
-            isInc = true,
-            displayName = "Received"
-        ),
-        TransactionType(
-            name = "received.bank",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) on (?<Date>[\d\/]+) (at )?(?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
-            provider = "MPESA",
-            isInc = true,
-            displayName = "Received"
-        ),
-        TransactionType(
-            name = "airtime.own",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.You bought Ksh(?<Amount>[\d,]+\.\d{2}) of (?<Name>airtime) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M)\.New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Airtime"
-        ),
-        TransactionType(
-            name = "airtime.other",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.You bought Ksh(?<Amount>[\d,]+\.\d{2}) of (?<Name>airtime) for (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M)\.New *balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Airtime"
-        ),
-        TransactionType(
-            name = "cash_deposit",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. On (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M) Give Ksh(?<Amount>[\d,\.]+) cash to\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = true,
-            displayName = "Cash Deposit"
-        ),
-        TransactionType(
-            name = "cash_withdrawal.atm",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. Ksh(?<Amount>[\d,\.]+) withdrawn from\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "ATM Withdrawal"
-        ),
-        TransactionType(
-            name = "cash_withdrawal.agent",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\.on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)Withdraw Ksh(?<Amount>[\d,\.]+) from\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Agent Withdrawal"
-        ),
-        TransactionType(
-            name = "mshwari.deposit",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.Ksh(?<Amount>[\d,]+\.\d{2}) transferred to (?<Name>M-Shwari account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}) \.New M-Shwari saving account balance is Ksh(?<MshwariBal>[\d,]+\.\d{2})\. Transaction cost Ksh\.(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "M-Shwari Deposit"
-        ),
-        TransactionType(
-            name = "mshwari.withdrawal",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.Ksh(?<Amount>[\d,]+\.\d{2}) transferred from (?<Name>M-Shwari account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-Shwari balance is Ksh(?<MshwariBal>[\d,]+\.\d{2}) \.M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}) \.Transaction cost Ksh\.(?<Cost>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = true,
-            displayName = "M-Shwari Withdrawal"
-        ),
-        TransactionType(
-            name = "mshwari.lock_savings.deposit",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) transfered to (?<Name>Lock Savings Account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2})\. Lock Savings Account balance is Ksh(?<LockSavingsBal>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Lock Savings Deposit"
-        ),
-        TransactionType(
-            name = "mshwari.lock_savings.withdrawal",
-            pattern = """Dear customer, Ksh (?<Amount>[\d,]+\.\d{2}) has been moved from your (?<Name>Lock Savings Account) to your M-Shwari account\. New M-Shwari balance is Ksh (?<MshwariBal>[\d,]+\.\d{2}). Transaction cost (?<Cost>[\d,]+\.\d{2})""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Lock Savings Withdrawal"
-        ),
-        TransactionType(
-            name = "fuliza.loan",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed.*(?<Name>Fuliza) M-PESA amount is Ksh (?<Amount>[\d,]+\.\d{2}).*(?:Interest|Access Fee|Fee) charged Ksh (?<Cost>[\d,]+\.\d{2}).*Total Fuliza M-PESA outstanding amount is Ksh.?(?<TotalLoan>[\d,]+\.\d{2}) due on (?<DueDate>[\d\/]+).)""",
-            provider = "MPESA",
-            isInc = true,
-            displayName = "Fuliza Loan"
-        ),
-        TransactionType(
-            name = "fuliza.partial_pay",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s*[cC]onfirmed.*Ksh (?<Amount>[\d,]+\.\d{2}).*from your M-PESA has been used to partially pay your outstanding (?<Name>Fuliza) M-PESA\. Your available Fuliza M-PESA limit is Ksh (?<AvailableFuliza>[\d,]+\.\d{2}).* M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}).)""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Fuliza Repayment"
-        ),
-        TransactionType(
-            name = "fuliza.final_pay",
-            pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s*[cC]onfirmed\. Ksh (?<Amount>[\d,]+\.\d{2}) from your M-PESA has been used to fully pay your outstanding (?<Name>Fuliza) M-PESA\. Available Fuliza M-PESA limit is Ksh (?<AvailableFuliza>[\d,]+\.\d{2})\. M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}))""",
-            provider = "MPESA",
-            isInc = false,
-            displayName = "Fuliza Repayment"
-        ),
-    )
-}
+private fun mpesa(name: String, displayName: String, isInc: Boolean, pattern: String) =
+    TransactionType(name = name, displayName = displayName, isInc = isInc, pattern = pattern)
 
-//TODO: Saf Dividend Payout
-//Failed to parse message: SmsMessage(body=TCQ453QIC0 Confirmed.  You have received a dividend payment from SAFARICOM PLC INTERIM DIVIDEND 2025 of Ksh2,246.75 on 26/3/25  at 8:28 AM. Your new Account balance is Ksh2,255.34., id=14514, originatingAddress=MPESA, timestamp=1742966885632)
-//Failed to parse message: SmsMessage(body=TCQ25D2GFG Confirmed.  You have received a dividend payment from SAFARICOM PLC INTERIM DIVIDEND 2025 of Ksh104.50 on 26/3/25  at 9:39 AM. Your new Account balance is Ksh100,359.84., id=14516, originatingAddress=MPESA, timestamp=1742971199934)
+/**
+ * The built-in message formats, synced into the database on every open (see DatabaseInitializer).
+ *
+ * Patterns use named groups that [com.kimaita.monies.services.SmsParser] reads: Body, Code, Amount,
+ * Cost, Name, Number, Date, Time, plus balance groups for BalanceExtractor (Balance, MpesaBal,
+ * MshwariBal, LockSavingsBal, AvailableFuliza, TotalLoan).
+ *
+ * Order matters: the parser takes the first pattern that matches, so a more specific format must
+ * come before a looser one (send_money before pochi, received.person before received.bank).
+ * `name` is the stable key used to sync these rows, so don't rename an existing entry.
+ */
+fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
+    // Payments and transfers out
+    mpesa(
+        name = "paybill", displayName = "Paybill", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) for account (?<Number>.*)on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\.? New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "till", displayName = "Till", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) paid to (?<Name>.*) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\.New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "send_money", displayName = "Send Money", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "pochi", displayName = "Pochi La Biashara", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+
+    // Money in
+    mpesa(
+        name = "received.person", displayName = "Received", isInc = true,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
+    ),
+    mpesa(
+        name = "received.bank", displayName = "Received", isInc = true,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) on (?<Date>[\d\/]+) (at )?(?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
+    ),
+    // e.g. "...Confirmed.  You have received a dividend payment from SAFARICOM PLC INTERIM DIVIDEND 2025
+    // of Ksh1,000.00 on 26/3/25  at 8:28 AM. Your new Account balance is Ksh2,000.00."
+    // Name drops the "INTERIM DIVIDEND 2025" suffix so every payout groups under one payer.
+    mpesa(
+        name = "dividend", displayName = "Dividend", isInc = true,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\.\s+You have received a dividend payment from (?<Name>.+?)(?: (?:INTERIM|FINAL|SPECIAL) DIVIDEND \d{4})? of Ksh(?<Amount>[\d,]+\.\d{2}) on (?<Date>[\d\/]+)\s+at (?<Time>\d{1,2}:\d{2} [AP]M)\. Your new Account balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
+    ),
+
+    // Airtime
+    mpesa(
+        name = "airtime.own", displayName = "Airtime", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.You bought Ksh(?<Amount>[\d,]+\.\d{2}) of (?<Name>airtime) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M)\.New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "airtime.other", displayName = "Airtime", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.You bought Ksh(?<Amount>[\d,]+\.\d{2}) of (?<Name>airtime) for (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M)\.New *balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+
+    // Cash
+    mpesa(
+        name = "cash_deposit", displayName = "Cash Deposit", isInc = true,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. On (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M) Give Ksh(?<Amount>[\d,\.]+) cash to\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "cash_withdrawal.atm", displayName = "ATM Withdrawal", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. Ksh(?<Amount>[\d,\.]+) withdrawn from\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "cash_withdrawal.agent", displayName = "Agent Withdrawal", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\.on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)Withdraw Ksh(?<Amount>[\d,\.]+) from\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d]+\.\d{2}))""",
+    ),
+
+    // M-Shwari and Lock Savings
+    mpesa(
+        name = "mshwari.deposit", displayName = "M-Shwari Deposit", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.Ksh(?<Amount>[\d,]+\.\d{2}) transferred to (?<Name>M-Shwari account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}) \.New M-Shwari saving account balance is Ksh(?<MshwariBal>[\d,]+\.\d{2})\. Transaction cost Ksh\.(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "mshwari.withdrawal", displayName = "M-Shwari Withdrawal", isInc = true,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.Ksh(?<Amount>[\d,]+\.\d{2}) transferred from (?<Name>M-Shwari account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-Shwari balance is Ksh(?<MshwariBal>[\d,]+\.\d{2}) \.M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}) \.Transaction cost Ksh\.(?<Cost>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "mshwari.lock_savings.deposit", displayName = "Lock Savings Deposit", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) transfered to (?<Name>Lock Savings Account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2})\. Lock Savings Account balance is Ksh(?<LockSavingsBal>[\d,]+\.\d{2}))""",
+    ),
+    mpesa(
+        name = "mshwari.lock_savings.withdrawal", displayName = "Lock Savings Withdrawal", isInc = false,
+        pattern = """Dear customer, Ksh (?<Amount>[\d,]+\.\d{2}) has been moved from your (?<Name>Lock Savings Account) to your M-Shwari account\. New M-Shwari balance is Ksh (?<MshwariBal>[\d,]+\.\d{2}). Transaction cost (?<Cost>[\d,]+\.\d{2})""",
+    ),
+
+    // Fuliza
+    mpesa(
+        name = "fuliza.loan", displayName = "Fuliza Loan", isInc = true,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed.*(?<Name>Fuliza) M-PESA amount is Ksh (?<Amount>[\d,]+\.\d{2}).*(?:Interest|Access Fee|Fee) charged Ksh (?<Cost>[\d,]+\.\d{2}).*Total Fuliza M-PESA outstanding amount is Ksh[. ]?(?<TotalLoan>[\d,]+\.\d{2}) due on (?<DueDate>[\d\/]+).)""",
+    ),
+    mpesa(
+        name = "fuliza.partial_pay", displayName = "Fuliza Repayment", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s*[cC]onfirmed.*Ksh (?<Amount>[\d,]+\.\d{2}).*from your M-PESA has been used to partially pay your outstanding (?<Name>Fuliza) M-PESA\. Your available Fuliza M-PESA limit is Ksh (?<AvailableFuliza>[\d,]+\.\d{2}).* (?:Your\s+)?M-PESA balance is (?:Ksh)?(?<MpesaBal>[\d,]+\.\d{2}).)""",
+    ),
+    mpesa(
+        name = "fuliza.final_pay", displayName = "Fuliza Repayment", isInc = false,
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s*[cC]onfirmed\.*Ksh (?<Amount>[\d,]+\.\d{2}) from your M-PESA has been used to fully pay your outstanding (?<Name>Fuliza) M-PESA\. Available Fuliza M-PESA limit is Ksh (?<AvailableFuliza>[\d,]+\.\d{2})\. (?:Your\s+)?M-PESA balance is (?:Ksh)?(?<MpesaBal>[\d,]+\.\d{2}))""",
+    ),
+)

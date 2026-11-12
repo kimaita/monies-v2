@@ -50,9 +50,10 @@ data class Transaction(
     val transactionCode: String?,
     val amount: Double,
     val cost: Double? = 0.0,
+    val balance: Double? = null,
     val transactionTime: LocalDateTime,
     val currency: String? = "KES",
-    val subject: Long?=null,
+    val subject: Long? = null,
     val transactionType: Int,
     val transactionCategory: Int? = null,
     val accountId: Int? = 0

@@ -46,3 +46,36 @@ data class SubjectStats(
     val outgoingCount: Int = 0,
     val totalCost: Double = 0.0
 )
+
+data class CashFlowBucket(
+    val bucket: String,
+    val income: Double,
+    val expense: Double,
+    val cost: Double
+)
+
+
+data class ActivityCell(val weekday: Int, val slot: Int, val count: Int)
+
+/** Latest balance per bucket — the balance-trend line. */
+data class BalanceBucket(val bucket: String, val balance: Float)
+
+/** Subject ranked by spend (top subjects, cross-filterable). */
+data class SubjectAmount(val subjectId: Long, val name: String, val amount: Double)
+
+/** Subject ranked by frequency (leaderboard). */
+data class SubjectCount(val subjectId: Long, val name: String, val count: Int)
+
+/** Income grouped by source (treemap). */
+data class SourceAmount(val name: String, val amount: Double)
+
+data class WeekdayCount(val weekday: Int, val count: Int, val total: Double)
+
+/** Raw rows for recurring detection (grouped + analysed in Kotlin). */
+data class SubjectOccurrence(
+    val subjectId: Long, val name: String, val typeName: String,
+    val transactionTime: String, val amount: Double,
+)
+
+/** Minimal projection for the balance backfill pass. */
+data class BalanceRow(val id: Long, val message: String, val transactionType: Int)

@@ -1,6 +1,8 @@
-package com.kimaita.monies.data.di
+package com.kimaita.monies.di
 
+import android.content.ContentValues
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -14,6 +16,7 @@ import com.kimaita.monies.data.database.AppDatabase
 import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.database.models.getDefaultCategories
 import com.kimaita.monies.data.database.models.getDefaultTransactionTypes
+import com.kimaita.monies.services.SmsSyncer
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,7 +36,6 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(
         @ApplicationContext context: Context,
-        transactionTypeDaoProvider: Provider<TransactionTypeDao>,
         categoryDaoProvider: Provider<CategoryDao>,
         userAccountDaoProvider: Provider<AccountDao>,
     ): AppDatabase {
@@ -43,7 +45,6 @@ object DatabaseModule {
             .fallbackToDestructiveMigration(false)
             .addCallback(
                 DatabaseInitializer(
-                    transactionTypeDaoProvider,
                     categoryDaoProvider,
                     userAccountDaoProvider
                 )
@@ -81,16 +82,10 @@ object DatabaseModule {
         return appDatabase.accountDao()
     }
 
-
-//    @Provides
-//    fun provideTransactionRunnerDao(appDatabase: AppDatabase): TransactionRunnerDao {
-//        return appDatabase.transactionRunnerDao()
-//    }
 }
 
 
 class DatabaseInitializer(
-    private val daoProvider: Provider<TransactionTypeDao>,
     private val categoryDaoProvider: Provider<CategoryDao>,
     private val userAccountDaoProvider: Provider<AccountDao>,
 ) : RoomDatabase.Callback() {
@@ -102,8 +97,71 @@ class DatabaseInitializer(
         }
     }
 
+    /** Runs synchronously before any DAO sees the database, so a sync can never miss a new type. */
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        super.onOpen(db)
+        syncDefaultTransactionTypes(db)
+    }
+
+    /**
+     * Inserts default types that are missing and updates ones whose pattern, direction or label
+     * changed, matching rows by name. When anything changes, the SMS cursor is rewound so the
+     * next sync re-reads the inbox; already-saved messages are skipped by the unique index on
+     * `transactions.message`. The cursor is only rewound if it exists, so a first run stays one.
+     */
+    private fun syncDefaultTransactionTypes(db: SupportSQLiteDatabase) {
+        data class Row(val id: Long, val pattern: String?, val isInc: Boolean, val displayName: String?)
+
+        val existing = HashMap<String, Row>()
+        db.query("SELECT id, name, pattern, isInc, displayName FROM transaction_types").use { c ->
+            while (c.moveToNext()) {
+                existing[c.getString(1)] = Row(
+                    id = c.getLong(0),
+                    pattern = c.getString(2),
+                    isInc = c.getInt(3) != 0,
+                    displayName = c.getString(4),
+                )
+            }
+        }
+
+        var changed = false
+        db.beginTransaction()
+        try {
+            for (type in getDefaultTransactionTypes()) {
+                val values = ContentValues().apply {
+                    put("pattern", type.pattern)
+                    put("isInc", if (type.isInc) 1 else 0)
+                    put("displayName", type.displayName)
+                }
+                val row = existing[type.name]
+                if (row == null) {
+                    values.put("name", type.name)
+                    values.put("provider", type.provider)
+                    values.put("isActive", if (type.isActive) 1 else 0)
+                    db.insert("transaction_types", SQLiteDatabase.CONFLICT_IGNORE, values)
+                    changed = true
+                } else if (row.pattern != type.pattern || row.isInc != type.isInc || row.displayName != type.displayName) {
+                    db.update(
+                        "transaction_types", SQLiteDatabase.CONFLICT_REPLACE, values,
+                        "id = ?", arrayOf(row.id)
+                    )
+                    changed = true
+                }
+            }
+            if (changed) {
+                db.execSQL(
+                    "UPDATE settings SET value = '0' WHERE `key` = ?",
+                    arrayOf(SmsSyncer.LAST_SMS_SYNC_ID_KEY)
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     private suspend fun populateDatabase() {
-        daoProvider.get().insertAll(getDefaultTransactionTypes());
+        // Transaction types are inserted by onOpen, which Room calls straight after onCreate.
         categoryDaoProvider.get().insertAll(getDefaultCategories())
         userAccountDaoProvider.get().insert(
             UserAccount(

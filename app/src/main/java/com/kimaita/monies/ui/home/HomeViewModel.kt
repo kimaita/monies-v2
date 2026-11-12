@@ -1,24 +1,34 @@
 package com.kimaita.monies.ui.home
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kimaita.monies.data.DefaultTransactionsRepository
+import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.data.dao.dtos.IncExp
+import com.kimaita.monies.models.OtherBalances
+import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
-import com.kimaita.monies.ui.components.TimeFilter
-import com.kimaita.monies.ui.components.getDatesForFilter
+import com.kimaita.monies.models.getDatesForFilter
+import com.kimaita.monies.services.SmsSyncer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.time.Duration
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -26,98 +36,127 @@ data class HomeUiState(
     val mpesaBalance: Double = 0.0,
     val incomeVsExpense: IncExp = IncExp(),
     val transactionCount: Int = 0,
-    val recentTransactions: List<Transaction?> = emptyList(),
+    val recentTransactions: List<Transaction> = emptyList(),
     val largestIncome: Transaction? = null,
     val largestExpense: Transaction? = null,
-    val availableFuliza: Double = 0.0,
-    val outstandingFuliza: Double = 0.0,
-    val mshwariLoan: Double = 0.0,
-    val lockSavings: Double = 0.0,
-    val mshwariBalance: Double = 0.0,
+    val availableFuliza: Double? = null,
+    val outstandingFuliza: Double? = null,
+    val mshwariLoan: Double? = null,
+    val lockSavings: Double? = null,
+    val mshwariBalance: Double? = null,
     val totalTransactionAmount: Double = 0.0,
     val totalTransactionCost: Double = 0.0,
-    val changeInTotal: Double = 0.0,
+    val changeInTotal: Double? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
 )
 
+private data class PeriodData(
+    val incExp: IncExp,
+    val largestIncome: Transaction?,
+    val largestExpense: Transaction?,
+    val previousIncExp: IncExp?,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: DefaultTransactionsRepository,
-//    private val application: Application
+    private val repository: TransactionsRepository,
+    private val smsSyncer: SmsSyncer,
 ) : ViewModel() {
 
 
     private val _timeFilter = MutableStateFlow<TimeFilter>(TimeFilter.DAY)
     val filters: StateFlow<TimeFilter> = _timeFilter.asStateFlow()
 
+    val isSyncing: StateFlow<Boolean> =
+        smsSyncer.isSyncing.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val _errorEvents = MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
+
     fun setTimeFilter(filter: TimeFilter) {
         _timeFilter.value = filter
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val dateRange = _timeFilter.flatMapLatest { filter ->
-        MutableStateFlow(getDatesForFilter(filter))
+    private val dateRange: Flow<Pair<String?, String?>> = _timeFilter.map { getDatesForFilter(it) }
+
+    private val periodData: Flow<PeriodData> = dateRange.flatMapLatest { (start, end) ->
+        val prev = previousPeriod(start, end)
+        val previousIncExp: Flow<IncExp?> =
+            if (prev != null) repository.getIncomeVsExpense(prev.first, prev.second)
+                .fallbackOnError(IncExp())
+            else flowOf(null)
+
+        combine(
+            repository.getIncomeVsExpense(start, end).fallbackOnError(IncExp()),
+            repository.getLargestTransaction(isInc = true, startDate = start, endDate = end)
+                .fallbackOnError(null),
+            repository.getLargestTransaction(isInc = false, startDate = start, endDate = end)
+                .fallbackOnError(null),
+            previousIncExp,
+        ) { incExp, largestInc, largestExp, prevIncExp ->
+            PeriodData(incExp, largestInc, largestExp, prevIncExp)
+        }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val uiState: StateFlow<HomeUiState> = combine(
-        repository.getMpesaBalance(),
-        dateRange.flatMapLatest { (start, end) -> repository.getIncomeVsExpense(start, end) },
-        repository.getRecentTransactions(5),
-        dateRange.flatMapLatest { (start, end) ->
-            repository.getLargestTransaction(
-                isInc = true, startDate = start, endDate = end
-            )
-        },
-        dateRange.flatMapLatest { (start, end) ->
-            repository.getLargestTransaction(
-                isInc = false, startDate = start, endDate = end
-            )
-        },
-    ) { bal, incExp, recent, largestInc, largestExp ->
-        HomeUiState(
-            mpesaBalance = bal,
-            incomeVsExpense = incExp,
-            transactionCount = incExp.incomeCount + incExp.expenseCount,
-            totalTransactionCost = incExp.incomeCost + incExp.expenseCost,
-            totalTransactionAmount = incExp.income - incExp.expense,
-            recentTransactions = recent,
-            largestIncome = largestInc,
-            largestExpense = largestExp,
-            // TODO: Implement calculations for other balances
 
+    val uiState: StateFlow<HomeUiState> = combine(
+        repository.getMpesaBalance().fallbackOnError(0.0),
+        repository.getRecentTransactions(5).fallbackOnError(emptyList()),
+        repository.getOtherBalances().fallbackOnError(OtherBalances()),
+        periodData,
+    ) { balance, recent, other, period ->
+        val totalMoved = period.incExp.income + period.incExp.expense
+        val prevMoved = period.previousIncExp?.let { it.income + it.expense }
+        HomeUiState(
+            mpesaBalance = balance,
+            incomeVsExpense = period.incExp,
+            transactionCount = period.incExp.incomeCount + period.incExp.expenseCount,
+            totalTransactionCost = period.incExp.incomeCost + period.incExp.expenseCost,
+            totalTransactionAmount = period.incExp.income - period.incExp.expense,
+            recentTransactions = recent,
+            largestIncome = period.largestIncome,
+            largestExpense = period.largestExpense,
+            changeInTotal = percentChange(current = totalMoved, previous = prevMoved),
+            isLoading = false,
+            availableFuliza = other.availableFuliza,
+            outstandingFuliza = other.outstandingFuliza,
+            mshwariBalance = other.mshwariBalance,
+            lockSavings = other.lockSavings,
+            mshwariLoan = other.mshwariLoan,
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = HomeUiState(isLoading = true)
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = HomeUiState(isLoading = true),
     )
 
-    private val _uiState = MutableStateFlow(uiState.value)
 
-    /**
-     * Public function that can be called from the UI to start the initial SMS sync.
-     * This is useful for a "Sync Now" button or a pull-to-refresh action.
-     */
-//    fun performInitialSmsSync() {
-//        viewModelScope.launch {
-//            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-//            try {
-//                repository.syncAllSms(application)
-//            } catch (e: Exception) {
-//                _uiState.update { it.copy(errorMessage = "Failed to sync messages: ${e.message}") }
-//            } finally {
-//                _uiState.update { it.copy(isLoading = false) }
-//            }
-//        }
-//    }
+    private fun <T> Flow<T>.fallbackOnError(fallback: T): Flow<T> = catch { e ->
+        Timber.e(e, "Home data stream failed")
+        _errorEvents.tryEmit("Couldn't refresh dashboard data.")
+        emit(fallback)
+    }
 
-    /**
-     * Call this from the UI to clear any error messages after they've been shown,
-     * for example, after a Snackbar has been dismissed.
-     */
-    fun errorShown() {
-        _uiState.update { it.copy(errorMessage = null) }
+    private fun percentChange(current: Double, previous: Double?): Double? {
+        if (previous == null || previous == 0.0) return null
+        return (current - previous) / previous * 100.0
+    }
+
+
+    private fun previousPeriod(start: String?, end: String?): Pair<String, String>? {
+        if (start == null || end == null) return null
+        return try {
+            val s = LocalDateTime.parse(start)
+            val e = LocalDateTime.parse(end)
+            val length = Duration.between(s, e)
+            s.minus(length).toString() to s.toString()
+        } catch (e: Exception) {
+            null
+        }
     }
 }
