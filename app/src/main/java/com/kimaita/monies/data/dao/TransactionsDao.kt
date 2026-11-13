@@ -18,6 +18,17 @@ import com.kimaita.monies.data.database.models.TransactionWithDetails
 import com.kimaita.monies.models.SortOrder
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * The search box as a filter on alias `t`: the message text (FTS), the amount, or the display name
+ * of the subject, any one of them. Shared by every query that has to show the same rows for a search.
+ */
+private const val SEARCH_FILTER = """
+        AND (:fts IS NULL AND :amountQuery IS NULL AND :subjectLike IS NULL
+            OR :fts IS NOT NULL AND t.id IN (SELECT rowid FROM transactions_fts WHERE transactions_fts MATCH :fts)
+            OR :amountQuery IS NOT NULL AND CAST(t.amount AS TEXT) LIKE :amountQuery || '%'
+            OR :subjectLike IS NOT NULL AND t.subject IN (SELECT id FROM subjects WHERE name LIKE :subjectLike))
+"""
+
 @Dao
 interface TransactionsDao : BaseDao<Transaction> {
 
@@ -46,8 +57,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
         AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
         AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
-        AND (:fts IS NULL OR t.id IN (SELECT rowid FROM transactions_fts WHERE transactions_fts MATCH :fts))
-        AND (:amountQuery IS NULL OR CAST(t.amount AS TEXT) LIKE :amountQuery || '%')
+        """ + SEARCH_FILTER + """
         ORDER BY 
             CASE WHEN :sortOrder = 'DATE_DESC' THEN t.transactionTime END DESC,
             CASE WHEN :sortOrder = 'DATE_ASC' THEN t.transactionTime END ASC,
@@ -67,6 +77,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         sortOrder: SortOrder?,
         fts: String? = null,
         amountQuery: String? = null,
+        subjectLike: String? = null,
         limit: Int? = null
     ): PagingSource<Int, TransactionWithDetails>
 
