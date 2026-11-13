@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -117,8 +118,18 @@ fun MoniesNavHost(
 }
 
 
-fun NavHostController.navigateToTab(route: String) = navigate(route) {
-    popUpTo(graph.findStartDestination().id) { saveState = true }
-    launchSingleTop = true
-    restoreState = true
+/**
+ * Switches tab, keeping the state of Analytics and Export. Home is the start destination, so it is
+ * reached by popping back to it: navigating "to" Home with `restoreState` can restore whatever tab
+ * was just popped (the pop files it under Home's id when Home has no saved entry), which left the
+ * Home tab apparently doing nothing.
+ */
+fun NavController.navigateToTab(route: String) {
+    val home = graph.findStartDestination()
+    if (route == TopDest.HOME.route) popBackStack(home.id, inclusive = false, saveState = true)
+    else navigate(route) {
+        popUpTo(home.id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
 }

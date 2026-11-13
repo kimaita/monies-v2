@@ -10,6 +10,7 @@ import com.kimaita.monies.data.dao.dtos.AccountLine
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.UnparsedMessage
 import com.kimaita.monies.models.CategoryApplyMode
+import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.services.SmsSyncer
 import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.worker.SmsSyncWorker
@@ -39,6 +40,9 @@ class SettingsViewModel @Inject constructor(
     val theme = repository.themeMode.state(ThemeMode.SYSTEM)
     val unparsedCount = repository.getUnparsedCount().state(0)
     val unparsed = repository.getUnparsedMessages().state(emptyList<UnparsedMessage>())
+
+    /** The newest few transactions of a line, so lines can be told apart when merging. */
+    fun samples(accountId: Int): Flow<List<Transaction>> = repository.getLineSamples(accountId, 3)
 
     fun renameAccount(id: Int, label: String) {
         viewModelScope.launch { repository.renameAccount(id, label) }

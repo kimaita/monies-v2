@@ -516,6 +516,9 @@ class DefaultTransactionsRepository @Inject constructor(
 
     override fun getAccountLines() = accountDao.getLineSummaries().map { accountLines(it) }
 
+    override fun getLineSamples(accountId: Int, limit: Int): Flow<List<Transaction>> =
+        transactionsDao.getLatestTransactions(limit, accountId).map { list -> list.map { it.toDomainModel() } }
+
     override suspend fun renameAccount(accountId: Int, label: String?) = withContext(Dispatchers.IO) {
         accountDao.setLabel(accountId, label?.trim()?.takeIf { it.isNotEmpty() })
     }

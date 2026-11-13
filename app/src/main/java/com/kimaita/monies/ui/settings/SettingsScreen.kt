@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -36,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +47,7 @@ import com.kimaita.monies.R
 import com.kimaita.monies.data.dao.dtos.AccountLine
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.models.CategoryApplyMode
+import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.ui.util.formatKes
 import java.time.Instant
@@ -208,17 +212,25 @@ fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel = 
             onDismissRequest = { mergeSource = null },
             title = { Text("Merge ${source.name} into") },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "Latest on ${source.name}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Samples(viewModel, source.accountId)
+                    HorizontalDivider(Modifier.padding(top = 8.dp))
                     accounts.filter { it.provider == source.provider && it.accountId != source.accountId }
                         .forEach { t ->
-                            Text(
-                                t.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier
+                            Column(
+                                Modifier
                                     .fillMaxWidth()
                                     .clickable { mergePair = source to t; mergeSource = null }
-                                    .padding(vertical = 12.dp),
-                            )
+                                    .padding(vertical = 12.dp)
+                            ) {
+                                Text(t.name, style = MaterialTheme.typography.bodyLarge)
+                                Samples(viewModel, t.accountId)
+                            }
                         }
                 }
             },
@@ -335,6 +347,41 @@ fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewMode
                     HorizontalDivider()
                 }
             }
+        }
+    }
+}
+
+/** A line's latest few transactions (date, type, amount, subject), so the user can tell lines apart. */
+@Composable
+private fun Samples(viewModel: SettingsViewModel, accountId: Int) {
+    val rows by remember(accountId) { viewModel.samples(accountId) }
+        .collectAsStateWithLifecycle(emptyList())
+    if (rows.isEmpty()) Text(
+        "No transactions",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    rows.forEach { t ->
+        val type = t.type.displayName ?: t.type.name
+        val who = t.subject?.let { it.name ?: it.number }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    who ?: type,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    listOfNotNull(t.transactionTime?.format(dateFmt), type.takeIf { who != null }).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            CurrencyText(t.amount, isInc = t.isInc) { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

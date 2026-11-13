@@ -39,7 +39,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -67,6 +66,7 @@ import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.components.TransactionListItem
+import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.util.formatAmount
 import kotlin.math.abs
 
@@ -90,7 +90,7 @@ fun HomeScreen(
         onSearch = { navController.navigate("transactions?search=true") },
         onSettings = { navController.navigate("settings") },
         onToggleHideBalances = viewModel::toggleHideBalances,
-        onViewAnalytics = { navController.navigate("analytics") },
+        onViewAnalytics = { navController.navigateToTab("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
         onAccountSelect = viewModel::selectAccount,
         onSubjectClick = { subjectId -> navController.navigate("subject/$subjectId") },
@@ -211,7 +211,7 @@ fun HomeScreenContent(
                     ),
                 )
             }
-            if (uiState.accountBalances.size > 1) {
+            if (uiState.selectedAccount == null && uiState.accountBalances.size > 1) {
                 Spacer(Modifier.height(8.dp))
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
@@ -406,7 +406,6 @@ private fun PeriodSegment(filter: TimeFilter, onPeriod: (TimeFilter) -> Unit) {
             val on = filter == value
             Box(
                 Modifier
-                    .minimumInteractiveComponentSize()
                     .clip(RoundedCornerShape(7.dp))
                     .background(if (on) cs.surface else Color.Transparent)
                     .clickable { onPeriod(value) }
