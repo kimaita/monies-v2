@@ -25,15 +25,15 @@ interface SubjectDao : BaseDao<Subject> {
     @Query("SELECT id, name FROM subjects WHERE id IN (:ids)")
     suspend fun getSubjects(ids: List<Long>): List<SubjectRef>
 
-    @Query("SELECT id FROM subjects WHERE name = :name AND number = :number")
-    suspend fun getIdByNameAndNumber(name: String?, number: String?): Long?
+    @Query("SELECT id FROM subjects WHERE rawName = :rawName AND number = :number")
+    suspend fun getIdByRawNameAndNumber(rawName: String?, number: String?): Long?
 
 
     @Transaction
     suspend fun upsertAndGetId(subject: Subject): Long {
         val id = insert(subject)
         return if (id == -1L) {
-            getIdByNameAndNumber(subject.name, subject.number)!!
+            getIdByRawNameAndNumber(subject.rawName, subject.number)!!
         } else {
             id
         }

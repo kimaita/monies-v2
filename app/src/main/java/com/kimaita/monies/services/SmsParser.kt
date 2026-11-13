@@ -87,7 +87,7 @@ class SmsParser @Inject constructor() {
 
         val name = subjectName ?: subjectNumber
         val newSubject = name?.let { name ->
-            Subject(name = name, number = subjectNumber ?: "")
+            Subject(rawName = name, name = name, number = subjectNumber ?: "")
         }
         val transaction = Transaction(
             amount = amount,
@@ -100,7 +100,7 @@ class SmsParser @Inject constructor() {
             subject = null,
             transactionType = typeId,
             transactionCategory = null,
-            accountId = 0
+            accountId = 0 // placeholder; SmsSyncer sets the real account
         )
         return Pair(transaction, newSubject)
     }

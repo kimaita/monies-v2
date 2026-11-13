@@ -7,12 +7,17 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "subjects",
-    indices = [Index(value = ["name", "number"], unique = true)]
+    indices = [Index(value = ["rawName", "number"], unique = true)]
 )
 @Immutable
 data class Subject(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    /** The name as parsed; the parser's lookup key. */
+    val rawName: String,
+    /** Editable display name. */
     val name: String,
-    val number: String="",
+    val number: String = "",
+    val mergedInto: Long? = null,
+    val categoryId: Int? = null,
 )

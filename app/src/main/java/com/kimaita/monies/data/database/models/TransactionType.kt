@@ -1,5 +1,6 @@
 package com.kimaita.monies.data.database.models
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
@@ -14,6 +15,7 @@ data class TransactionType(
     val description: String? = null,
     val isActive: Boolean = true,
     val displayName: String? = null,
+    @ColumnInfo(defaultValue = "0") val isTransfer: Boolean = false,
 ) {
     @get:Ignore
     val finalDisplayName: String

@@ -281,7 +281,7 @@ class DefaultTransactionsRepository @Inject constructor(
         FilterOptions(
             categories = categories.await().map { NamedRef(it.id, it.name) },
             accounts = accounts.await()
-                .map { NamedRef(it.subscriptionId, it.carrier + ' ' + it.number) },
+                .map { NamedRef(it.id, it.label ?: it.provider) },
             types = types.await().map { NamedRef(it.id, it.name) },
         )
     }

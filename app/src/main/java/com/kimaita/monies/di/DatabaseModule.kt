@@ -13,7 +13,6 @@ import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
 import com.kimaita.monies.data.database.AppDatabase
-import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.database.models.getDefaultCategories
 import com.kimaita.monies.data.database.models.getDefaultTransactionTypes
 import com.kimaita.monies.services.SmsSyncer
@@ -37,17 +36,13 @@ object DatabaseModule {
     fun provideAppDatabase(
         @ApplicationContext context: Context,
         categoryDaoProvider: Provider<CategoryDao>,
-        userAccountDaoProvider: Provider<AccountDao>,
     ): AppDatabase {
         return Room.databaseBuilder(
             context, AppDatabase::class.java, "monies-db",
         )
-            .fallbackToDestructiveMigration(false)
+            .fallbackToDestructiveMigrationFrom(true, 1)
             .addCallback(
-                DatabaseInitializer(
-                    categoryDaoProvider,
-                    userAccountDaoProvider
-                )
+                DatabaseInitializer(categoryDaoProvider)
             )
             .build()
     }
@@ -87,7 +82,6 @@ object DatabaseModule {
 
 class DatabaseInitializer(
     private val categoryDaoProvider: Provider<CategoryDao>,
-    private val userAccountDaoProvider: Provider<AccountDao>,
 ) : RoomDatabase.Callback() {
 
     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -163,13 +157,5 @@ class DatabaseInitializer(
     private suspend fun populateDatabase() {
         // Transaction types are inserted by onOpen, which Room calls straight after onCreate.
         categoryDaoProvider.get().insertAll(getDefaultCategories())
-        userAccountDaoProvider.get().insert(
-            UserAccount(
-                subscriptionId = 0,
-                carrier = null,
-                number = null
-            )
-        )
-
     }
 }

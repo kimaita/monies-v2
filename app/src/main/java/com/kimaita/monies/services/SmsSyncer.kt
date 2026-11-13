@@ -3,12 +3,14 @@ package com.kimaita.monies.services
 import androidx.room.withTransaction
 import com.kimaita.monies.data.BalanceExtractor
 import com.kimaita.monies.data.SmsDataSource
+import com.kimaita.monies.data.dao.AccountDao
 import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
 import com.kimaita.monies.data.database.AppDatabase
 import com.kimaita.monies.data.database.models.Setting
+import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.models.SmsBatchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -34,6 +36,7 @@ class SmsSyncer @Inject constructor(
     private val subjectDao: SubjectDao,
     private val transactionsDao: TransactionsDao,
     private val settingsDao: SettingsDao,
+    private val accountDao: AccountDao,
 ) {
 
     private val syncMutex = Mutex()
@@ -96,8 +99,13 @@ class SmsSyncer @Inject constructor(
         val subjectIds = parsed.mapNotNull { it.second }.distinct()
             .associateWith { subjectDao.upsertAndGetId(it) }
 
+        // Until WP3 every transaction goes to one account row.
+        val accountId = accountDao.getId("MPESA", -1)
+            ?: accountDao.insert(UserAccount(provider = "MPESA", subscriptionId = -1)).toInt()
+
         val toInsert = parsed.map { (txn, subject) ->
-            val withSubject = if (subject != null) txn.copy(subject = subjectIds.getValue(subject)) else txn
+            val withSubject = (if (subject != null) txn.copy(subject = subjectIds.getValue(subject)) else txn)
+                .copy(accountId = accountId)
             withSubject.copy(balance = BalanceExtractor.extract(withSubject.message, typesById[withSubject.transactionType]?.pattern))
         }
         transactionsDao.insertAll(toInsert)

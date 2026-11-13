@@ -11,5 +11,8 @@ interface AccountDao : BaseDao<UserAccount> {
     @Query("""SELECT * FROM accounts""")
     fun getAll(): Flow<List<UserAccount>>
 
+    @Query("SELECT id FROM accounts WHERE provider = :provider AND subscriptionId = :subscriptionId")
+    suspend fun getId(provider: String, subscriptionId: Int): Int?
+
 
 }

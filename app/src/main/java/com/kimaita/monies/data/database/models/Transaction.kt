@@ -36,7 +36,7 @@ import java.time.LocalDateTime
         ),
         ForeignKey(
             entity = UserAccount::class,
-            parentColumns = ["subscriptionId"],
+            parentColumns = ["id"],
             childColumns = ["accountId"]
         )
     ]
@@ -56,7 +56,7 @@ data class Transaction(
     val subject: Long? = null,
     val transactionType: Int,
     val transactionCategory: Int? = null,
-    val accountId: Int? = 0
+    val accountId: Int
 )
 
 @Entity(tableName = "transactions_fts")
