@@ -39,7 +39,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -406,7 +405,6 @@ private fun PeriodSegment(filter: TimeFilter, onPeriod: (TimeFilter) -> Unit) {
             val on = filter == value
             Box(
                 Modifier
-                    .minimumInteractiveComponentSize()
                     .clip(RoundedCornerShape(7.dp))
                     .background(if (on) cs.surface else Color.Transparent)
                     .clickable { onPeriod(value) }
