@@ -35,6 +35,7 @@ import com.kimaita.monies.data.database.models.TransactionWithDetails
 import com.kimaita.monies.data.database.toDomainModel
 import com.kimaita.monies.models.BalanceField
 import com.kimaita.monies.models.OtherBalances
+import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.export.ExportFilters
@@ -148,12 +149,18 @@ class DefaultTransactionsRepository @Inject constructor(
         endDate: String?,
     ): Flow<PagingData<Transaction>> {
         val search = searchTermsOf(transactionFilters?.searchQuery)
+        val query = when (transactionFilters?.sortOrder) {
+            SortOrder.DATE_ASC -> transactionsDao::getTransactionsOldest
+            SortOrder.AMOUNT_DESC -> transactionsDao::getTransactionsLargest
+            SortOrder.AMOUNT_ASC -> transactionsDao::getTransactionsSmallest
+            SortOrder.DATE_DESC, null -> transactionsDao::getTransactionsNewest
+        }
         return forAccount { selected ->
             Pager(
                 config = PagingConfig(
-                    pageSize = 50, enablePlaceholders = false, prefetchDistance = 10
+                    pageSize = 50, prefetchDistance = 10, enablePlaceholders = false, maxSize = 300
                 ), pagingSourceFactory = {
-                    transactionsDao.getTransactions(
+                    query(
                         startDate,
                         endDate,
                         transactionFilters?.subjectFilter,
@@ -161,7 +168,6 @@ class DefaultTransactionsRepository @Inject constructor(
                         transactionFilters?.typeFilters?.takeIf { it.isNotEmpty() },
                         transactionFilters?.accountFilter ?: selected,
                         transactionFilters?.natureFilter,
-                        transactionFilters?.sortOrder,
                         search.fts,
                         search.amount,
                         search.subjectLike
