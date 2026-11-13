@@ -2,6 +2,8 @@ package com.kimaita.monies.data.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
+import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.database.models.Category
 import kotlinx.coroutines.flow.Flow
@@ -42,4 +44,35 @@ interface CategoryDao : BaseDao<Category> {
         categoryId: List<Int>? = null, transactionType: List<Int>? = null, natureFilter: Boolean? = null, account: Int? = null,
     ): Flow<List<CategorySpending>>
 
+    @Query("UPDATE transactions SET transactionCategory = NULL WHERE transactionCategory = :id")
+    suspend fun clearTransactionCategory(id: Int)
+
+    @Query("UPDATE subjects SET categoryId = NULL WHERE categoryId = :id")
+    suspend fun clearSubjectCategory(id: Int)
+
+    @Query("DELETE FROM categories WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
+    @Transaction
+    suspend fun deleteCategory(id: Int) {
+        clearTransactionCategory(id)
+        clearSubjectCategory(id)
+        deleteById(id)
+    }
+
+    /** Budgeted categories with what they spent between [start] and [end] (ISO text), money out only. */
+    @Query(
+        """
+        SELECT c.id AS id, c.name AS name, c.monthlyBudget AS budget, COALESCE(SUM(t.amount), 0) AS spent
+        FROM categories c
+        LEFT JOIN transactions t ON t.transactionCategory = c.id
+            AND t.transactionTime >= :start AND t.transactionTime <= :end
+            AND t.transactionType IN (SELECT id FROM transaction_types WHERE isInc = 0 AND isTransfer = 0)
+            AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        WHERE c.monthlyBudget IS NOT NULL
+        GROUP BY c.id
+        ORDER BY c.name
+    """
+    )
+    fun getBudgets(start: String, end: String, account: Int? = null): Flow<List<CategoryBudget>>
 }

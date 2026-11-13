@@ -25,7 +25,8 @@ import com.kimaita.monies.ui.subject.SubjectScreen
 import com.kimaita.monies.ui.analytics.AnalyticsScreen
 import com.kimaita.monies.ui.export.ExportScreen
 import com.kimaita.monies.ui.home.HomeScreen
-import com.kimaita.monies.ui.profile.ProfileScreen
+import com.kimaita.monies.ui.settings.SettingsScreen
+import com.kimaita.monies.ui.settings.UnrecognisedScreen
 import com.kimaita.monies.ui.transactions.TransactionsScreen
 
 enum class TopDest(val route: String, val label: String) {
@@ -103,12 +104,8 @@ fun MoniesNavHost(
                 viewModel = hiltViewModel()
             )
         }
-        composable("account") {
-            ProfileScreen(
-                navController = navController,
-                viewModel = hiltViewModel()
-            )
-        }
+        composable("settings") { SettingsScreen(navController = navController) }
+        composable("settings/unrecognised") { UnrecognisedScreen(navController = navController) }
         composable(
             route = "subject/{subjectId}",
             arguments = listOf(navArgument("subjectId") { type = NavType.StringType })

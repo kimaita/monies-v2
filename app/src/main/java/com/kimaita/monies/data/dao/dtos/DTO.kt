@@ -119,3 +119,40 @@ fun lineNames(lines: List<LineBalance>): Map<Int, String> {
         l.accountId to (l.label?.takeIf { it.isNotBlank() } ?: if (perProvider.getValue(l.provider) > 1 && n > 1) "$base $n" else base)
     }
 }
+
+/** A line as read for Settings: provider, label, transaction count and the time of its last transaction. */
+data class LineSummary(
+    val accountId: Int,
+    val provider: String,
+    val label: String?,
+    val count: Int,
+    val lastActivity: String?,
+)
+
+/** A line for the Settings list; [dormant] lines have been quiet for over 90 days before the newest transaction. */
+data class AccountLine(
+    val accountId: Int,
+    val name: String,
+    val provider: String,
+    val count: Int,
+    val lastActivity: String?,
+    val dormant: Boolean,
+)
+
+fun accountLines(lines: List<LineSummary>): List<AccountLine> {
+    val names = lineNames(lines.map { LineBalance(it.accountId, it.provider, it.label, null) })
+    val newest = lines.mapNotNull { it.lastActivity }.maxOrNull()?.let { java.time.LocalDateTime.parse(it) }
+    return lines.map {
+        val last = it.lastActivity
+        val dormant = last != null && newest != null &&
+            java.time.LocalDateTime.parse(last).isBefore(newest.minusDays(90))
+        AccountLine(it.accountId, names.getValue(it.accountId), it.provider, it.count, last, dormant)
+    }
+}
+
+/** A category with a monthly budget and what was spent against it. */
+data class CategoryBudget(val id: Int, val name: String, val budget: Double, val spent: Double) {
+    /** Share of the budget used, 0..1 for the bar. */
+    val progress: Float get() = if (budget <= 0.0) 0f else (spent / budget).toFloat().coerceIn(0f, 1f)
+    val isOver: Boolean get() = spent > budget
+}

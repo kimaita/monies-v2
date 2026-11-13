@@ -167,6 +167,9 @@ class SmsSyncer(
             }
         }
 
+    /** Runs [block] while no sync is running or can start (used to reset the data before a re-import). */
+    suspend fun <T> exclusive(block: suspend () -> T): T = syncMutex.withLock { block() }
+
     /** Drains the inbox by looping [syncBatch]. Cancellable. Use for a non-WorkManager "sync now". */
     suspend fun syncAll() {
         if (activeSyncs.getAndIncrement() == 0) _isSyncing.value = true

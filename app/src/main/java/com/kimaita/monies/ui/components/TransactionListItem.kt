@@ -66,8 +66,7 @@ fun TransactionListItem(
             onSubjectClick = {
                 showSheet = false
                 subject?.id?.let { onSubjectClick(it) }
-            },
-            onCategoryChange = {})
+            })
     }
 
     Row(

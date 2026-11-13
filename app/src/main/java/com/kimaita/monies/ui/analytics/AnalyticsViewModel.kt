@@ -3,6 +3,7 @@ package com.kimaita.monies.ui.analytics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kimaita.monies.data.TransactionsRepository
+import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CashFlowBucket
@@ -173,6 +174,10 @@ class AnalyticsViewModel @Inject constructor(
                 .sortedByDescending { it.total }
                 .map { SliceValue(it.name, it.total.toFloat()) }
         }.stateIn(viewModelScope, started, emptyList())
+
+    /** Budgeted categories with this calendar month's spending (not affected by the filters). */
+    val budgets: StateFlow<List<CategoryBudget>> =
+        repository.getBudgets().stateIn(viewModelScope, started, emptyList())
 
     val filterOptions: StateFlow<FilterOptions?> =
         flow { emit(repository.getFilterOptions()) }.stateIn(viewModelScope, onceStarted, null)

@@ -15,7 +15,12 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
+import com.kimaita.monies.data.dao.dtos.AccountLine
+import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.database.models.Category
+import com.kimaita.monies.data.database.models.UnparsedMessage
+import com.kimaita.monies.models.CategoryApplyMode
+import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.data.database.models.Subject
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.data.database.models.TransactionWithDetails
@@ -177,5 +182,35 @@ interface TransactionsRepository {
     ): Flow<List<SourceAmount>>
 
     suspend fun getRecurringPayments(): List<RecurringPayment>
+
+    // ---- Settings ----
+    val themeMode: Flow<ThemeMode>
+    suspend fun getThemeMode(): ThemeMode
+    suspend fun setThemeMode(mode: ThemeMode)
+    val hideBalances: Flow<Boolean>
+    suspend fun setHideBalances(hide: Boolean)
+    val categoryApplyMode: Flow<CategoryApplyMode>
+    suspend fun setCategoryApplyMode(mode: CategoryApplyMode)
+
+    // ---- Accounts ----
+    /** Every line, dormant ones included. */
+    fun getAccountLines(): Flow<List<AccountLine>>
+    suspend fun renameAccount(accountId: Int, label: String?)
+    suspend fun mergeAccounts(sourceId: Int, targetId: Int)
+
+    // ---- Categories ----
+    suspend fun addCategory(name: String, monthlyBudget: Double?)
+    suspend fun updateCategory(category: Category)
+    suspend fun deleteCategory(categoryId: Int)
+    /** Sets a transaction's category, or the subject's category and all its transactions. */
+    suspend fun assignCategory(transactionId: Long, subjectId: Long?, categoryId: Int, allFromSubject: Boolean)
+    /** Budgeted categories with this calendar month's spending, for the selected account. */
+    fun getBudgets(): Flow<List<CategoryBudget>>
+
+    // ---- Unrecognised messages and re-import ----
+    fun getUnparsedMessages(): Flow<List<UnparsedMessage>>
+    fun getUnparsedCount(): Flow<Int>
+    /** Deletes all transactions and unparsed messages and rewinds the SMS cursor. */
+    suspend fun clearForReimport()
 }
 

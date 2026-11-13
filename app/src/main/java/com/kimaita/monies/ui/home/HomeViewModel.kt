@@ -44,6 +44,7 @@ data class HomeUiState(
     /** Every active line, for the account chips. */
     val accounts: List<AccountBalance> = emptyList(),
     val selectedAccount: Int? = null,
+    val hideBalances: Boolean = false,
     val incomeVsExpense: IncExp = IncExp(),
     val transactionCount: Int = 0,
     val recentTransactions: List<Transaction> = emptyList(),
@@ -91,6 +92,10 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { repository.setSelectedAccount(id) }
     }
 
+    fun toggleHideBalances() {
+        viewModelScope.launch { repository.setHideBalances(!uiState.value.hideBalances) }
+    }
+
     fun setTimeFilter(filter: TimeFilter) {
         _timeFilter.value = filter
     }
@@ -121,11 +126,13 @@ class HomeViewModel @Inject constructor(
         combine(
             repository.getAccountBalances().fallbackOnError(emptyList()),
             repository.selectedAccount,
-        ) { lines, selected -> Triple(lines.filter { it.balance != null }, selected, lines) },
+            repository.hideBalances,
+        ) { lines, selected, hide -> Triple(lines.filter { it.balance != null }, selected, lines) to hide },
         repository.getRecentTransactions(5).fallbackOnError(emptyList()),
         repository.getOtherBalances().fallbackOnError(OtherBalances()),
         periodData,
-    ) { (balances, selected, lines), recent, other, period ->
+    ) { (balancesAndSelected, hide), recent, other, period ->
+        val (balances, selected, lines) = balancesAndSelected
         val shown = if (selected == null) balances else balances.filter { it.accountId == selected }
         // Fuliza and M-Shwari belong to M-PESA: hide them when another provider's line is selected.
         val mpesaView = selected == null || lines.any { it.accountId == selected && it.provider == Provider.MPESA.name }
@@ -136,6 +143,7 @@ class HomeViewModel @Inject constructor(
             accountBalances = balances,
             accounts = lines,
             selectedAccount = selected,
+            hideBalances = hide,
             incomeVsExpense = period.incExp,
             transactionCount = period.incExp.incomeCount + period.incExp.expenseCount,
             totalTransactionCost = period.incExp.incomeCost + period.incExp.expenseCost,

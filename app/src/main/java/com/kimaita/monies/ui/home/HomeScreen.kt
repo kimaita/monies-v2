@@ -78,6 +78,8 @@ fun HomeScreen(
         modifier = modifier,
         onViewAllTransactions = { navController.navigate("transactions") },
         onSearch = { navController.navigate("transactions?search=true") },
+        onSettings = { navController.navigate("settings") },
+        onToggleHideBalances = viewModel::toggleHideBalances,
         onViewAnalytics = { navController.navigate("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
         onAccountSelect = viewModel::selectAccount,
@@ -102,7 +104,11 @@ fun HomeScreenContent(
     onViewAnalytics: () -> Unit,
     onSubjectClick: (Long) -> Unit,
     onSearch: () -> Unit = {},
+    onSettings: () -> Unit = {},
+    onToggleHideBalances: () -> Unit = {},
 ) {
+    val hide = uiState.hideBalances
+    fun bal(v: Double) = if (hide) HIDDEN else money(v)
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
@@ -121,6 +127,12 @@ fun HomeScreenContent(
                             Icon(
                                 painter = painterResource(R.drawable.search),
                                 contentDescription = "Search transactions"
+                            )
+                        }
+                        IconButton(onClick = onSettings) {
+                            Icon(
+                                painter = painterResource(R.drawable.settings),
+                                contentDescription = "Settings"
                             )
                         }
                     },
@@ -158,12 +170,25 @@ fun HomeScreenContent(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Text(
-                if (uiState.accountBalances.size > 1) "BALANCE" else "M-PESA BALANCE",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            CurrencyText(uiState.mpesaBalance) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (uiState.accountBalances.size > 1) "BALANCE" else "M-PESA BALANCE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                IconButton(onClick = onToggleHideBalances, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        painter = painterResource(if (hide) R.drawable.visibility_off else R.drawable.visibility),
+                        contentDescription = if (hide) "Show balances" else "Hide balances",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            if (hide) Text(
+                HIDDEN,
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.ExtraBold
+            ) else CurrencyText(uiState.mpesaBalance) {
                 Text(
                     it,
                     style = MaterialTheme.typography.displayMedium,
@@ -179,7 +204,7 @@ fun HomeScreenContent(
                     uiState.accountBalances.forEach { account ->
                         Pill {
                             Svc(account.name)
-                            Strong(money(account.balance ?: 0.0))
+                            Strong(bal(account.balance ?: 0.0))
                         }
                     }
                 }
@@ -196,6 +221,7 @@ fun HomeScreenContent(
                     outstandingFuliza = uiState.outstandingFuliza,
                     mshwariBalance = uiState.mshwariBalance,
                     lockSavings = uiState.lockSavings,
+                    hide = hide,
                 )
             }
 
@@ -380,7 +406,9 @@ fun OtherBalances(
     outstandingFuliza: Double?,
     mshwariBalance: Double?,
     lockSavings: Double?,
+    hide: Boolean = false,
 ) {
+    fun bal(v: Double) = if (hide) HIDDEN else money(v)
     var expanded by remember { mutableStateOf(false) }
     val fulizaMax = (availableFuliza ?: 0.0) + (outstandingFuliza ?: 0.0)
     val hasFuliza = fulizaMax > 0.0
@@ -406,13 +434,13 @@ fun OtherBalances(
                     if (hasFuliza) Pill {
                         Svc("Fuliza")
                         if (owedFuliza) {
-                            Owe(money(outstandingFuliza!!)); Muted("/${money(fulizaMax)}")
+                            Owe(bal(outstandingFuliza!!)); Muted("/${bal(fulizaMax)}")
                         } else {
-                            Strong(money(availableFuliza ?: 0.0)); Muted("available")
+                            Strong(bal(availableFuliza ?: 0.0)); Muted("available")
                         }
                     }
-                    mshwariBalance?.let { Pill { Svc("M-Shwari"); Strong(money(it)) } }
-                    lockSavings?.let { Pill { Svc("Lock"); Strong(money(it)) } }
+                    mshwariBalance?.let { Pill { Svc("M-Shwari"); Strong(bal(it)) } }
+                    lockSavings?.let { Pill { Svc("Lock"); Strong(bal(it)) } }
                     Pill(onClick = { expanded = true }) {
                         Text(
                             "More ›",
@@ -429,6 +457,7 @@ fun OtherBalances(
                     owedFuliza,
                     mshwariBalance,
                     lockSavings,
+                    hide,
                     onCollapse = { expanded = false })
             }
         }
@@ -438,9 +467,10 @@ fun OtherBalances(
 @Composable
 private fun OtherBalancesPanel(
     availableFuliza: Double?, outstandingFuliza: Double?, fulizaMax: Double, owedFuliza: Boolean,
-    mshwariBalance: Double?, lockSavings: Double?,
+    mshwariBalance: Double?, lockSavings: Double?, hide: Boolean,
     onCollapse: () -> Unit,
 ) {
+    fun bal(v: Double) = if (hide) HIDDEN else money(v)
     val cs = MaterialTheme.colorScheme
     Column(
         Modifier
@@ -466,8 +496,8 @@ private fun OtherBalancesPanel(
         if (fulizaMax > 0.0) PanelRow(divider = false) {
             RowLine(
                 "Fuliza",
-                if (owedFuliza) "${money(outstandingFuliza ?: 0.0)} used" else "${
-                    money(availableFuliza ?: 0.0)
+                if (owedFuliza) "${bal(outstandingFuliza ?: 0.0)} used" else "${
+                    bal(availableFuliza ?: 0.0)
                 } available",
                 owed = owedFuliza
             )
@@ -490,16 +520,16 @@ private fun OtherBalancesPanel(
             }
             Spacer(Modifier.height(7.dp))
             Text(
-                "${money(outstandingFuliza ?: 0.0)} used · ${money(availableFuliza ?: 0.0)} available · ${
-                    money(
+                "${bal(outstandingFuliza ?: 0.0)} used · ${bal(availableFuliza ?: 0.0)} available · ${
+                    bal(
                         fulizaMax
                     )
                 } limit",
                 style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant
             )
         }
-        mshwariBalance?.let { PanelRow { RowLine("M-Shwari balance", money(it)) } }
-        lockSavings?.let { PanelRow { RowLine("Lock savings", money(it)) } }
+        mshwariBalance?.let { PanelRow { RowLine("M-Shwari balance", bal(it)) } }
+        lockSavings?.let { PanelRow { RowLine("Lock savings", bal(it)) } }
         Spacer(Modifier.height(8.dp))
     }
 }
@@ -617,6 +647,8 @@ private fun Muted(t: String) = Text(
     color = MaterialTheme.colorScheme.onSurfaceVariant
 )
 
+
+private const val HIDDEN = "••••"
 
 private fun money(v: Double): String = NumberFormat.getIntegerInstance().format(v.toLong())
 private fun periodWord(f: TimeFilter): String = when (f) {

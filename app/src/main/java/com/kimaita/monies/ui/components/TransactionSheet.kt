@@ -15,7 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.collectAsState
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.kimaita.monies.models.applyToAllOfSubject
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,9 +66,35 @@ import java.util.Locale
 fun TransactionBottomSheet(
     transaction: Transaction,
     onDismissRequest: () -> Unit,
-    onCategoryChange: (String) -> Unit,
     onSubjectClick: () -> Unit,
+    viewModel: TransactionSheetViewModel = hiltViewModel(),
 ) {
+    val categories by viewModel.categories.collectAsState()
+    val mode by viewModel.mode.collectAsState()
+    var pending by remember { mutableStateOf<Category?>(null) }
+    val subject = transaction.subject
+
+    fun assign(category: Category, all: Boolean) =
+        viewModel.setCategory(transaction.id, subject?.id, category.id, all)
+
+    pending?.let { category ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text("Set category to ${category.name}") },
+            text = { Text("Apply to this transaction only, or to everything from ${subject?.name ?: "this subject"}?") },
+            confirmButton = {
+                TextButton(onClick = { assign(category, true); pending = null }) {
+                    Text("All from ${subject?.name ?: "this subject"}")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { assign(category, false); pending = null }) {
+                    Text("Only this transaction")
+                }
+            },
+        )
+    }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -72,7 +103,11 @@ fun TransactionBottomSheet(
         dragHandle = { BottomSheetDefaults.DragHandle() }) {
         TransactionContent(
             transaction = transaction,
-            onCategoryChange = onCategoryChange,
+            categories = categories.map { Category(it.id, it.name) },
+            onCategoryChange = { picked ->
+                val all = applyToAllOfSubject(mode, subject != null)
+                if (all == null) pending = picked else assign(picked, all)
+            },
             onSubjectClick = onSubjectClick
         )
     }
@@ -80,7 +115,10 @@ fun TransactionBottomSheet(
 
 @Composable
 fun TransactionContent(
-    transaction: Transaction, onCategoryChange: (String) -> Unit, onSubjectClick: () -> Unit
+    transaction: Transaction,
+    categories: List<Category>,
+    onCategoryChange: (Category) -> Unit,
+    onSubjectClick: () -> Unit,
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -129,6 +167,7 @@ fun TransactionContent(
         // --- Editable Category Section ---
         EditableCategoryChip(
             currentCategory = transaction.category?.name ?: "Assign Category",
+            categories = categories,
             onCategorySelected = onCategoryChange
         )
 
@@ -160,6 +199,7 @@ fun TransactionContent(
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
+                val number = transaction.subject?.number
 
                 // Name and Phone
                 Column(
@@ -167,7 +207,6 @@ fun TransactionContent(
                     verticalArrangement = Arrangement.Center
                 ) {
                     val name = transaction.subject?.name?.uppercase()
-                    val number = transaction.subject?.number
 
                     if (!name.isNullOrBlank()) {
                         Text(
@@ -190,16 +229,15 @@ fun TransactionContent(
                     }
                 }
 
-//                IconButton(onClick = {
-//                    TODO("Implement copy to clipboard")
-//                    clipboardManager.setClipEntry(AnnotatedString(transaction.senderPhone))
-//                    Toast.makeText(context, "Phone copied", Toast.LENGTH_SHORT).show()
-//                }) {
-//                    Icon(
-//                        painter = painterResource(R.drawable.outline_copy),
-//                        contentDescription = "Copy Phone",
-//                    )
-//                }
+                if (!number.isNullOrBlank()) IconButton(onClick = {
+                    clipboardManager.setText(AnnotatedString(number))
+                    android.widget.Toast.makeText(context, "Phone copied", android.widget.Toast.LENGTH_SHORT).show()
+                }) {
+                    Icon(
+                        painter = painterResource(R.drawable.outline_copy),
+                        contentDescription = "Copy phone",
+                    )
+                }
             }
         }
 
@@ -239,10 +277,9 @@ fun TransactionContent(
 
 @Composable
 fun EditableCategoryChip(
-    currentCategory: String, onCategorySelected: (String) -> Unit
+    currentCategory: String, categories: List<Category>, onCategorySelected: (Category) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val categories = listOf("Allowance", "Shopping", "Bills", "Entertainment", "Transport")
 
     Box {
         Surface(
@@ -273,7 +310,7 @@ fun EditableCategoryChip(
             onDismissRequest = { expanded = false },
         ) {
             categories.forEach { category ->
-                DropdownMenuItem(text = { Text(category) }, onClick = {
+                DropdownMenuItem(text = { Text(category.name) }, onClick = {
                     onCategorySelected(category)
                     expanded = false
                 })
@@ -331,7 +368,11 @@ fun PreviewSheetContent() {
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(top = 16.dp)
         ) {
-            TransactionContent(transaction = mockData, onCategoryChange = {}, onSubjectClick = {})
+            TransactionContent(
+                transaction = mockData,
+                categories = listOf(Category(5, "Shopping")),
+                onCategoryChange = {},
+                onSubjectClick = {})
         }
     }
 }

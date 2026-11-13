@@ -26,10 +26,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.workDataOf
 import com.kimaita.monies.data.DefaultTransactionsRepository
 import com.kimaita.monies.services.SmsContentObserver
 import com.kimaita.monies.services.SmsSyncer
@@ -40,6 +36,7 @@ import com.kimaita.monies.ui.onboarding.OnboardingScreen
 import com.kimaita.monies.ui.permission.PermissionScreen
 import com.kimaita.monies.ui.rememberSmsImportProgress
 import com.kimaita.monies.ui.theme.AppTheme
+import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.worker.SmsSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.awaitCancellation
@@ -69,12 +66,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            AppTheme {
+            var themeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
+            AppTheme(themeMode) {
                 val scope = rememberCoroutineScope()
                 var onboardingComplete by remember { mutableStateOf<Boolean?>(null) }
                 var hasRequiredPermissions by remember { mutableStateOf(checkPermissions()) }
 
-                LaunchedEffect(Unit) { onboardingComplete = repository.isOnboardingComplete() }
+                // The theme is read first and the onboarding flag last, so the first real frame is themed.
+                LaunchedEffect(Unit) {
+                    themeMode = repository.getThemeMode()
+                    onboardingComplete = repository.isOnboardingComplete()
+                    repository.themeMode.collect { themeMode = it }
+                }
 
                 val permissionsLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
@@ -117,7 +120,7 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(Unit) {
                             val first = repository.isFirstRun()
                             firstRun = first
-                            if (first) enqueueSmsImport() else smsSyncer.syncAll()
+                            if (first) SmsSyncWorker.enqueueImport(applicationContext) else smsSyncer.syncAll()
                         }
                         ObserveIncomingSms(smsContentObserver)
 
@@ -152,17 +155,6 @@ class MainActivity : ComponentActivity() {
 
             }
         }
-    }
-
-    private fun enqueueSmsImport() {
-        val request = OneTimeWorkRequestBuilder<SmsSyncWorker>()
-            .setInputData(workDataOf(SmsSyncWorker.KEY_FOREGROUND to true))
-            .build()
-        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-            SmsSyncWorker.WORK_NAME,
-            ExistingWorkPolicy.KEEP,
-            request,
-        )
     }
 
     private fun checkPermissions(): Boolean {

@@ -39,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import com.kimaita.monies.ui.theme.MoniesTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,7 +83,7 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     val isLast = pagerState.currentPage == pageCount - 1
 
-    Scaffold(modifier = modifier, containerColor = OnbColors.Paper) { padding ->
+    Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.surface) { padding ->
         Column(Modifier
             .fillMaxSize()
             .padding(padding)) {
@@ -98,7 +99,7 @@ fun OnboardingScreen(
                     TextButton(onClick = onSkip) {
                         Text(
                             "Skip",
-                            color = OnbColors.Muted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -139,7 +140,7 @@ fun OnboardingScreen(
                         .height(56.dp),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OnbColors.Emerald,
+                        containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White
                     ),
                 ) {
@@ -162,7 +163,7 @@ private fun PagerIndicator(pageCount: Int, currentPage: Int) {
             val selected = i == currentPage
             val w by animateDpAsState(if (selected) 28.dp else 8.dp, label = "w")
             val c by animateColorAsState(
-                if (selected) OnbColors.Coral else OnbColors.DotIdle,
+                if (selected) MoniesTheme.extra.outflow else MaterialTheme.colorScheme.outlineVariant,
                 label = "c"
             )
             Box(Modifier
@@ -223,8 +224,8 @@ private fun SmsBubble() {
         Modifier
             .widthIn(max = 290.dp)
             .clip(shape)
-            .background(OnbColors.SmsBg)
-            .border(1.dp, OnbColors.Rule, shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(
@@ -234,19 +235,19 @@ private fun SmsBubble() {
             Box(Modifier
                 .size(7.dp)
                 .clip(CircleShape)
-                .background(OnbColors.Emerald))
+                .background(MaterialTheme.colorScheme.primary))
             Text(
                 "M-PESA · TODAY 2:02 PM",
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 9.5.sp,
                 letterSpacing = 1.2.sp,
-                color = OnbColors.Muted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(Modifier.height(7.dp))
         Text(
             buildAnnotatedString {
-                withStyle(SpanStyle(color = OnbColors.Coral)) { append("WEF6X3K9LM") }
+                withStyle(SpanStyle(color = MoniesTheme.extra.outflow)) { append("WEF6X3K9LM") }
                 append(" Confirmed. Ksh1,500.00 paid to NAIVAS LIMITED. New M-PESA balance is Ksh8,420.00.")
             },
             fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, lineHeight = 18.sp, color = Color(0xFF34302A),
@@ -266,24 +267,25 @@ private fun ArrowBadge(modifier: Modifier = Modifier) {
             fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 10.5.sp,
-            color = OnbColors.EmeraldDeep,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier
                 .clip(RoundedCornerShape(7.dp))
-                .background(OnbColors.Mint)
+                .background(MaterialTheme.colorScheme.primaryContainer)
                 .padding(horizontal = 8.dp, vertical = 3.dp)
         )
+        val dashColor = MaterialTheme.colorScheme.primaryContainer
         Canvas(Modifier
             .weight(1f)
             .height(2.dp)) {
             drawLine(
-                OnbColors.Mint,
+                dashColor,
                 Offset(0f, size.height / 2),
                 Offset(size.width, size.height / 2),
                 strokeWidth = 2.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 6.dp.toPx()))
             )
         }
-        Text("↓", color = OnbColors.Muted, fontSize = 14.sp)
+        Text("↓", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
     }
 }
 
@@ -300,7 +302,7 @@ private fun RecordCard() {
             Modifier
                 .size(42.dp)
                 .clip(RoundedCornerShape(13.dp))
-                .background(OnbColors.Mint),
+                .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -308,7 +310,7 @@ private fun RecordCard() {
                 fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = OnbColors.EmeraldDeep
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
         Column(Modifier.weight(1f)) {
@@ -316,13 +318,13 @@ private fun RecordCard() {
                 "Naivas Limited",
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = OnbColors.Ink
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 "Pay bill · 14:02",
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 11.5.sp,
-                color = OnbColors.Muted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Text(
@@ -330,7 +332,7 @@ private fun RecordCard() {
             fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
-            color = OnbColors.Neg
+            color = MoniesTheme.extra.negative
         )
     }
 }
@@ -351,31 +353,31 @@ private data class AutoRowData(
 private fun AutoPage(active: Boolean) {
     val rows = listOf(
         AutoRowData(
-            OnbColors.Emerald,
+            MaterialTheme.colorScheme.primary,
             "↗",
             "RECV",
             "Salary",
             "Received · just now",
             "+48,000",
-            OnbColors.Pos
+            MoniesTheme.extra.positive
         ),
         AutoRowData(
-            OnbColors.Coral,
+            MoniesTheme.extra.outflow,
             "↘",
             "SEND",
             "Naivas",
             "Pay bill · 14:02",
             "−1,500",
-            OnbColors.Neg
+            MoniesTheme.extra.negative
         ),
         AutoRowData(
-            OnbColors.EmeraldDeep,
+            MaterialTheme.colorScheme.onPrimaryContainer,
             "F",
             "FULIZA",
             "Available",
             "Updated 2:02 PM",
             "1,000",
-            OnbColors.Ink
+            MaterialTheme.colorScheme.onSurface
         ),
     )
     Column(
@@ -395,7 +397,7 @@ private fun AutoPage(active: Boolean) {
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             letterSpacing = 1.sp,
-            color = OnbColors.Emerald
+            color = MaterialTheme.colorScheme.primary
         )
         }
         Spacer(Modifier.height(12.dp))
@@ -460,21 +462,21 @@ private fun AutoRow(r: AutoRowData) {
                     fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                     fontSize = 9.5.sp,
                     letterSpacing = 0.8.sp,
-                    color = OnbColors.EmeraldDeep,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(OnbColors.Mint)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                         .padding(horizontal = 7.dp, vertical = 2.dp)
                 )
                 Text(
                     r.name,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.5.sp,
-                    color = OnbColors.Ink
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Spacer(Modifier.height(2.dp))
-            Text(r.sub, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 11.sp, color = OnbColors.Muted)
+            Text(r.sub, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
             r.amount,
@@ -499,7 +501,7 @@ private fun PulseDot() {
         .size(7.dp)
         .graphicsLayer { alpha = a }
         .clip(CircleShape)
-        .background(OnbColors.Emerald))
+        .background(MaterialTheme.colorScheme.primary))
 }
 
 /* ---------- Page 3: analytics dashboard ---------- */
@@ -550,9 +552,9 @@ private fun BreakdownCard() {
             .onbCard(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        RankedPreviewRow("Groceries", 42, OnbColors.Emerald)
-        RankedPreviewRow("Transport", 28, OnbColors.Coral)
-        RankedPreviewRow("Bills", 18, OnbColors.EmeraldDeep)
+        RankedPreviewRow("Groceries", 42, MaterialTheme.colorScheme.primary)
+        RankedPreviewRow("Transport", 28, MoniesTheme.extra.outflow)
+        RankedPreviewRow("Bills", 18, MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 
@@ -560,13 +562,13 @@ private fun BreakdownCard() {
 private fun RankedPreviewRow(label: String, pct: Int, color: Color) {
     Column {
         Row {
-            Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnbColors.Ink)
+            Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.weight(1f))
             Text(
                 "$pct%",
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 12.sp,
-                color = OnbColors.Muted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -575,7 +577,7 @@ private fun RankedPreviewRow(label: String, pct: Int, color: Color) {
                 .fillMaxWidth()
                 .height(10.dp)
                 .clip(RoundedCornerShape(5.dp))
-                .background(OnbColors.Rule)
+                .background(MaterialTheme.colorScheme.outlineVariant)
         ) {
             Box(
                 Modifier
@@ -602,7 +604,7 @@ private fun StatCard(
             fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
             fontSize = 10.sp,
             letterSpacing = 1.2.sp,
-            color = OnbColors.Muted
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(5.dp))
         Text(
@@ -611,7 +613,7 @@ private fun StatCard(
             fontWeight = FontWeight.Bold,
             fontSize = 21.sp,
             letterSpacing = (-0.5).sp,
-            color = OnbColors.Ink
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (change != null) {
             Spacer(Modifier.height(4.dp)); Text(
@@ -619,7 +621,7 @@ private fun StatCard(
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
-                color = OnbColors.Neg
+                color = MoniesTheme.extra.negative
             )
         }
         if (sub != null) {
@@ -627,7 +629,7 @@ private fun StatCard(
                 sub,
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 11.sp,
-                color = OnbColors.Muted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -648,13 +650,13 @@ private fun CashFlowCard() {
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontSize = 10.sp,
                 letterSpacing = 1.2.sp,
-                color = OnbColors.Muted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FlowLegend(
-                    OnbColors.Emerald,
+                    MaterialTheme.colorScheme.primary,
                     "In"
-                ); FlowLegend(OnbColors.Coral, "Out")
+                ); FlowLegend(MoniesTheme.extra.outflow, "Out")
             }
         }
         Spacer(Modifier.height(11.dp))
@@ -672,7 +674,7 @@ private fun FlowLegend(color: Color, label: String) {
             .size(9.dp)
             .clip(RoundedCornerShape(3.dp))
             .background(color))
-        Text(label, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 10.sp, color = OnbColors.Muted)
+        Text(label, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -708,14 +710,14 @@ private fun MiniBars() {
                         .weight(1f)
                         .fillMaxHeight(inF)
                         .clip(barShape)
-                        .background(OnbColors.Emerald)
+                        .background(MaterialTheme.colorScheme.primary)
                 )
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight(outF)
                         .clip(barShape)
-                        .background(OnbColors.Coral)
+                        .background(MoniesTheme.extra.outflow)
                 )
             }
         }
@@ -731,10 +733,10 @@ private fun ExportChips() {
                 fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
-                color = OnbColors.EmeraldDeep,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(OnbColors.Mint)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
                     .padding(horizontal = 12.dp, vertical = 7.dp)
             )
         }
@@ -796,13 +798,13 @@ private fun OnbPermissionRow(item: PermissionRationale) {
             Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(OnbColors.Mint),
+                .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painterResource(item.icon),
                 null,
-                tint = OnbColors.EmeraldDeep,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -815,12 +817,12 @@ private fun OnbPermissionRow(item: PermissionRationale) {
                     item.title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    color = OnbColors.Ink
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 OnbMarker(item.isRequired)
             }
             Spacer(Modifier.height(3.dp))
-            Text(item.description, fontSize = 13.sp, lineHeight = 18.sp, color = OnbColors.Muted)
+            Text(item.description, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -833,10 +835,10 @@ private fun OnbMarker(required: Boolean) {
         fontWeight = FontWeight.Bold,
         fontSize = 9.5.sp,
         letterSpacing = 0.6.sp,
-        color = if (required) Color.White else OnbColors.Muted,
+        color = if (required) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (required) OnbColors.Coral else OnbColors.ChipOpt)
+            .background(if (required) MoniesTheme.extra.outflow else MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 10.dp, vertical = 3.dp),
     )
 }

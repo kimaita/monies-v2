@@ -11,7 +11,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.kimaita.monies.R
@@ -38,6 +41,16 @@ class SmsSyncWorker @AssistedInject constructor(
         const val KEY_FOREGROUND = "foreground"
         private const val CHANNEL_ID = "sms_sync"
         private const val NOTIFICATION_ID = 4242
+
+        /** Starts the foreground import of the whole inbox (first run, or a re-import). */
+        fun enqueueImport(context: Context) {
+            val request = OneTimeWorkRequestBuilder<SmsSyncWorker>()
+                .setInputData(workDataOf(KEY_FOREGROUND to true))
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                WORK_NAME, ExistingWorkPolicy.KEEP, request
+            )
+        }
     }
 
     override suspend fun doWork(): Result {

@@ -12,7 +12,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
+enum class ThemeMode(val key: String) {
+    SYSTEM("system"), LIGHT("light"), DARK("dark");
+
+    companion object {
+        fun fromKey(key: String?) = entries.firstOrNull { it.key == key } ?: SYSTEM
+    }
+}
 
 private val LightColors = lightColorScheme(
     primary = Emerald, onPrimary = Color.White,

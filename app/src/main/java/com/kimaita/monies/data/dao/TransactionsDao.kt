@@ -372,6 +372,39 @@ interface TransactionsDao : BaseDao<Transaction> {
     )
     fun getFulizaRows(account: Int? = null): Flow<List<FulizaRow>>
 
+    @Query("UPDATE transactions SET transactionCategory = :category WHERE id = :id")
+    suspend fun setCategory(id: Long, category: Int?)
+
+    @Query("UPDATE transactions SET transactionCategory = :category WHERE subject = :subjectId")
+    suspend fun setCategoryForSubject(subjectId: Long, category: Int?)
+
+    @Query("UPDATE subjects SET categoryId = :category WHERE id = :subjectId")
+    suspend fun setSubjectCategory(subjectId: Long, category: Int?)
+
+    /** "All from this person or business": the subject's default and every one of its transactions. */
+    @androidx.room.Transaction
+    suspend fun setCategoryForAllOfSubject(subjectId: Long, category: Int?) {
+        setSubjectCategory(subjectId, category)
+        setCategoryForSubject(subjectId, category)
+    }
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAllTransactions()
+
+    @Query("DELETE FROM unparsed_messages")
+    suspend fun deleteAllUnparsed()
+
+    @Query("INSERT OR REPLACE INTO settings (`key`, value) VALUES (:key, '0')")
+    suspend fun resetCursor(key: String)
+
+    /** Clears every transaction and unparsed message and rewinds the SMS cursor, keeping subjects, categories and accounts. */
+    @androidx.room.Transaction
+    suspend fun clearForReimport(cursorKey: String) {
+        deleteAllTransactions()
+        deleteAllUnparsed()
+        resetCursor(cursorKey)
+    }
+
     @Query("SELECT MIN(transactionTime) FROM transactions")
     suspend fun getEarliestTransactionTime(): String?
 }

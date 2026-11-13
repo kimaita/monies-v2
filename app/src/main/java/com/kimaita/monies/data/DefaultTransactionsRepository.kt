@@ -11,10 +11,19 @@ import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
+import com.kimaita.monies.data.dao.UnparsedMessageDao
+import com.kimaita.monies.data.dao.dtos.CategoryBudget
+import com.kimaita.monies.data.dao.dtos.accountLines
+import com.kimaita.monies.data.database.models.UnparsedMessage
+import com.kimaita.monies.models.CategoryApplyMode
+import com.kimaita.monies.ui.theme.ThemeMode
+import java.time.LocalDate
+import java.time.LocalTime
 import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.FulizaRow
+import com.kimaita.monies.data.dao.dtos.LineBalance
 import com.kimaita.monies.data.dao.dtos.lineNames
 import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
@@ -67,6 +76,7 @@ class DefaultTransactionsRepository @Inject constructor(
     private val subjectDao: SubjectDao,
     private val accountDao: AccountDao,
     private val settingsDao: SettingsDao,
+    private val unparsedDao: UnparsedMessageDao,
     private val recurringDetector: RecurringDetector
 ) : TransactionsRepository {
 
@@ -150,9 +160,13 @@ class DefaultTransactionsRepository @Inject constructor(
         .map { it?.toDomainModel() }
 
 
+    /** Names of every line, dormant included, so a line's name never depends on which lines are active. */
+    private fun allLineNames(): Flow<Map<Int, String>> = accountDao.getLineSummaries().map { lines ->
+        lineNames(lines.map { LineBalance(it.accountId, it.provider, it.label, null) })
+    }
+
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
-        transactionsDao.getAccountBalances().map { lines ->
-            val names = lineNames(lines)
+        combine(transactionsDao.getAccountBalances(), allLineNames()) { lines, names ->
             lines.map { AccountBalance(it.accountId, names.getValue(it.accountId), it.balance, it.provider) }
         }
 
@@ -324,12 +338,12 @@ class DefaultTransactionsRepository @Inject constructor(
 
         val categories = async { categoryDao.getAll().first() }
         val accounts = async { transactionsDao.getAccountBalances().first() }
+        val names = async { allLineNames().first() }
         val types = async { transactionTypeDao.getAll().first() }
         FilterOptions(
             categories = categories.await().map { NamedRef(it.id, it.name) },
-            accounts = accounts.await().let { lines ->
-                val names = lineNames(lines)
-                lines.map { NamedRef(it.accountId, names.getValue(it.accountId)) }
+            accounts = names.await().let { names ->
+                accounts.await().map { NamedRef(it.accountId, names.getValue(it.accountId)) }
             },
             types = types.await().map { NamedRef(it.id, it.name) },
         )
@@ -470,7 +484,78 @@ class DefaultTransactionsRepository @Inject constructor(
             runCatching { LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }.getOrNull()
         }
 
+    // ---- Settings ----
+
+    private fun setting(key: String) = settingsDao.observeSetting(key)
+    private suspend fun save(key: String, value: String) =
+        withContext(Dispatchers.IO) { settingsDao.saveSetting(Setting(key, value)) }
+
+    override val themeMode: Flow<ThemeMode> = setting(THEME_KEY).map { ThemeMode.fromKey(it) }
+    override suspend fun getThemeMode(): ThemeMode =
+        withContext(Dispatchers.IO) { ThemeMode.fromKey(settingsDao.getSetting(THEME_KEY)) }
+
+    override suspend fun setThemeMode(mode: ThemeMode) = save(THEME_KEY, mode.key)
+
+    override val hideBalances: Flow<Boolean> = setting(HIDE_BALANCES_KEY).map { it == "true" }
+    override suspend fun setHideBalances(hide: Boolean) = save(HIDE_BALANCES_KEY, hide.toString())
+
+    override val categoryApplyMode: Flow<CategoryApplyMode> =
+        setting(CATEGORY_APPLY_MODE_KEY).map { CategoryApplyMode.fromKey(it) }
+
+    override suspend fun setCategoryApplyMode(mode: CategoryApplyMode) =
+        save(CATEGORY_APPLY_MODE_KEY, mode.key)
+
+    // ---- Accounts ----
+
+    override fun getAccountLines() = accountDao.getLineSummaries().map { accountLines(it) }
+
+    override suspend fun renameAccount(accountId: Int, label: String?) = withContext(Dispatchers.IO) {
+        accountDao.setLabel(accountId, label?.trim()?.takeIf { it.isNotEmpty() })
+    }
+
+    override suspend fun mergeAccounts(sourceId: Int, targetId: Int) =
+        withContext(Dispatchers.IO) { accountDao.mergeLines(sourceId, targetId) }
+
+    // ---- Categories ----
+
+    override suspend fun addCategory(name: String, monthlyBudget: Double?) = withContext(Dispatchers.IO) {
+        categoryDao.insert(Category(name = name.trim(), monthlyBudget = monthlyBudget)); Unit
+    }
+
+    override suspend fun updateCategory(category: Category) =
+        withContext(Dispatchers.IO) { categoryDao.update(category) }
+
+    override suspend fun deleteCategory(categoryId: Int) =
+        withContext(Dispatchers.IO) { categoryDao.deleteCategory(categoryId) }
+
+    override suspend fun assignCategory(
+        transactionId: Long, subjectId: Long?, categoryId: Int, allFromSubject: Boolean
+    ) = withContext(Dispatchers.IO) {
+        if (allFromSubject && subjectId != null) transactionsDao.setCategoryForAllOfSubject(subjectId, categoryId)
+        else transactionsDao.setCategory(transactionId, categoryId)
+    }
+
+    override fun getBudgets(): Flow<List<CategoryBudget>> = forAccount { account ->
+        val today = LocalDate.now()
+        val fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+        val start = today.withDayOfMonth(1).atStartOfDay().format(fmt)
+        val end = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX).withNano(0).format(fmt)
+        categoryDao.getBudgets(start, end, account)
+    }
+
+    // ---- Unrecognised messages and re-import ----
+
+    override fun getUnparsedMessages(): Flow<List<UnparsedMessage>> = unparsedDao.getAll()
+    override fun getUnparsedCount(): Flow<Int> = unparsedDao.count()
+
+    override suspend fun clearForReimport() = withContext(Dispatchers.IO) {
+        transactionsDao.clearForReimport(SmsSyncer.LAST_SMS_SYNC_ID_KEY)
+    }
+
     companion object {
+        const val THEME_KEY = "theme"
+        const val HIDE_BALANCES_KEY = "hide_balances"
+        const val CATEGORY_APPLY_MODE_KEY = "category_apply_mode"
         const val ONBOARDING_COMPLETE_KEY = "onboarding_complete"
         const val SELECTED_ACCOUNT_KEY = "selected_account"
         const val EXPORT_PAGE_SIZE = 500

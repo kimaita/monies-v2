@@ -3,6 +3,7 @@ package com.kimaita.monies.data.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
 import com.kimaita.monies.data.database.models.Setting
 
 @Dao
@@ -12,6 +13,9 @@ interface SettingsDao {
 
     @Query("SELECT value FROM settings WHERE `key` = :key")
     suspend fun getSetting(key: String): String?
+
+    @Query("SELECT value FROM settings WHERE `key` = :key")
+    fun observeSetting(key: String): Flow<String?>
 
     @Query("DELETE FROM settings WHERE `key` = :key")
     suspend fun deleteSetting(key: String)

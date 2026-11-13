@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kimaita.monies.R
+import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.dao.dtos.SourceAmount
 import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.models.analytics.RecurringPayment
@@ -329,6 +330,7 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val sources by vm.incomeSources.collectAsStateWithLifecycle()
     val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
     val extra = MoniesTheme.extra
+    val budgets by vm.budgets.collectAsStateWithLifecycle()
 
     TabList(listState) {
         item(key = "direction") {
@@ -344,6 +346,14 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
         }
 
         if (direction == SpendDirection.OUT) {
+            if (budgets.isNotEmpty()) item(key = "budgets") {
+                SectionCard("Budgets this month") {
+                    budgets.forEachIndexed { i, b ->
+                        if (i > 0) Spacer(Modifier.height(12.dp))
+                        BudgetRow(b)
+                    }
+                }
+            }
             item(key = "breakdown") {
                 SectionCard("Breakdown") {
                     ToggleRow(
@@ -568,6 +578,25 @@ private fun BentoCard(
             Column(Modifier.padding(16.dp), content = content)
         }
     }
+}
+
+@Composable
+private fun BudgetRow(b: CategoryBudget) {
+    val color = if (b.isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(b.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Text(
+            "${formatKes(b.spent)} / ${formatKes(b.budget)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (b.isOver) color else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    LinearProgressIndicator(
+        progress = { b.progress },
+        modifier = Modifier.fillMaxWidth(),
+        color = color,
+    )
 }
 
 @Composable
