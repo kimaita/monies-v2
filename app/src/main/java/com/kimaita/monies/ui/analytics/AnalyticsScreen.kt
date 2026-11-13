@@ -209,6 +209,11 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                     minFontSize = 22.sp,
                 )
                 Spacer(Modifier.height(4.dp))
+                Text(
+                    "In ${formatCompactKes(stats.income)}  /  Out ${formatCompactKes(stats.expense)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 TopLine("Top in", sources.firstOrNull()?.let { it.name to it.amount })
                 TopLine("Top out", top.firstOrNull()?.let { it.name to it.amount })
             }
@@ -225,15 +230,11 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             }
         }
 
-        item(key = "spent_fees") {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile("Spent", formatCompactKes(stats.expense), extra.negative, Modifier.weight(1f).heightIn(min = 104.dp))
-                StatTile(
-                    "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
-                    Modifier.weight(1f).heightIn(min = 104.dp),
-                    sub = feeShareText(fees, stats.expense),
-                )
-            }
+        item(key = "fees") {
+            StatTile(
+                "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
+                sub = feeShareText(fees, stats.expense),
+            )
         }
 
         item(key = "cashflow") {
