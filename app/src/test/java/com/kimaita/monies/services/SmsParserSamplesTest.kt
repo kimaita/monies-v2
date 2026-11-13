@@ -78,6 +78,14 @@ class SmsParserSamplesTest {
     }
 
     @Test
+    fun reversalsAreSplitByDirection() {
+        val byName = types.associateBy { it.name }
+        assertTrue(byName.getValue("reversal").isInc)
+        assertTrue(!byName.getValue("reversal.debit").isInc)
+        assertTrue(!byName.getValue("reversal.debit").isTransfer)
+    }
+
+    @Test
     fun unknownSenderIsNeverMatched() {
         val body = mpesaSamples.first { it.type == "till" }.body
         assertTrue(parseOne(body, "SOMEONE").isEmpty())
