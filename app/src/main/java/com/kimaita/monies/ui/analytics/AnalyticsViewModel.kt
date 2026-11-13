@@ -346,7 +346,7 @@ class AnalyticsViewModel @Inject constructor(
     private fun bucketFormatFor(tf: TimeFilter): String = when (tf) {
         TimeFilter.DAY -> "%Y-%m-%d %H"
         TimeFilter.WEEK -> "%Y-%m-%d"
-        TimeFilter.MONTH, TimeFilter.QUARTER -> "%Y-%W"
+        TimeFilter.MONTH -> "%Y-%W"
         TimeFilter.SIX_MONTHS, TimeFilter.YTD, TimeFilter.ALL -> "%Y-%m"
         is TimeFilter.CustomRange -> "%Y-%m-%d"
     }
@@ -363,7 +363,7 @@ class AnalyticsViewModel @Inject constructor(
     private fun bucketLabel(bucket: String, tf: TimeFilter): String = when (tf) {
         TimeFilter.DAY -> bucket.substringAfter(" ", bucket) + "h"
         TimeFilter.WEEK, is TimeFilter.CustomRange -> bucket.substringAfterLast("-")
-        TimeFilter.MONTH, TimeFilter.QUARTER -> "Wk " + bucket.substringAfterLast("-")
+        TimeFilter.MONTH -> "Wk " + bucket.substringAfterLast("-")
         else -> bucket.substringAfterLast("-").toIntOrNull()
             ?.let { monthAbbrev.getOrElse(it - 1) { bucket } } ?: bucket
     }
@@ -372,7 +372,6 @@ class AnalyticsViewModel @Inject constructor(
         TimeFilter.DAY -> 1
         TimeFilter.WEEK -> 7
         TimeFilter.MONTH -> 30
-        TimeFilter.QUARTER -> 90
         TimeFilter.SIX_MONTHS -> 182
         TimeFilter.YTD -> LocalDate.now().dayOfYear
         TimeFilter.ALL -> spanDays ?: 1

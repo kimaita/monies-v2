@@ -80,7 +80,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-private fun List<Int>.toggle(id: Int): List<Int> = if (id in this) this - id else this + id
 private val FORMAT_ORDER =
     listOf(ExportFormat.XLSX, ExportFormat.CSV, ExportFormat.PDF, ExportFormat.JSON)
 

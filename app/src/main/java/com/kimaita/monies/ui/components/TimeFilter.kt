@@ -24,7 +24,6 @@ private val timeFilterOptions = listOf(
     "TODAY" to TimeFilter.DAY,
     "1W" to TimeFilter.WEEK,
     "1M" to TimeFilter.MONTH,
-//        "3M" to TimeFilter.QUARTER,
     "6M" to TimeFilter.SIX_MONTHS,
     "YTD" to TimeFilter.YTD,
     "ALL" to TimeFilter.ALL

@@ -20,15 +20,12 @@ import com.kimaita.monies.ui.theme.ThemeMode
 import java.time.LocalDate
 import java.time.LocalTime
 import com.kimaita.monies.data.dao.dtos.AccountBalance
-import com.kimaita.monies.data.dao.dtos.CategorySpending
-import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.FulizaRow
 import com.kimaita.monies.data.dao.dtos.LineBalance
 import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.lineNames
 import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
-import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.Setting
 import com.kimaita.monies.data.database.models.Subject
@@ -163,13 +160,6 @@ class DefaultTransactionsRepository @Inject constructor(
 
     override fun getSubjects(subjectID: Long): Flow<List<Subject>> =
         subjectDao.getSubjects(subjectID)
-
-
-    override fun getLargestTransaction(
-        isInc: Boolean, startDate: String?, endDate: String?
-    ): Flow<Transaction?> =
-        forAccount { transactionsDao.getLargestTransaction(isInc, startDate, endDate, it) }
-        .map { it?.toDomainModel() }
 
 
     /** Names of every line, dormant included, so a line's name never depends on which lines are active. */

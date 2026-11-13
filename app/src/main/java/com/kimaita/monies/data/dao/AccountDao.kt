@@ -17,10 +17,6 @@ interface AccountDao : BaseDao<UserAccount> {
     @Query("SELECT id FROM accounts WHERE provider = :provider AND subscriptionId = :subscriptionId")
     suspend fun getId(provider: String, subscriptionId: Int): Int?
 
-    /** The root of the line an account belongs to; null when the account does not exist. */
-    @Query("SELECT COALESCE(mergedInto, id) FROM accounts WHERE id = :id")
-    suspend fun getRootId(id: Int): Int?
-
     /** Each account with the time span of its transactions; accounts without transactions are left out. */
     @Query(
         """

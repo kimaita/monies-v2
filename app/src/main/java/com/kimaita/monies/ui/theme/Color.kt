@@ -37,6 +37,4 @@ val DContainerHighest = Color(0xFF262320)
 val DSurfaceVariant = Color(0xFF262626)
 val DOutline = Color(0xFF3A3A38)
 val DOutlineVariant = Color(0xFF262626)
-val RedExpense = Color(0xFFF44336)
-val GreenIncome = Color(0xFF00563B)
 

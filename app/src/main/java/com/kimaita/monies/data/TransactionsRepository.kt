@@ -13,7 +13,6 @@ import com.kimaita.monies.data.dao.dtos.SourceAmount
 import com.kimaita.monies.data.dao.dtos.SubjectAmount
 import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
-import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.dao.dtos.AccountLine
 import com.kimaita.monies.data.dao.dtos.CategoryBudget
@@ -105,12 +104,6 @@ interface TransactionsRepository {
      * Get a list of subjects.
      */
     fun getSubjects(subjectID: Long): Flow<List<Subject>>
-
-    fun getLargestTransaction(
-        isInc: Boolean,
-        startDate: String? = null,
-        endDate: String? = null
-    ): Flow<Transaction?>
 
     /** Latest known balance of every account, unaffected by [selectedAccount]. */
     fun getAccountBalances(): Flow<List<AccountBalance>>

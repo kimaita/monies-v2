@@ -679,6 +679,6 @@ private const val HIDDEN = "••••"
 private fun money(v: Double): String = formatAmount(v)
 private fun periodWord(f: TimeFilter): String = when (f) {
     TimeFilter.DAY -> "today"; TimeFilter.WEEK -> "this week"; TimeFilter.MONTH -> "this month"
-    TimeFilter.QUARTER -> "this quarter"; TimeFilter.SIX_MONTHS -> "last 6 months"
-    TimeFilter.YTD -> "this year"; TimeFilter.ALL -> "all time"; is TimeFilter.CustomRange -> "selected range"
+    TimeFilter.SIX_MONTHS -> "last 6 months"; TimeFilter.YTD -> "this year"
+    TimeFilter.ALL -> "all time"; is TimeFilter.CustomRange -> "selected range"
 }
