@@ -15,6 +15,7 @@ import com.kimaita.monies.data.dao.UnparsedMessageDao
 import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.dao.dtos.accountLines
 import com.kimaita.monies.data.database.models.UnparsedMessage
+import com.kimaita.monies.di.ApplicationScope
 import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.ui.theme.ThemeMode
 import java.time.LocalDate
@@ -51,22 +52,28 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -83,41 +90,57 @@ class DefaultTransactionsRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val settingsDao: SettingsDao,
     private val unparsedDao: UnparsedMessageDao,
-    private val recurringDetector: RecurringDetector
+    private val recurringDetector: RecurringDetector,
+    @ApplicationScope private val scope: CoroutineScope,
 ) : TransactionsRepository {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val storedAccount = MutableStateFlow<Int?>(null)
+    /** The stored choice. No value until it is read from settings, so nothing resolves before that. */
+    private val storedAccount = MutableSharedFlow<Int?>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    /** The stored choice resolved against the current lines, so it follows merges and dormancy. */
-    override val selectedAccount: StateFlow<Int?> = combine(
-        storedAccount, accountDao.getAll(), transactionsDao.getAccountBalances()
-    ) { stored, accounts, lines ->
-        effectiveSelection(stored, accounts, lines.map { it.accountId }.toSet())
-    }.stateIn(scope, SharingStarted.Eagerly, null)
+    /**
+     * Balance of every active line, queried once for the selection, [getAccountBalances] and
+     * [getFilterOptions]. The replay cache is dropped when nobody listens so a late subscriber never
+     * sees an old balance first.
+     */
+    private val lines = transactionsDao.getAccountBalances()
+        .shareIn(scope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
+
+    /**
+     * The stored choice resolved against the current lines, so it follows merges and dormancy. It has
+     * no initial value: every query waits for it, so none runs for "All" first when a line is stored.
+     */
+    private val resolvedSelection: SharedFlow<Int?> = combine(
+        storedAccount, accountDao.getAll(), lines
+    ) { stored, accounts, active ->
+        effectiveSelection(stored, accounts, active.map { it.accountId }.toSet())
+    }.distinctUntilChanged()
+        .shareIn(scope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
+
+    /** For the UI: [resolvedSelection] as state. Null until it resolves, which also means All. */
+    override val selectedAccount: StateFlow<Int?> =
+        resolvedSelection.stateIn(scope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         scope.launch {
-            storedAccount.value = settingsDao.getSetting(SELECTED_ACCOUNT_KEY)?.toIntOrNull()
+            storedAccount.emit(settingsDao.getSetting(SELECTED_ACCOUNT_KEY)?.toIntOrNull())
         }
     }
 
     override suspend fun setSelectedAccount(accountId: Int?) {
-        storedAccount.value = accountId
-        withContext(Dispatchers.IO) {
-            if (accountId == null) settingsDao.deleteSetting(SELECTED_ACCOUNT_KEY)
-            else settingsDao.saveSetting(Setting(SELECTED_ACCOUNT_KEY, accountId.toString()))
-        }
+        storedAccount.emit(accountId)
+        if (accountId == null) settingsDao.deleteSetting(SELECTED_ACCOUNT_KEY)
+        else settingsDao.saveSetting(Setting(SELECTED_ACCOUNT_KEY, accountId.toString()))
     }
 
     /** Re-runs [query] with the selected account each time the selection changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun <T> forAccount(query: (Int?) -> Flow<T>): Flow<T> =
-        selectedAccount.flatMapLatest(query)
+        resolvedSelection.flatMapLatest(query)
 
     override fun getRecentTransactions(limit: Int): Flow<List<Transaction>> =
         forAccount { transactionsDao.getLatestTransactions(limit, it) }
             .map { list -> list.map { it.toDomainModel() } }
+            .flowOn(Dispatchers.Default)
 
     override fun getTransactions(
         transactionFilters: TransactionFilters?,
@@ -144,7 +167,7 @@ class DefaultTransactionsRepository @Inject constructor(
                         search.subjectLike
                     )
                 }).flow
-        }.map { list -> list.map { it.toDomainModel() } }
+        }.map { list -> list.map { it.toDomainModel() } }.flowOn(Dispatchers.Default)
     }
 
 
@@ -168,9 +191,9 @@ class DefaultTransactionsRepository @Inject constructor(
     }
 
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
-        combine(transactionsDao.getAccountBalances(), allLineNames()) { lines, names ->
-            lines.map { AccountBalance(it.accountId, names.getValue(it.accountId), it.balance, it.provider) }
-        }
+        combine(lines, allLineNames()) { active, names ->
+            active.map { AccountBalance(it.accountId, names.getValue(it.accountId), it.balance, it.provider) }
+        }.flowOn(Dispatchers.Default)
 
     override fun getSubjectStats(
         subjectId: Long,
@@ -229,7 +252,7 @@ class DefaultTransactionsRepository @Inject constructor(
     private val exportHandoff = MutableStateFlow<TransactionFilters?>(null)
 
     override fun handOffToExport(filters: TransactionFilters) {
-        exportHandoff.value = filters.copy(accountFilter = filters.accountFilter ?: selectedAccount.value)
+        exportHandoff.value = filters.copy(accountFilter = filters.accountFilter ?: resolvedSelection.replayCache.firstOrNull())
     }
 
     override fun takeExportHandoff(): TransactionFilters? = exportHandoff.getAndUpdate { null }
@@ -329,24 +352,21 @@ class DefaultTransactionsRepository @Inject constructor(
         return settingsDao.getSetting(SmsSyncer.LAST_SMS_SYNC_ID_KEY) == null
     }
 
-    override suspend fun isOnboardingComplete(): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun isOnboardingComplete(): Boolean =
         settingsDao.getSetting(ONBOARDING_COMPLETE_KEY) == "true"
-    }
 
-    override suspend fun setOnboardingComplete() = withContext(Dispatchers.IO) {
+    override suspend fun setOnboardingComplete() =
         settingsDao.saveSetting(Setting(ONBOARDING_COMPLETE_KEY, "true"))
-    }
 
 
     override suspend fun searchSubjects(trim: String) =
         subjectDao.searchSubjects(trim).map { NamedRef(it.id, it.name) }
 
-    override suspend fun renameSubject(id: Long, name: String) = withContext(Dispatchers.IO) {
-        name.trim().takeIf { it.isNotEmpty() }?.let { subjectDao.rename(id, it) } ?: Unit
+    override suspend fun renameSubject(id: Long, name: String) {
+        name.trim().takeIf { it.isNotEmpty() }?.let { subjectDao.rename(id, it) }
     }
 
-    override suspend fun mergeSubject(source: Long, target: Long) =
-        withContext(Dispatchers.IO) { subjectDao.merge(source, target) }
+    override suspend fun mergeSubject(source: Long, target: Long) = subjectDao.merge(source, target)
 
     override suspend fun getSubjects(ids: List<Long>): List<NamedRef<Long>> =
         if (ids.isEmpty()) emptyList() else subjectDao.getSubjects(ids)
@@ -368,14 +388,14 @@ class DefaultTransactionsRepository @Inject constructor(
             accounts = accounts.map { NamedRef(it.accountId, it.name) },
             types = typeGroups(types),
         )
-    }
+    }.flowOn(Dispatchers.Default)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun getOtherBalances(): Flow<OtherBalances> = forAccount { account ->
         transactionTypeDao.getAll().flatMapLatest { types ->
 
             val regexByType: Map<Int, Regex> = types.mapNotNull { t ->
-                t.pattern?.let { p -> t.id to p.toRegex(BALANCE_REGEX_OPTIONS) }
+                t.pattern?.let { p -> t.id to balanceRegex(p) }
             }.toMap()
 
             val balanceTypeIds = types.filter { t ->
@@ -406,7 +426,13 @@ class DefaultTransactionsRepository @Inject constructor(
                 )
             }
         }
-    }
+    }.flowOn(Dispatchers.Default)
+
+    /** Compiled once per pattern for the life of the process, not each time the types table emits. */
+    private val balanceRegexes = ConcurrentHashMap<String, Regex>()
+
+    private fun balanceRegex(pattern: String) =
+        balanceRegexes.getOrPut(pattern) { pattern.toRegex(BALANCE_REGEX_OPTIONS) }
 
     private fun fulizaEvent(row: FulizaRow, regexByName: Map<String, Regex>): FulizaEvent? {
         val kind = when (row.typeName) {
@@ -466,7 +492,7 @@ class DefaultTransactionsRepository @Inject constructor(
             if (it != null) transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate, it)
             else transactionsDao.getLineBalanceBuckets(bucketFormat, startDate, endDate)
                 .map(::sumLineBalances)
-        }
+        }.flowOn(Dispatchers.Default)
 
     override fun getWeekdayCounts(
         startDate: String?,
@@ -526,22 +552,21 @@ class DefaultTransactionsRepository @Inject constructor(
     }
 
     override suspend fun getRecurringPayments() =
-        recurringDetector.detect(account = selectedAccount.value)
+        recurringDetector.detect(account = resolvedSelection.first())
 
     override suspend fun getEarliestTransactionDate(): LocalDateTime? =
-        transactionsDao.getEarliestTransactionTime(selectedAccount.value)?.let {
+        transactionsDao.getEarliestTransactionTime(resolvedSelection.first())?.let {
             runCatching { LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }.getOrNull()
         }
 
     // ---- Settings ----
 
     private fun setting(key: String) = settingsDao.observeSetting(key)
-    private suspend fun save(key: String, value: String) =
-        withContext(Dispatchers.IO) { settingsDao.saveSetting(Setting(key, value)) }
+    private suspend fun save(key: String, value: String) = settingsDao.saveSetting(Setting(key, value))
 
     override val themeMode: Flow<ThemeMode> = setting(THEME_KEY).map { ThemeMode.fromKey(it) }
     override suspend fun getThemeMode(): ThemeMode =
-        withContext(Dispatchers.IO) { ThemeMode.fromKey(settingsDao.getSetting(THEME_KEY)) }
+        ThemeMode.fromKey(settingsDao.getSetting(THEME_KEY))
 
     override suspend fun setThemeMode(mode: ThemeMode) = save(THEME_KEY, mode.key)
 
@@ -556,33 +581,32 @@ class DefaultTransactionsRepository @Inject constructor(
 
     // ---- Accounts ----
 
-    override fun getAccountLines() = accountDao.getLineSummaries().map { accountLines(it) }
+    override fun getAccountLines() = accountDao.getLineSummaries().map { accountLines(it) }.flowOn(Dispatchers.Default)
 
     override fun getLineSamples(accountId: Int, limit: Int): Flow<List<Transaction>> =
-        transactionsDao.getLatestTransactions(limit, accountId).map { list -> list.map { it.toDomainModel() } }
+        transactionsDao.getLatestTransactions(limit, accountId)
+            .map { list -> list.map { it.toDomainModel() } }
+            .flowOn(Dispatchers.Default)
 
-    override suspend fun renameAccount(accountId: Int, label: String?) = withContext(Dispatchers.IO) {
+    override suspend fun renameAccount(accountId: Int, label: String?) =
         accountDao.setLabel(accountId, label?.trim()?.takeIf { it.isNotEmpty() })
-    }
 
     override suspend fun mergeAccounts(sourceId: Int, targetId: Int) =
-        withContext(Dispatchers.IO) { accountDao.mergeLines(sourceId, targetId) }
+        accountDao.mergeLines(sourceId, targetId)
 
     // ---- Categories ----
 
-    override suspend fun addCategory(name: String, monthlyBudget: Double?) = withContext(Dispatchers.IO) {
-        categoryDao.insert(Category(name = name.trim(), monthlyBudget = monthlyBudget)); Unit
+    override suspend fun addCategory(name: String, monthlyBudget: Double?) {
+        categoryDao.insert(Category(name = name.trim(), monthlyBudget = monthlyBudget))
     }
 
-    override suspend fun updateCategory(category: Category) =
-        withContext(Dispatchers.IO) { categoryDao.update(category) }
+    override suspend fun updateCategory(category: Category) = categoryDao.update(category)
 
-    override suspend fun deleteCategory(categoryId: Int) =
-        withContext(Dispatchers.IO) { categoryDao.deleteCategory(categoryId) }
+    override suspend fun deleteCategory(categoryId: Int) = categoryDao.deleteCategory(categoryId)
 
     override suspend fun assignCategory(
         transactionId: Long, subjectId: Long?, categoryId: Int, allFromSubject: Boolean
-    ) = withContext(Dispatchers.IO) {
+    ) {
         if (allFromSubject && subjectId != null) transactionsDao.setCategoryForAllOfSubject(subjectId, categoryId)
         else transactionsDao.setCategory(transactionId, categoryId)
     }
@@ -600,9 +624,7 @@ class DefaultTransactionsRepository @Inject constructor(
     override fun getUnparsedMessages(): Flow<List<UnparsedMessage>> = unparsedDao.getAll()
     override fun getUnparsedCount(): Flow<Int> = unparsedDao.count()
 
-    override suspend fun clearForReimport() = withContext(Dispatchers.IO) {
-        transactionsDao.clearForReimport(SmsSyncer.LAST_SMS_SYNC_ID_KEY)
-    }
+    override suspend fun clearForReimport() = transactionsDao.clearForReimport(SmsSyncer.LAST_SMS_SYNC_ID_KEY)
 
     companion object {
         const val THEME_KEY = "theme"
