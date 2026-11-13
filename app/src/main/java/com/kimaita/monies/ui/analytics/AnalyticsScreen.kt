@@ -161,6 +161,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val balanceOrNull by vm.balanceTrend.collectAsStateWithLifecycle()
     val heatOrNull by vm.heat.collectAsStateWithLifecycle()
     val topOrNull by vm.topMerchant.collectAsStateWithLifecycle()
+    val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val extra = MoniesTheme.extra
 
     val stats = statsOrNull
@@ -169,7 +170,10 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val balance = balanceOrNull
     val heat = heatOrNull
     val top = topOrNull
-    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || heat == null || top == null) {
+    val sources = sourcesOrNull
+    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || heat == null ||
+        top == null || sources == null
+    ) {
         LoadingTab(listState)
         return
     }
@@ -200,11 +204,8 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                     minFontSize = 22.sp,
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "In ${formatCompactKes(stats.income)}  /  Out ${formatCompactKes(stats.expense)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                TopLine("Top in", sources.firstOrNull()?.let { it.name to it.amount })
+                TopLine("Top out", top.firstOrNull()?.let { it.name to it.amount })
             }
         }
 
@@ -652,6 +653,28 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         content()
+    }
+}
+
+/** "Top in  Name  KES 12K": the name takes the room left and ellipsizes; "–" when there is none. */
+@Composable
+private fun TopLine(label: String, top: Pair<String, Double>?) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            label, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            top?.first ?: "–", Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        top?.let {
+            Text(
+                formatCompactKes(it.second), style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 
