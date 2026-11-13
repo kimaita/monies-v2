@@ -62,7 +62,6 @@ class AnalyticsViewModel @Inject constructor(
 
     private val started = SharingStarted.WhileSubscribed(5_000)
     private val onceStarted = SharingStarted.Lazily
-    private val isoDateTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     private val _filters = MutableStateFlow(TransactionFilters(timeFilter = TimeFilter.MONTH))
     val filters: StateFlow<TransactionFilters> = _filters.asStateFlow()
@@ -237,8 +236,8 @@ class AnalyticsViewModel @Inject constructor(
     val streakWindow: ClosedRange<LocalDate> = streakStart..streakEnd
     private val streakDaily = repository
         .getDailyTotals(
-            streakStart.atStartOfDay().format(isoDateTime),
-            streakEnd.plusDays(1).atStartOfDay().format(isoDateTime),
+            streakStart.atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            streakEnd.plusDays(1).atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             natureFilter = false
         )
         .stateIn(viewModelScope, started, emptyList())
@@ -275,7 +274,7 @@ class AnalyticsViewModel @Inject constructor(
 
 
     val recurring: StateFlow<List<RecurringPayment>> =
-        flow { emit(repository.getRecurringPayments()) }.stateIn(
+        repository.selectedAccount.mapLatest { repository.getRecurringPayments() }.stateIn(
             viewModelScope,
             onceStarted,
             emptyList()

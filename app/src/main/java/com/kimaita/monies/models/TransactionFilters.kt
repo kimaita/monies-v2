@@ -8,7 +8,8 @@ enum class SortOrder {
     DATE_DESC, DATE_ASC, AMOUNT_DESC, AMOUNT_ASC
 }
 
-val isoDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+/** Stored times are ISO_LOCAL_DATE_TIME text. Kept only for UI-lane callers; use the constant directly. */
+val isoDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
 
 sealed class TimeFilter {
     object DAY : TimeFilter()

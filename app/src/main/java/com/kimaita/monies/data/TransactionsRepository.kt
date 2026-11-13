@@ -2,6 +2,7 @@ package com.kimaita.monies.data
 
 
 import androidx.paging.PagingData
+import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CashFlowBucket
@@ -26,9 +27,14 @@ import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import java.time.LocalDateTime
 
 interface TransactionsRepository {
+
+    /** The account every list, total and balance is limited to; null means all accounts. */
+    val selectedAccount: StateFlow<Int?>
+    suspend fun setSelectedAccount(accountId: Int?)
 
     /**
      * Get a list of recent transactions.
@@ -97,7 +103,8 @@ interface TransactionsRepository {
         endDate: String? = null
     ): Flow<Transaction?>
 
-    fun getMpesaBalance(): Flow<Double>
+    /** Latest known balance of every account, unaffected by [selectedAccount]. */
+    fun getAccountBalances(): Flow<List<AccountBalance>>
     fun getSubjectStats(subjectId: Long, startDate: String?, endDate: String?): Flow<SubjectStats>
     suspend fun countForExport(filters: ExportFilters): Int
     suspend fun forEachExportBatch(

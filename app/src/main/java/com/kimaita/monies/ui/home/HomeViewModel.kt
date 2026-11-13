@@ -3,6 +3,7 @@ package com.kimaita.monies.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kimaita.monies.data.TransactionsRepository
+import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.models.OtherBalances
 import com.kimaita.monies.models.TimeFilter
@@ -28,12 +29,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 data class HomeUiState(
     val phoneNumber: String? = null,
+    /** The selected account's balance, or the sum across accounts when none is selected. */
     val mpesaBalance: Double = 0.0,
+    val accountBalances: List<AccountBalance> = emptyList(),
     val incomeVsExpense: IncExp = IncExp(),
     val transactionCount: Int = 0,
     val recentTransactions: List<Transaction> = emptyList(),
@@ -104,15 +109,20 @@ class HomeViewModel @Inject constructor(
 
 
     val uiState: StateFlow<HomeUiState> = combine(
-        repository.getMpesaBalance().fallbackOnError(0.0),
+        combine(
+            repository.getAccountBalances().fallbackOnError(emptyList()),
+            repository.selectedAccount,
+        ) { balances, selected -> balances.filter { it.balance != null } to selected },
         repository.getRecentTransactions(5).fallbackOnError(emptyList()),
         repository.getOtherBalances().fallbackOnError(OtherBalances()),
         periodData,
-    ) { balance, recent, other, period ->
+    ) { (balances, selected), recent, other, period ->
+        val shown = if (selected == null) balances else balances.filter { it.accountId == selected }
         val totalMoved = period.incExp.income + period.incExp.expense
         val prevMoved = period.previousIncExp?.let { it.income + it.expense }
         HomeUiState(
-            mpesaBalance = balance,
+            mpesaBalance = shown.sumOf { it.balance ?: 0.0 },
+            accountBalances = balances,
             incomeVsExpense = period.incExp,
             transactionCount = period.incExp.incomeCount + period.incExp.expenseCount,
             totalTransactionCost = period.incExp.incomeCost + period.incExp.expenseCost,
@@ -149,12 +159,17 @@ class HomeViewModel @Inject constructor(
     private fun previousPeriod(start: String?, end: String?): Pair<String, String>? {
         if (start == null || end == null) return null
         return try {
-            val s = LocalDateTime.parse(start)
-            val e = LocalDateTime.parse(end)
+            val s = parseBound(start)
+            val e = parseBound(end)
             val length = Duration.between(s, e)
-            s.minus(length).toString() to s.toString()
+            val fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+            s.minus(length).format(fmt) to s.format(fmt)
         } catch (e: Exception) {
             null
         }
     }
+
+    /** Preset periods give date-only bounds; custom ranges give date-times. */
+    private fun parseBound(bound: String): LocalDateTime =
+        if ('T' in bound) LocalDateTime.parse(bound) else LocalDate.parse(bound).atStartOfDay()
 }

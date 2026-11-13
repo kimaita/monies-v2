@@ -41,20 +41,21 @@ interface SubjectDao : BaseDao<Subject> {
     @Query(
         """
     SELECT 
-        SUM(CASE WHEN isInc = 1 THEN amount ELSE 0 END) as incomingTotal,
-        SUM(CASE WHEN isInc = 0 THEN amount ELSE 0 END) as outgoingTotal,
-        COUNT(CASE WHEN isInc = 1 THEN 1 END) as incomingCount,
-        COUNT(CASE WHEN isInc = 0 THEN 1 END) as outgoingCount,
+        SUM(CASE WHEN isInc = 1 AND isTransfer = 0 THEN amount ELSE 0 END) as incomingTotal,
+        SUM(CASE WHEN isInc = 0 AND isTransfer = 0 THEN amount ELSE 0 END) as outgoingTotal,
+        COUNT(CASE WHEN isInc = 1 AND isTransfer = 0 THEN 1 END) as incomingCount,
+        COUNT(CASE WHEN isInc = 0 AND isTransfer = 0 THEN 1 END) as outgoingCount,
         SUM(cost) as totalCost
     FROM transactions t
     JOIN transaction_types ON t.transactionType = transaction_types.id
     WHERE subject = :subjectId
     AND (:startDate IS NULL OR t.transactionTime >= :startDate)
     AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+    AND (:account IS NULL OR t.accountId = :account)
     """
     )
     fun getSubjectStats(
-        subjectId: Long, startDate: String? = null, endDate: String? = null
+        subjectId: Long, startDate: String? = null, endDate: String? = null, account: Int? = null
     ): Flow<SubjectStats>
 
 
@@ -89,6 +90,8 @@ interface SubjectDao : BaseDao<Subject> {
       AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
       AND (:transactionCategory IS NULL OR t.transactionCategory IN (:transactionCategory))
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
+      AND tt.isTransfer = 0
+      AND (:account IS NULL OR t.accountId = :account)
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
     )
@@ -99,6 +102,7 @@ interface SubjectDao : BaseDao<Subject> {
         transactionCategory: List<Int>?,
         natureFilter: Boolean?,
         limit: Int,
+        account: Int? = null,
     ): Flow<List<SubjectAmount>>
 
     @Query(
@@ -106,15 +110,19 @@ interface SubjectDao : BaseDao<Subject> {
     SELECT s.id AS subjectId, s.name AS name, COUNT(*) AS count
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
+    JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+      AND tt.isTransfer = 0
+      AND (:account IS NULL OR t.accountId = :account)
     GROUP BY s.id ORDER BY count DESC LIMIT :limit
 """
     )
     fun getTopSubjectsByCount(
         startDate: String?,
         endDate: String?,
-        limit: Int
+        limit: Int,
+        account: Int? = null
     ): Flow<List<SubjectCount>>
 
     @Query(
@@ -123,16 +131,18 @@ interface SubjectDao : BaseDao<Subject> {
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id
-    WHERE tt.isInc = 1
+    WHERE tt.isInc = 1 AND tt.isTransfer = 0
       AND (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+      AND (:account IS NULL OR t.accountId = :account)
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
     )
     fun getIncomeBySource(
         startDate: String?,
         endDate: String?,
-        limit: Int
+        limit: Int,
+        account: Int? = null
     ): Flow<List<SourceAmount>>
 
 }

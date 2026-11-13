@@ -15,7 +15,6 @@ import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.getDatesForFilter
-import com.kimaita.monies.models.isoDateTimeFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -53,8 +52,8 @@ class AccountViewModel @Inject constructor(
         if (subjectId != null) {
             repository.getSubjectStats(
                 subjectId = subjectId,
-                startDate = startDate?.format(isoDateTimeFormatter),
-                endDate = endDate?.format(isoDateTimeFormatter)
+                startDate = startDate,
+                endDate = endDate
             )
         } else {
             flowOf(SubjectStats())
@@ -66,8 +65,8 @@ class AccountViewModel @Inject constructor(
         _filters.flatMapLatest { filters ->
             val (startDate, endDate) = getDatesForFilter(filters.timeFilter)
             repository.getTransactions(
-                startDate = startDate?.format(isoDateTimeFormatter),
-                endDate = endDate?.format(isoDateTimeFormatter),
+                startDate = startDate,
+                endDate = endDate,
                 transactionFilters = filters,
             )
 

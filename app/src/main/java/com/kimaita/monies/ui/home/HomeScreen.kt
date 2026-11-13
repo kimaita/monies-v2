@@ -55,6 +55,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kimaita.monies.R
+import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
@@ -137,7 +138,7 @@ fun HomeScreenContent(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                "M-PESA BALANCE",
+                if (uiState.accountBalances.size > 1) "BALANCE" else "M-PESA BALANCE",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -147,6 +148,20 @@ fun HomeScreenContent(
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.ExtraBold
                 )
+            }
+            if (uiState.accountBalances.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    uiState.accountBalances.forEach { account ->
+                        Pill {
+                            Svc(account.label ?: Provider.entries.firstOrNull { it.name == account.provider }?.displayName ?: account.provider)
+                            Strong(money(account.balance ?: 0.0))
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
             ChangePill(change = uiState.changeInTotal, filter = filter, onClick = onViewAnalytics)

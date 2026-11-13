@@ -79,3 +79,12 @@ data class SubjectOccurrence(
 
 /** Minimal projection for the balance backfill pass. */
 data class BalanceRow(val id: Long, val message: String, val transactionType: Int)
+
+/** An account with its latest known balance. */
+data class AccountBalance(
+    val accountId: Int,
+    val provider: String,
+    val subscriptionId: Int,
+    val label: String?,
+    val balance: Double?,
+)
