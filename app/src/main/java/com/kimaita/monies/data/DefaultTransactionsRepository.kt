@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
@@ -186,6 +187,7 @@ class DefaultTransactionsRepository @Inject constructor(
         filters: ExportFilters,
         onPage: suspend (List<TransactionWithDetails>) -> Unit,
     ) {
+        val search = searchTermsOf(filters.search)
         var afterId: Long? = null
         while (true) {
             currentCoroutineContext().ensureActive()
@@ -199,6 +201,9 @@ class DefaultTransactionsRepository @Inject constructor(
                 transactionType = filters.transactionType?.takeIf { it.isNotEmpty() },
                 account = filters.account,
                 natureFilter = filters.natureFilter,
+                fts = search.fts,
+                amountQuery = search.amount,
+                subjectLike = search.subjectLike,
             )
             if (batch.isEmpty()) break
             onPage(batch)
@@ -208,8 +213,9 @@ class DefaultTransactionsRepository @Inject constructor(
         }
     }
 
-    override suspend fun countForExport(filters: ExportFilters): Int =
-        transactionsDao.countForExport(
+    override suspend fun countForExport(filters: ExportFilters): Int {
+        val search = searchTermsOf(filters.search)
+        return transactionsDao.countForExport(
             startDate = filters.startDate,
             endDate = filters.endDate,
             subjectId = filters.subjectId?.takeIf { it.isNotEmpty() },
@@ -217,7 +223,19 @@ class DefaultTransactionsRepository @Inject constructor(
             transactionType = filters.transactionType?.takeIf { it.isNotEmpty() },
             account = filters.account,
             natureFilter = filters.natureFilter,
+            fts = search.fts,
+            amountQuery = search.amount,
+            subjectLike = search.subjectLike,
         )
+    }
+
+    private val exportHandoff = MutableStateFlow<TransactionFilters?>(null)
+
+    override fun handOffToExport(filters: TransactionFilters) {
+        exportHandoff.value = filters.copy(accountFilter = filters.accountFilter ?: selectedAccount.value)
+    }
+
+    override fun takeExportHandoff(): TransactionFilters? = exportHandoff.getAndUpdate { null }
 
     override fun getIncomeVsExpense(
         startDate: String?,

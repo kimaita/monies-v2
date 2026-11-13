@@ -104,4 +104,6 @@ class TransactionsViewModel @Inject constructor(
         _filters.value = _filters.value.copy(sortOrder = sortOrder)
     }
 
+    /** Hands the current filters and search to the Export screen. */
+    fun exportResults() = repository.handOffToExport(_filters.value)
 }

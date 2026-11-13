@@ -12,6 +12,8 @@ data class ExportFilters(
     val transactionType: List<Int>? = null,
     val account: Int? = null,
     val natureFilter: Boolean? = null,
+    /** The Transactions search box text, matched the same way as in the list. */
+    val search: String? = null,
 )
 
 

@@ -62,7 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.paging.LoadState
 import androidx.paging.PagingData
@@ -77,6 +77,7 @@ import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.ui.components.TransactionItemStyle
+import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
 import kotlinx.coroutines.flow.flowOf
@@ -86,7 +87,7 @@ import java.time.LocalDateTime
 @Composable
 fun TransactionsScreen(
     modifier: Modifier = Modifier,
-    navController: NavController,
+    navController: NavHostController,
     viewModel: TransactionsViewModel = hiltViewModel(),
     openSearch: Boolean = false,
 ) {
@@ -107,6 +108,10 @@ fun TransactionsScreen(
         onSetSearchQuery = viewModel::setSearchQuery,
         onSetSortOrder = viewModel::setSortOrder,
         onUpdateFilters = viewModel::updateFilters,
+        onExport = {
+            viewModel.exportResults()
+            navController.navigateToTab("export")
+        },
         onBack = { navController.popBackStack() },
         onTransactionClick = { subjectId ->
             navController.navigate("subject/$subjectId")
@@ -127,7 +132,7 @@ fun TransactionsScreenContent(
     onSetSearchQuery: (String) -> Unit,
     onSetSortOrder: (SortOrder) -> Unit,
     onUpdateFilters: (TransactionFilters) -> Unit,
-//    onExport: suspend () -> Unit,
+    onExport: () -> Unit,
     onBack: () -> Unit = {},
     onTransactionClick: (Long) -> Unit
 ) {
@@ -250,8 +255,22 @@ fun TransactionsScreenContent(
                     typeMap = typeMap,
                     onRemoveFilter = onUpdateFilters
                 )
-                Spacer(modifier = Modifier.height(16.dp))
             }
+            if (hasActiveFilters || filters.searchQuery.isNotBlank()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onExport) {
+                        Icon(painterResource(R.drawable.csv_export), null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Export these results")
+                    }
+                }
+            }
+            if (hasActiveFilters) Spacer(modifier = Modifier.height(8.dp))
             val refresh = filteredTransactions.loadState.refresh
             if (filteredTransactions.itemCount == 0 && refresh !is LoadState.NotLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -614,7 +633,7 @@ fun TransactionsScreenPreview() {
             onSetSearchQuery = {},
             onSetSortOrder = {},
             onUpdateFilters = {},
-//            onExport = {},
+            onExport = {},
             onTransactionClick = {})
     }
 }

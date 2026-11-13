@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.models.TimeFilter
+import com.kimaita.monies.models.TransactionFilters
+import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
@@ -39,10 +41,12 @@ data class ExportSelections(
     val categoryIds: Set<Int> = emptySet(),
     val typeIds: Set<Int> = emptySet(),
     val subjects: List<NamedRef<Long>> = emptyList(),
+    val search: String = "",
 ) {
     val activeFilterCount: Int
         get() = subjects.size + categoryIds.size + typeIds.size +
-                (if (nature != null) 1 else 0) + (if (accountId != null) 1 else 0)
+                (if (nature != null) 1 else 0) + (if (accountId != null) 1 else 0) +
+                (if (search.isNotBlank()) 1 else 0)
 
     fun toExportFilters() = ExportFilters(
         startDate = startDate?.atStartOfDay()?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
@@ -53,6 +57,7 @@ data class ExportSelections(
         transactionType = typeIds.toList().ifEmpty { null },
         account = accountId,
         natureFilter = nature,
+        search = search.trim().ifEmpty { null },
     )
 
     private fun rangeFilter(s: LocalDate?, e: LocalDate?): TimeFilter =
@@ -103,14 +108,24 @@ class ExportViewModel @Inject constructor(
         it.copy(subjects = it.subjects.filterNot { s -> s.id == ref.id })
     }
 
+    fun setSearch(q: String) = _sel.update { it.copy(search = q) }
+
     fun clearFilters() = _sel.update {
         it.copy(
             nature = null,
             accountId = null,
             categoryIds = emptySet(),
             typeIds = emptySet(),
-            subjects = emptyList()
+            subjects = emptyList(),
+            search = "",
         )
+    }
+
+    /** Takes the filters handed over from Transactions, once. True when there were some. */
+    fun applyHandoff(): Boolean {
+        val handed = repository.takeExportHandoff() ?: return false
+        _sel.update { handed.toExportSelections(it) }
+        return true
     }
 
     // subject search (debounced, export-style)
@@ -131,4 +146,22 @@ class ExportViewModel @Inject constructor(
     fun acknowledge() = manager.acknowledge()
 
     private fun <T> Set<T>.toggle(v: T): Set<T> = if (v in this) this - v else this + v
+}
+
+/** The Export selections that show the same rows as these Transactions filters. */
+internal fun TransactionFilters.toExportSelections(base: ExportSelections): ExportSelections {
+    val (start, end) = getDatesForFilter(timeFilter)
+    // Presets end on the day after today (exclusive); a custom range ends on its own last day.
+    val lastDay = end?.take(10)?.let(LocalDate::parse)
+        ?.let { if (timeFilter is TimeFilter.CustomRange) it else it.minusDays(1) }
+    return base.copy(
+        startDate = start?.take(10)?.let(LocalDate::parse),
+        endDate = lastDay,
+        nature = natureFilter,
+        accountId = accountFilter,
+        categoryIds = categoryFilters.toSet(),
+        typeIds = typeFilters.toSet(),
+        subjects = emptyList(),
+        search = searchQuery.trim(),
+    )
 }

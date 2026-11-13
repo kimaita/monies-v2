@@ -116,6 +116,12 @@ interface TransactionsRepository {
     fun getAccountBalances(): Flow<List<AccountBalance>>
     fun getSubjectStats(subjectId: Long, startDate: String?, endDate: String?): Flow<SubjectStats>
     suspend fun countForExport(filters: ExportFilters): Int
+
+    /** Hands the Transactions filters to the Export screen; the account is the one the list shows. */
+    fun handOffToExport(filters: TransactionFilters)
+
+    /** The filters handed over by [handOffToExport], once; null when there are none. */
+    fun takeExportHandoff(): TransactionFilters?
     suspend fun forEachExportBatch(
         filters: ExportFilters,
         onPage: suspend (List<TransactionWithDetails>) -> Unit
