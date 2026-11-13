@@ -1,5 +1,6 @@
 package com.kimaita.monies.services
 
+import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.database.models.TransactionType
@@ -128,5 +129,70 @@ class AnalyticsCalculationsTest {
         assertEquals(filters to filters, sliceFilter(byType, selected, filters, filters))
         // A selection whose row has gone narrows nothing.
         assertEquals(null to null, sliceFilter(byType, "Food", null, null))
+    }
+
+    @Test
+    fun yearStarts_oneYearHasNoMarks() {
+        assertEquals(listOf<String?>(null, null, null), yearStarts(listOf("2026-01", "2026-02", "2026-03")))
+        assertEquals(emptyList<String?>(), yearStarts(emptyList()))
+    }
+
+    @Test
+    fun yearStarts_marksFirstBucketAndEachNewYear() {
+        assertEquals(
+            listOf("2025", null, "2026", null),
+            yearStarts(listOf("2025-11", "2025-12", "2026-01", "2026-02")),
+        )
+        assertEquals(listOf("2025", "2026"), yearStarts(listOf("2025-12-31 23", "2026-01-01 00")))
+    }
+
+    @Test
+    fun thin_keepsFirstAndLastAndRespectsMax() {
+        val items = (1..100).toList()
+        val t = thin(items, 10)
+        assertEquals(10, t.size)
+        assertEquals(1, t.first())
+        assertEquals(100, t.last())
+        assertEquals(t.sorted(), t)
+        assertEquals(listOf(1, 2, 3), thin(listOf(1, 2, 3), 10))
+    }
+
+    @Test
+    fun balancePoints_dailyLabelsCarryTheYearInTheTooltip() {
+        val p = balancePoints(listOf(BalanceBucket("2026-11-13", 100f), BalanceBucket("2026-11-20", 150f)))
+        assertEquals("13 Nov 2026", p[0].label)
+        assertEquals("13 Nov", p[0].axisLabel)
+        assertEquals("20 Nov", p[1].axisLabel)
+        assertEquals(150f, p[1].balance, 0f)
+    }
+
+    @Test
+    fun balancePoints_hourlyOnOneDayUsesTheHourOnTheAxis() {
+        val p = balancePoints(listOf(BalanceBucket("2026-11-13 09", 1f), BalanceBucket("2026-11-13 14", 2f)))
+        assertEquals("13 Nov 09:00", p[0].label)
+        assertEquals("09:00", p[0].axisLabel)
+        assertEquals("14:00", p[1].axisLabel)
+    }
+
+    @Test
+    fun balancePoints_hourlyAcrossDaysUsesTheDate() {
+        val p = balancePoints(listOf(BalanceBucket("2026-11-12 22", 1f), BalanceBucket("2026-11-13 14", 2f)))
+        assertEquals("12 Nov 22:00", p[0].label)
+        assertEquals("12 Nov", p[0].axisLabel)
+    }
+
+    @Test
+    fun balancePoints_acrossYearsAxisCarriesTwoDigitYear() {
+        val p = balancePoints(listOf(BalanceBucket("2025-12-30", 1f), BalanceBucket("2026-01-02", 2f)))
+        assertEquals("30 Dec 25", p[0].axisLabel)
+        assertEquals("2 Jan 26", p[1].axisLabel)
+        assertEquals("2 Jan 2026", p[1].label)
+    }
+
+    @Test
+    fun balancePoints_isThinnedAndEmptyIsEmpty() {
+        val rows = (1..28).map { BalanceBucket("2026-02-%02d".format(it), it.toFloat()) }
+        assertEquals(10, balancePoints(rows, maxPoints = 10).size)
+        assertEquals(emptyList<Any>(), balancePoints(emptyList()))
     }
 }

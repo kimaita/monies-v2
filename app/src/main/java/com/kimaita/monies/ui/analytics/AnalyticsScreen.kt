@@ -245,33 +245,17 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             }
         }
 
-        item(key = "balance_fees") {
-            // No IntrinsicSize here: StatTile's AutoSizeText is a BoxWithConstraints (SubcomposeLayout).
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                BentoCard(
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 112.dp),
-                    onClick = { onJump(AnalyticsTab.CASHFLOW) }) {
-                    TileLabel("Balance")
-                    Spacer(Modifier.height(8.dp))
-                    if (balance.size < 2) EmptyHint()
-                    else MiniSparkline(
-                        balance,
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    )
-                }
-                StatTile(
-                    "Fees",
-                    formatCompactKes(fees),
-                    MaterialTheme.colorScheme.onSurface,
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 112.dp)
-                )
+        item(key = "balance") {
+            BentoCard(onClick = { onJump(AnalyticsTab.CASHFLOW) }) {
+                TileLabel("Balance")
+                Spacer(Modifier.height(8.dp))
+                if (balance.size < 2) EmptyHint()
+                else BalanceTrendChart(balance, Modifier.fillMaxWidth(), plotHeight = 140.dp)
             }
+        }
+
+        item(key = "fees") {
+            StatTile("Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface)
         }
 
         item(key = "heat") {

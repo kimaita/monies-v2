@@ -2,13 +2,18 @@ package com.kimaita.monies.services
 
 
 import com.kimaita.monies.data.dao.dtos.ActivityCell
+import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.analytics.BalancePoint
 import com.kimaita.monies.models.export.NamedRef
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
 
 data class StreakSummary(
     val currentStreak: Int,
@@ -144,4 +149,50 @@ fun sliceFilter(
     val s = slices.firstOrNull { it.label == selected }
     return (s?.categoryIds?.takeIf { it.isNotEmpty() } ?: categories) to
             (s?.typeIds?.takeIf { it.isNotEmpty() } ?: types)
+}
+
+/**
+ * For bucket keys that start with the year ("2026-03", "2026-45", "2026-03-14 09"): the year at each
+ * bucket where a new one begins, null elsewhere. The first bucket is marked only when the buckets
+ * span several years, so one year of data carries no markers.
+ */
+fun yearStarts(buckets: List<String>): List<String?> {
+    val years = buckets.map { it.take(4) }
+    val several = years.distinct().size > 1
+    return years.mapIndexed { i, y -> if (if (i == 0) several else y != years[i - 1]) y else null }
+}
+
+/** At most [max] of [items], evenly picked, always keeping the first and the last. */
+fun <T> thin(items: List<T>, max: Int): List<T> {
+    if (items.size <= max || max < 2) return items
+    return List(max) { i -> items[(i * (items.size - 1).toDouble() / (max - 1)).roundToInt()] }
+}
+
+private val dateFmt = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val dateYearFmt = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private val dateShortYearFmt = DateTimeFormatter.ofPattern("d MMM yy", Locale.ENGLISH)
+
+/**
+ * Balance points with dates, from per-day ("2026-03-14") or per-hour ("2026-03-14 09") buckets.
+ * The tooltip label is the full date (with the hour for hourly buckets); the axis label is the short
+ * date, the hour when every point is on one day, and carries the year when the range spans several.
+ */
+fun balancePoints(rows: List<BalanceBucket>, maxPoints: Int = 90): List<BalancePoint> {
+    val kept = thin(rows, maxPoints)
+    if (kept.isEmpty()) return emptyList()
+    val dates = kept.map { LocalDate.parse(it.bucket.take(10)) }
+    val hourly = kept.first().bucket.length > 10
+    val sameDay = dates.first() == dates.last()
+    val several = dates.first().year != dates.last().year
+    return kept.mapIndexed { i, r ->
+        val date = dates[i]
+        val hour = if (hourly) r.bucket.substring(11, 13) + ":00" else null
+        val label = if (hour != null) "${date.format(dateFmt)} $hour" else date.format(dateYearFmt)
+        val axis = when {
+            hour != null && sameDay -> hour
+            several -> date.format(dateShortYearFmt)
+            else -> date.format(dateFmt)
+        }
+        BalancePoint(label, r.balance, axis)
+    }
 }

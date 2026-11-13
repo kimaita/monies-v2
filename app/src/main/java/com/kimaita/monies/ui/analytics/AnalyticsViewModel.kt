@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.dao.dtos.ActivityCell
-import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CashFlowBucket
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.data.dao.dtos.SourceAmount
@@ -34,6 +33,8 @@ import com.kimaita.monies.services.sliceFilter
 import com.kimaita.monies.services.toggleSlice
 import com.kimaita.monies.services.typeSlices
 import com.kimaita.monies.services.scopeLabel
+import com.kimaita.monies.services.balancePoints
+import com.kimaita.monies.services.yearStarts
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -131,33 +132,38 @@ class AnalyticsViewModel @Inject constructor(
     }.stateIn(viewModelScope, started, null)
 
     val cashFlow: StateFlow<List<CashFlowWeek>?> = combine(cashFlowRaw, _filters) { rows, f ->
-        rows?.map {
-            CashFlowWeek(
-                bucketLabel(it.bucket, f.timeFilter),
-                it.income.toFloat(),
-                it.expense.toFloat()
-            )
+        rows?.let { r ->
+            val years = yearStarts(r.map { it.bucket })
+            r.mapIndexed { i, it ->
+                CashFlowWeek(
+                    bucketLabel(it.bucket, f.timeFilter),
+                    it.income.toFloat(),
+                    it.expense.toFloat(),
+                    years[i]
+                )
+            }
         }
     }.stateIn(viewModelScope, started, null)
 
     val costs: StateFlow<List<CostMonth>?> = combine(cashFlowRaw, _filters) { rows, f ->
-        rows?.map {
-            CostMonth(
-                bucketLabel(it.bucket, f.timeFilter),
-                it.expense.toFloat(),
-                it.cost.toFloat()
-            )
+        rows?.let { r ->
+            val years = yearStarts(r.map { it.bucket })
+            r.mapIndexed { i, it ->
+                CostMonth(
+                    bucketLabel(it.bucket, f.timeFilter),
+                    it.expense.toFloat(),
+                    it.cost.toFloat(),
+                    years[i]
+                )
+            }
         }
     }.stateIn(viewModelScope, started, null)
 
     val balanceTrend: StateFlow<List<BalancePoint>?> = _filters.flatMapLatest { f ->
         val (s, e) = getDatesForFilter(f.timeFilter)
-        repository.getBalanceTrend(bucketFormatFor(f.timeFilter), s, e)
-            .map { rows -> rows.map { it.toPoint(f.timeFilter) } }
+        repository.getBalanceTrend(balanceBucketFormatFor(f.timeFilter), s, e)
+            .map { rows -> balancePoints(rows) }
     }.stateIn(viewModelScope, started, null)
-
-    private fun BalanceBucket.toPoint(tf: TimeFilter) =
-        BalancePoint(bucketLabel(bucket, tf), balance)
 
     // ---------------- headline stats (net / in / out / fees) ----------------
     val stats: StateFlow<IncExp?> = key.flatMapLatest { k ->
@@ -344,6 +350,12 @@ class AnalyticsViewModel @Inject constructor(
         TimeFilter.MONTH, TimeFilter.QUARTER -> "%Y-%W"
         TimeFilter.SIX_MONTHS, TimeFilter.YTD, TimeFilter.ALL -> "%Y-%m"
         is TimeFilter.CustomRange -> "%Y-%m-%d"
+    }
+
+    /** Balance points are daily, or hourly for the short ranges. */
+    private fun balanceBucketFormatFor(tf: TimeFilter): String = when (tf) {
+        TimeFilter.DAY, TimeFilter.WEEK -> "%Y-%m-%d %H"
+        else -> "%Y-%m-%d"
     }
 
     private val monthAbbrev =

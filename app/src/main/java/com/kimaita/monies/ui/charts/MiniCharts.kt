@@ -13,13 +13,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.kimaita.monies.models.analytics.BalancePoint
 import com.kimaita.monies.models.analytics.CashFlowWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -57,28 +53,6 @@ fun MiniInOutBars(data: List<CashFlowWeek>, modifier: Modifier = Modifier, bucke
             drawPath(upPath, colors.inflow)
             drawPath(downPath, colors.outflow)
         }
-    })
-}
-
-/** Non-interactive balance sparkline for the Overview bento. */
-@Composable
-fun MiniSparkline(points: List<BalancePoint>, modifier: Modifier = Modifier) {
-    val color = chartColors().inflow
-    Spacer(modifier.drawWithCache {
-        if (points.size < 2) return@drawWithCache onDrawBehind { }
-        val strokeW = 2.dp.toPx()
-        val scale = lineScale(points.minOf { it.balance }, points.maxOf { it.balance })
-        val top = strokeW
-        val bottom = size.height - strokeW
-        val stepX = size.width / (points.size - 1)
-        val path = Path().apply {
-            monotoneCurve(
-                FloatArray(points.size) { it * stepX },
-                FloatArray(points.size) { scale.y(points[it].balance, top, bottom) },
-            )
-        }
-        val stroke = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        onDrawBehind { drawPath(path, color, style = stroke) }
     })
 }
 
