@@ -12,6 +12,7 @@ import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
+import com.kimaita.monies.data.dao.UnparsedMessageDao
 import com.kimaita.monies.data.database.AppDatabase
 import com.kimaita.monies.data.database.models.getDefaultCategories
 import com.kimaita.monies.data.database.models.getDefaultTransactionTypes
@@ -75,6 +76,11 @@ object DatabaseModule {
     @Provides
     fun provideAccountDao(appDatabase: AppDatabase): AccountDao {
         return appDatabase.accountDao()
+    }
+
+    @Provides
+    fun provideUnparsedMessageDao(appDatabase: AppDatabase): UnparsedMessageDao {
+        return appDatabase.unparsedMessageDao()
     }
 
 }
@@ -151,6 +157,7 @@ class DatabaseInitializer(
                 }
             }
             if (changed) {
+                db.execSQL("DELETE FROM unparsed_messages")
                 db.execSQL(
                     "UPDATE settings SET value = '0' WHERE `key` = ?",
                     arrayOf(SmsSyncer.LAST_SMS_SYNC_ID_KEY)

@@ -10,6 +10,7 @@ import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
+import com.kimaita.monies.data.dao.UnparsedMessageDao
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.Setting
 import com.kimaita.monies.data.database.models.Subject
@@ -43,4 +44,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun subjectDao(): SubjectDao
     abstract fun settingsDao(): SettingsDao
     abstract fun accountDao(): AccountDao
+    abstract fun unparsedMessageDao(): UnparsedMessageDao
 }

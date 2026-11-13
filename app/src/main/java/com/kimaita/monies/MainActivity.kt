@@ -29,6 +29,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.kimaita.monies.data.DefaultTransactionsRepository
 import com.kimaita.monies.services.SmsContentObserver
 import com.kimaita.monies.services.SmsSyncer
@@ -59,8 +60,6 @@ class MainActivity : ComponentActivity() {
     val permissionsToRequest: Array<String> = buildList {
         add(Manifest.permission.READ_SMS)
         add(Manifest.permission.RECEIVE_SMS)
-        add(Manifest.permission.READ_PHONE_NUMBERS)
-        add(Manifest.permission.READ_PHONE_STATE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             add(Manifest.permission.POST_NOTIFICATIONS)
     }.toTypedArray()
@@ -156,7 +155,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun enqueueSmsImport() {
-        val request = OneTimeWorkRequestBuilder<SmsSyncWorker>().build()
+        val request = OneTimeWorkRequestBuilder<SmsSyncWorker>()
+            .setInputData(workDataOf(SmsSyncWorker.KEY_FOREGROUND to true))
+            .build()
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(
             SmsSyncWorker.WORK_NAME,
             ExistingWorkPolicy.KEEP,

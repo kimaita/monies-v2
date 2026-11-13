@@ -38,12 +38,6 @@ fun permissionRationales(): List<PermissionRationale> = remember {
             "To retrieve your M-PESA messages for processing.", isRequired = true,
         ),
         PermissionRationale(
-            R.drawable.ic_phone,
-            "Phone number & carrier",
-            "To match each line to the right account. Recommended if you have more than one number and want to separate transactions.",
-            isRequired = false
-        ),
-        PermissionRationale(
             R.drawable.ic_notifications, "Notifications",
             "To show progress for longer running tasks.", isRequired = false,
         ),

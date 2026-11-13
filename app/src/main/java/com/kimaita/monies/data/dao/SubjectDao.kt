@@ -25,18 +25,17 @@ interface SubjectDao : BaseDao<Subject> {
     @Query("SELECT id, name FROM subjects WHERE id IN (:ids)")
     suspend fun getSubjects(ids: List<Long>): List<SubjectRef>
 
-    @Query("SELECT id FROM subjects WHERE rawName = :rawName AND number = :number")
-    suspend fun getIdByRawNameAndNumber(rawName: String?, number: String?): Long?
+    /** The id to use for this subject: its merge target when it has been merged. */
+    @Query("SELECT COALESCE(mergedInto, id) FROM subjects WHERE rawName = :rawName AND number = :number")
+    suspend fun getIdByRawNameAndNumber(rawName: String, number: String): Long?
+
+    @Query("SELECT categoryId FROM subjects WHERE id = :id")
+    suspend fun getCategoryId(id: Long): Int?
 
 
     @Transaction
     suspend fun upsertAndGetId(subject: Subject): Long {
-        val id = insert(subject)
-        return if (id == -1L) {
-            getIdByRawNameAndNumber(subject.rawName, subject.number)!!
-        } else {
-            id
-        }
+        return getIdByRawNameAndNumber(subject.rawName, subject.number) ?: insert(subject)
     }
 
     @Query(

@@ -17,7 +17,9 @@ import javax.inject.Singleton
 class SmsParser @Inject constructor() {
 
     data class SmsMessage(
-        val body: String, val id: Long?, val originatingAddress: String, val timestamp: Long
+        val body: String, val id: Long?, val originatingAddress: String, val timestamp: Long,
+        /** SIM the message arrived on; -1 = unknown. */
+        val subscriptionId: Int = -1,
     )
 
     private val regexCache = ConcurrentHashMap<String, Regex>()

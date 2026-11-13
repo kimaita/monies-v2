@@ -35,18 +35,20 @@ class SmsSyncWorker @AssistedInject constructor(
         const val KEY_PROCESSED = "processed"
         const val KEY_TOTAL = "total"
         const val KEY_YEAR = "year"
+        const val KEY_FOREGROUND = "foreground"
         private const val CHANNEL_ID = "sms_sync"
         private const val NOTIFICATION_ID = 4242
     }
 
     override suspend fun doWork(): Result {
+        val foreground = inputData.getBoolean(KEY_FOREGROUND, false)
         val batchSize = SmsSyncer.SMS_BATCH_SIZE
         val total = smsSyncer.pendingCount()
         val zone = ZoneId.systemDefault()
         var processed = 0
         var maxYear = 0
 
-        setForeground(buildForegroundInfo(0, total))
+        if (foreground) setForeground(buildForegroundInfo(0, total))
         setProgress(workDataOf(KEY_PROCESSED to 0, KEY_TOTAL to total))
         Timber.i("SmsSyncWorker started.")
 
@@ -67,7 +69,7 @@ class SmsSyncWorker @AssistedInject constructor(
                         KEY_YEAR to maxYear,
                     )
                 )
-                updateNotification(processed, total)
+                if (foreground) updateNotification(processed, total)
                 if (result.count < batchSize) break
             }
             Result.success()
