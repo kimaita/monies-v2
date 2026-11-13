@@ -80,11 +80,41 @@ data class SubjectOccurrence(
 /** Minimal projection for the balance backfill pass. */
 data class BalanceRow(val id: Long, val message: String, val transactionType: Int)
 
-/** An account with its latest known balance. */
-data class AccountBalance(
+/** A line (root account) with its latest known balance, as read from the database. */
+data class LineBalance(
     val accountId: Int,
     val provider: String,
-    val subscriptionId: Int,
     val label: String?,
     val balance: Double?,
 )
+
+/** A line with its display name (see [lineNames]) and latest balance. */
+data class AccountBalance(
+    val accountId: Int,
+    val name: String,
+    val balance: Double?,
+)
+
+/** A Fuliza transaction: type name, time (ISO text), amount, and the stored message. */
+data class FulizaRow(
+    val typeName: String,
+    val transactionTime: String,
+    val amount: Double,
+    val message: String,
+)
+
+/**
+ * The one place account names are made: the label if set, else the provider's display name,
+ * numbered ("M-PESA", "M-PESA 2") when a provider has several lines. [lines] must be in order of
+ * first activity.
+ */
+fun lineNames(lines: List<LineBalance>): Map<Int, String> {
+    val perProvider = lines.groupingBy { it.provider }.eachCount()
+    val seen = HashMap<String, Int>()
+    return lines.associate { l ->
+        val n = (seen[l.provider] ?: 0) + 1
+        seen[l.provider] = n
+        val base = com.kimaita.monies.models.Provider.entries.firstOrNull { it.name == l.provider }?.displayName ?: l.provider
+        l.accountId to (l.label?.takeIf { it.isNotBlank() } ?: if (perProvider.getValue(l.provider) > 1 && n > 1) "$base $n" else base)
+    }
+}

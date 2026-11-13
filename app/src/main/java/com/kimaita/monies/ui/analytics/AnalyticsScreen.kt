@@ -211,15 +211,12 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
         }
 
         item(key = "balance_fees") {
-            Row(
-                Modifier.height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            // No IntrinsicSize here: StatTile's AutoSizeText is a BoxWithConstraints (SubcomposeLayout).
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BentoCard(
                     Modifier
                         .weight(1f)
-                        .heightIn(min = 112.dp)
-                        .fillMaxHeight(),
+                        .heightIn(min = 112.dp),
                     onClick = { onJump(AnalyticsTab.CASHFLOW) }) {
                     TileLabel("Balance")
                     Spacer(Modifier.height(8.dp))
@@ -238,7 +235,6 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                     Modifier
                         .weight(1f)
                         .heightIn(min = 112.dp)
-                        .fillMaxHeight()
                 )
             }
         }

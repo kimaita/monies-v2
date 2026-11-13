@@ -26,7 +26,7 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
               AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
               AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
               AND tt.isTransfer = 0
-              AND (:account IS NULL OR t.accountId = :account)
+              AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
             GROUP BY tt.id
             ORDER BY total DESC
         """

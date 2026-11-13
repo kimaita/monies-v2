@@ -51,7 +51,7 @@ interface SubjectDao : BaseDao<Subject> {
     WHERE subject = :subjectId
     AND (:startDate IS NULL OR t.transactionTime >= :startDate)
     AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-    AND (:account IS NULL OR t.accountId = :account)
+    AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
     """
     )
     fun getSubjectStats(
@@ -92,7 +92,7 @@ interface SubjectDao : BaseDao<Subject> {
       AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
-      AND (:account IS NULL OR t.accountId = :account)
+      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
     )
@@ -120,7 +120,7 @@ interface SubjectDao : BaseDao<Subject> {
       AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
-      AND (:account IS NULL OR t.accountId = :account)
+      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
     GROUP BY s.id ORDER BY count DESC LIMIT :limit
 """
     )
@@ -147,7 +147,7 @@ interface SubjectDao : BaseDao<Subject> {
       AND (:subjectId IS NULL OR t.subject IN (:subjectId))
       AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
       AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
-      AND (:account IS NULL OR t.accountId = :account)
+      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
     )

@@ -1,10 +1,6 @@
 package com.kimaita.monies.services
 
 import androidx.room.withTransaction
-import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import android.telephony.SubscriptionManager
 import com.kimaita.monies.data.SmsDataSource
 import com.kimaita.monies.data.SmsSource
 import com.kimaita.monies.data.dao.AccountDao
@@ -22,7 +18,6 @@ import com.kimaita.monies.data.database.models.UnparsedMessage
 import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.SmsBatchResult
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -45,6 +40,10 @@ interface SyncStore {
     suspend fun transactionTypes(): List<TransactionType>
     suspend fun accountId(provider: String, subscriptionId: Int): Int?
     suspend fun createAccount(account: UserAccount): Int
+
+    /** Every account that has transactions, with the span of its activity. */
+    suspend fun accountActivity(): List<AccountActivity>
+    suspend fun setMergedInto(accountId: Int, root: Int?)
 
     /** Inserts the subject if new; returns the id to use, following any merge. */
     suspend fun subjectId(subject: Subject): Long
@@ -77,6 +76,9 @@ class RoomSyncStore(
         accountDao.getId(provider, subscriptionId)
 
     override suspend fun createAccount(account: UserAccount) = accountDao.insert(account).toInt()
+    override suspend fun accountActivity() = accountDao.getActivity()
+    override suspend fun setMergedInto(accountId: Int, root: Int?) =
+        accountDao.setMergedInto(accountId, root)
     override suspend fun subjectId(subject: Subject) = subjectDao.upsertAndGetId(subject)
     override suspend fun subjectCategory(subjectId: Long) = subjectDao.getCategoryId(subjectId)
     override suspend fun insertTransactions(transactions: List<Transaction>) =
@@ -97,7 +99,6 @@ class SmsSyncer(
     private val store: SyncStore,
     private val smsDataSource: SmsSource,
     private val smsParser: SmsParser,
-    private val accountLabel: (subscriptionId: Int) -> String?,
 ) {
 
     @Inject
@@ -111,12 +112,11 @@ class SmsSyncer(
         settingsDao: SettingsDao,
         accountDao: AccountDao,
         unparsedDao: UnparsedMessageDao,
-        @ApplicationContext context: Context,
     ) : this(
         RoomSyncStore(
             db, transactionTypeDao, subjectDao, transactionsDao, settingsDao, accountDao, unparsedDao
         ),
-        smsDataSource, smsParser, { simLabel(context, it) },
+        smsDataSource, smsParser,
     )
 
     private val syncMutex = Mutex()
@@ -151,12 +151,16 @@ class SmsSyncer(
                 val afterId = currentCursor()
 
                 val batch = smsDataSource.readBatch(Provider.allSenders, afterId, limit)
-                if (batch.isEmpty()) return@withContext SmsBatchResult(0, null)
+                if (batch.isEmpty()) {
+                    store.inTransaction { recomputeMerges() }
+                    return@withContext SmsBatchResult(0, null)
+                }
 
                 val maxId = batch.maxOf { it.id ?: 0L }
                 store.inTransaction {
                     parseAndSave(batch)
                     store.setCursor(maxId)
+                    if (batch.size < limit) recomputeMerges()
                 }
                 Timber.d("Synced %d SMS up to id %d", batch.size, maxId)
                 SmsBatchResult(count = batch.size, newestEpochMillis = batch.maxOf { it.timestamp })
@@ -173,6 +177,16 @@ class SmsSyncer(
             }
         } finally {
             if (activeSyncs.decrementAndGet() == 0) _isSyncing.value = false
+        }
+    }
+
+    /** Re-derives `mergedInto` for every account; writes only the rows that change. */
+    private suspend fun recomputeMerges() {
+        val activity = store.accountActivity()
+        val roots = mergeRoots(activity)
+        activity.forEach { a ->
+            val root = roots[a.id]
+            if (root != a.mergedInto) store.setMergedInto(a.id, root)
         }
     }
 
@@ -200,11 +214,7 @@ class SmsSyncer(
             val subscriptionId = subscriptionById[txn.messageId] ?: -1
             val accountId = accountIds.getOrPut(provider to subscriptionId) {
                 store.accountId(provider, subscriptionId) ?: store.createAccount(
-                    UserAccount(
-                        provider = provider,
-                        subscriptionId = subscriptionId,
-                        label = accountLabel(subscriptionId),
-                    )
+                    UserAccount(provider = provider, subscriptionId = subscriptionId)
                 )
             }
             val subjectId = subject?.let { subjectIds.getValue(it) }
@@ -224,15 +234,36 @@ class SmsSyncer(
     }
 }
 
-/** "SIM 1 · Safaricom" when READ_PHONE_STATE is granted and the SIM is active; otherwise null. */
-private fun simLabel(context: Context, subscriptionId: Int): String? {
-    if (subscriptionId < 0) return null
-    if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return null
-    return try {
-        val manager = context.getSystemService(SubscriptionManager::class.java)
-        manager?.activeSubscriptionInfoList?.firstOrNull { it.subscriptionId == subscriptionId }
-            ?.let { "SIM ${it.simSlotIndex + 1} · ${it.carrierName}" }
-    } catch (e: SecurityException) {
-        null
+/** An account's provider and the first and last transaction time (ISO text) it has. */
+data class AccountActivity(
+    val id: Int,
+    val provider: String,
+    val minTime: String,
+    val maxTime: String,
+    val mergedInto: Int? = null,
+)
+
+/**
+ * Groups accounts of the same provider whose activity periods do not overlap into one line.
+ * Returns each account's root id (the earliest account of its line), or null for a root itself.
+ * Greedy: an account joins the cluster with the latest end that finished before it started.
+ */
+fun mergeRoots(activity: List<AccountActivity>): Map<Int, Int?> {
+    class Cluster(val root: Int, var max: String)
+
+    val result = HashMap<Int, Int?>()
+    activity.groupBy { it.provider }.values.forEach { accounts ->
+        val clusters = mutableListOf<Cluster>()
+        accounts.sortedWith(compareBy({ it.minTime }, { it.id })).forEach { a ->
+            val target = clusters.filter { it.max < a.minTime }.maxByOrNull { it.max }
+            if (target == null) {
+                clusters += Cluster(a.id, a.maxTime)
+                result[a.id] = null
+            } else {
+                target.max = a.maxTime
+                result[a.id] = target.root
+            }
+        }
     }
+    return result
 }

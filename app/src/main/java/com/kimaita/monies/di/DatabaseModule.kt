@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kimaita.monies.data.dao.AccountDao
 import com.kimaita.monies.data.dao.CategoryDao
@@ -28,6 +29,14 @@ import kotlinx.coroutines.launch
 import javax.inject.Provider
 import javax.inject.Singleton
 
+/** Adds `accounts.mergedInto` and clears the carrier-derived labels the old sync wrote. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE accounts ADD COLUMN mergedInto INTEGER")
+        db.execSQL("UPDATE accounts SET label = NULL")
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -41,6 +50,7 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context, AppDatabase::class.java, "monies-db",
         )
+            .addMigrations(MIGRATION_2_3)
             .fallbackToDestructiveMigrationFrom(true, 1)
             .addCallback(
                 DatabaseInitializer(categoryDaoProvider)

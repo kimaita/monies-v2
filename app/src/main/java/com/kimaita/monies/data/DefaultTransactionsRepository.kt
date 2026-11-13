@@ -14,6 +14,8 @@ import com.kimaita.monies.data.dao.TransactionsDao
 import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
+import com.kimaita.monies.data.dao.dtos.FulizaRow
+import com.kimaita.monies.data.dao.dtos.lineNames
 import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Category
@@ -29,7 +31,9 @@ import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
+import com.kimaita.monies.services.FulizaEvent
 import com.kimaita.monies.services.RecurringDetector
+import com.kimaita.monies.services.computeFuliza
 import com.kimaita.monies.utils.getSafeValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +48,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -69,6 +74,7 @@ class DefaultTransactionsRepository @Inject constructor(
     init {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             _selectedAccount.value = settingsDao.getSetting(SELECTED_ACCOUNT_KEY)?.toIntOrNull()
+                ?.let { accountDao.getRootId(it) }
         }
     }
 
@@ -137,7 +143,10 @@ class DefaultTransactionsRepository @Inject constructor(
 
 
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
-        transactionsDao.getAccountBalances()
+        transactionsDao.getAccountBalances().map { lines ->
+            val names = lineNames(lines)
+            lines.map { AccountBalance(it.accountId, names.getValue(it.accountId), it.balance) }
+        }
 
     override fun getSubjectStats(
         subjectId: Long,
@@ -306,12 +315,14 @@ class DefaultTransactionsRepository @Inject constructor(
     override suspend fun getFilterOptions(): FilterOptions = coroutineScope {
 
         val categories = async { categoryDao.getAll().first() }
-        val accounts = async { accountDao.getAll().first() }
+        val accounts = async { transactionsDao.getAccountBalances().first() }
         val types = async { transactionTypeDao.getAll().first() }
         FilterOptions(
             categories = categories.await().map { NamedRef(it.id, it.name) },
-            accounts = accounts.await()
-                .map { NamedRef(it.id, it.label ?: it.provider) },
+            accounts = accounts.await().let { lines ->
+                val names = lineNames(lines)
+                lines.map { NamedRef(it.accountId, names.getValue(it.accountId)) }
+            },
             types = types.await().map { NamedRef(it.id, it.name) },
         )
     }
@@ -329,11 +340,33 @@ class DefaultTransactionsRepository @Inject constructor(
                 BalanceField.entries.any { field -> p.contains("(?<${field.group}>") }
             }.map { it.id }
 
-            if (balanceTypeIds.isEmpty()) flowOf(OtherBalances())
-            else transactionsDao.getLatestPerType(balanceTypeIds, account).map { rows ->
-                extractBalances(rows, regexByType)
+            val fulizaRegex = types.filter { it.name.startsWith("fuliza.") }
+                .mapNotNull { t -> regexByType[t.id]?.let { t.name to it } }.toMap()
+
+            val savings = if (balanceTypeIds.isEmpty()) flowOf(emptyList())
+            else transactionsDao.getLatestPerType(balanceTypeIds, account)
+
+            combine(savings, transactionsDao.getFulizaRows(account)) { rows, fulizaRows ->
+                val fuliza = computeFuliza(fulizaRows.mapNotNull { fulizaEvent(it, fulizaRegex) })
+                extractBalances(rows, regexByType).copy(
+                    availableFuliza = fuliza.available,
+                    outstandingFuliza = fuliza.outstanding,
+                )
             }
         }
+    }
+
+    private fun fulizaEvent(row: FulizaRow, regexByName: Map<String, Regex>): FulizaEvent? {
+        val kind = when (row.typeName) {
+            "fuliza.loan" -> FulizaEvent.Kind.LOAN
+            "fuliza.partial_pay" -> FulizaEvent.Kind.PARTIAL
+            "fuliza.final_pay" -> FulizaEvent.Kind.FULL
+            else -> return null
+        }
+        val groups = regexByName[row.typeName]?.find(row.message)?.groups as? MatchNamedGroupCollection
+        val time = runCatching { LocalDateTime.parse(row.transactionTime) }.getOrNull() ?: return null
+        fun group(name: String) = groups?.getSafeValue(name)?.replace(",", "")?.toDoubleOrNull()
+        return FulizaEvent(kind, time, row.amount, group("TotalLoan"), group("AvailableFuliza"))
     }
 
     private fun extractBalances(
@@ -358,8 +391,6 @@ class DefaultTransactionsRepository @Inject constructor(
         return OtherBalances(
             mshwariBalance = best[BalanceField.MSHWARI_BALANCE]?.first,
             lockSavings = best[BalanceField.LOCK_SAVINGS]?.first,
-            availableFuliza = best[BalanceField.AVAILABLE_FULIZA]?.first,
-            outstandingFuliza = best[BalanceField.OUTSTANDING_FULIZA]?.first,
         )
     }
 

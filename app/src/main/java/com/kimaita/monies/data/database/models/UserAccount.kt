@@ -15,4 +15,6 @@ data class UserAccount(
     /** -1 = unknown. */
     val subscriptionId: Int,
     val label: String? = null,
+    /** Id of the account this one is merged into (same provider, non-overlapping activity); null for a line's root. */
+    val mergedInto: Int? = null,
 )

@@ -34,7 +34,7 @@ import com.kimaita.monies.data.database.models.UserAccount
         TransactionType::class,
         Setting::class,
         UnparsedMessage::class
-    ], version = 2, exportSchema = true
+    ], version = 3, exportSchema = true
 )
 @TypeConverters(DateTimeConverters::class)
 abstract class AppDatabase : RoomDatabase() {

@@ -55,7 +55,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kimaita.monies.R
-import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
@@ -157,7 +156,7 @@ fun HomeScreenContent(
                 ) {
                     uiState.accountBalances.forEach { account ->
                         Pill {
-                            Svc(account.label ?: Provider.entries.firstOrNull { it.name == account.provider }?.displayName ?: account.provider)
+                            Svc(account.name)
                             Strong(money(account.balance ?: 0.0))
                         }
                     }

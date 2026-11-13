@@ -48,6 +48,17 @@ class SmsSyncerTest {
             return saved.id
         }
 
+        override suspend fun accountActivity(): List<AccountActivity> =
+            accounts.mapNotNull { a ->
+                val times = transactions.filter { it.accountId == a.id }.map { it.transactionTime.toString() }
+                if (times.isEmpty()) null else AccountActivity(a.id, a.provider, times.min(), times.max(), a.mergedInto)
+            }
+
+        override suspend fun setMergedInto(accountId: Int, root: Int?) {
+            val i = accounts.indexOfFirst { it.id == accountId }
+            accounts[i] = accounts[i].copy(mergedInto = root)
+        }
+
         override suspend fun subjectId(subject: Subject) =
             subjects.getOrPut(subject.rawName to subject.number) { subjects.size + 1L }
 
@@ -77,7 +88,7 @@ class SmsSyncerTest {
         SmsParser.SmsMessage(body, id, sender, 1_700_000_000_000L + id, sub)
 
     private fun syncer(inbox: FakeInbox, store: FakeStore) =
-        SmsSyncer(store, inbox, SmsParser()) { null }
+        SmsSyncer(store, inbox, SmsParser())
 
     private fun run(inbox: FakeInbox, store: FakeStore) = runBlocking { syncer(inbox, store).syncAll() }
 
@@ -158,5 +169,53 @@ class SmsSyncerTest {
         run(FakeInbox(listOf(msg(1))), store)
         assertEquals(listOf(7L), store.transactions.map { it.subject })
         assertEquals(listOf(3), store.transactions.map { it.transactionCategory })
+    }
+
+    private fun act(id: Int, min: String, max: String, provider: String = "MPESA") =
+        AccountActivity(id, provider, min, max)
+
+    @Test
+    fun sequentialSubscriptionsMerge() {
+        val roots = mergeRoots(listOf(act(1, "2021-01-01T00:00:00", "2024-07-26T18:05:00"), act(2, "2024-07-26T20:08:00", "2026-11-01T00:00:00")))
+        assertEquals(mapOf(1 to null, 2 to 1), roots)
+    }
+
+    @Test
+    fun overlappingSubscriptionStaysSeparate() {
+        val roots = mergeRoots(
+            listOf(
+                act(1, "2021-01-01T00:00:00", "2024-07-26T18:05:00"),
+                act(2, "2024-07-26T20:08:00", "2026-11-01T00:00:00"),
+                act(3, "2024-09-06T10:00:00", "2024-09-06T11:00:00"),
+            )
+        )
+        assertEquals(mapOf(1 to null, 2 to 1, 3 to null), roots)
+    }
+
+    @Test
+    fun differentProvidersNeverMerge() {
+        val roots = mergeRoots(listOf(act(1, "2021-01-01T00:00:00", "2022-01-01T00:00:00"), act(2, "2023-01-01T00:00:00", "2024-01-01T00:00:00", "AIRTEL")))
+        assertEquals(mapOf(1 to null, 2 to null), roots)
+    }
+
+    @Test
+    fun aLaterOverlapUnmergesOnResync() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val inbox = FakeInbox(listOf(msg(1, sub = 1), msg(2, sub = 2)))
+        run(inbox, store)
+        // Same sample date on both: they overlap, so no merge.
+        assertEquals(listOf(null, null), store.accounts.map { it.mergedInto })
+
+        fun retime(account: Int, time: String) {
+            store.transactions.replaceAll { if (it.accountId == account) it.copy(transactionTime = java.time.LocalDateTime.parse(time)) else it }
+        }
+        retime(1, "2021-01-01T10:00:00")
+        retime(2, "2024-01-01T10:00:00")
+        run(inbox, store)
+        assertEquals(listOf(null, 1), store.accounts.map { it.mergedInto })
+
+        retime(1, "2024-01-01T10:00:00") // sub 1 now also active when sub 2 starts
+        run(inbox, store)
+        assertEquals(listOf(null, null), store.accounts.map { it.mergedInto })
     }
 }

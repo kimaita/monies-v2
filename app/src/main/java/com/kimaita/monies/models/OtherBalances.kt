@@ -10,7 +10,5 @@ data class OtherBalances(
 /** Maps a balance to the named regex group that carries it. Add a row to support a new balance. */
 enum class BalanceField(val group: String) {
     MSHWARI_BALANCE("MshwariBal"),
-    LOCK_SAVINGS("LockSavingsBal"),
-    AVAILABLE_FULIZA("AvailableFuliza"),
-    OUTSTANDING_FULIZA("TotalLoan"),
+    LOCK_SAVINGS("LockSavingsBal");
 }
