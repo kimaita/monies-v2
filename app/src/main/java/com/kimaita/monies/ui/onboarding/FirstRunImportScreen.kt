@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -88,7 +89,28 @@ fun FirstRunImportScreen(
     total: Int?,
     year: Int?,
     modifier: Modifier = Modifier,
+    failed: Boolean = false,
+    onRetry: () -> Unit = {},
 ) {
+    if (failed) {
+        Box(
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "Couldn't import your messages",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(24.dp))
+                Button(onClick = onRetry) { Text("Retry") }
+            }
+        }
+        return
+    }
     val fractionTarget =
         total?.takeIf { it > 0 }?.let { (processed.toFloat() / it).coerceIn(0f, 1f) }
     val fraction by animateFloatAsState(

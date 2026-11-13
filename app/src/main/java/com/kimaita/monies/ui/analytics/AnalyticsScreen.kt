@@ -97,7 +97,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
 @Composable
 private fun TimeChips(vm: AnalyticsViewModel) {
     val flow = remember(vm) { vm.filters.map { it.timeFilter }.distinctUntilChanged() }
-    val timeFilter by flow.collectAsStateWithLifecycle(vm.filters.collectAsState().value.timeFilter)
+    val timeFilter by flow.collectAsStateWithLifecycle(vm.filters.value.timeFilter)
     HighlightsFilter(timeFilter, onFilterChange = vm::setTimeFilter)
 }
 
@@ -140,18 +140,28 @@ private fun SegmentedTabs(selected: AnalyticsTab, onSelect: (AnalyticsTab) -> Un
 
 @Composable
 private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump: (AnalyticsTab) -> Unit) {
-    val stats by vm.stats.collectAsStateWithLifecycle()
+    val statsOrNull by vm.stats.collectAsStateWithLifecycle()
     val pace by vm.pace.collectAsStateWithLifecycle()
-    val breakdownRows by vm.breakdown.collectAsStateWithLifecycle()
-    val whereItGoes = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
-    val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
-    val balance by vm.balanceTrend.collectAsStateWithLifecycle()
-    val heat by vm.heat.collectAsStateWithLifecycle()
-    val top by vm.topSubjects.collectAsStateWithLifecycle()
+    val breakdownOrNull by vm.breakdown.collectAsStateWithLifecycle()
+    val cashFlowOrNull by vm.cashFlow.collectAsStateWithLifecycle()
+    val balanceOrNull by vm.balanceTrend.collectAsStateWithLifecycle()
+    val heatOrNull by vm.heat.collectAsStateWithLifecycle()
+    val topOrNull by vm.topMerchant.collectAsStateWithLifecycle()
+    val extra = MoniesTheme.extra
 
+    val stats = statsOrNull
+    val breakdownRows = breakdownOrNull
+    val cashFlow = cashFlowOrNull
+    val balance = balanceOrNull
+    val heat = heatOrNull
+    val top = topOrNull
+    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || heat == null || top == null) {
+        LoadingTab(listState)
+        return
+    }
+    val whereItGoes = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
     val net = remember(stats) { stats.income - stats.expense }
     val fees = remember(stats) { stats.incomeCost + stats.expenseCost }
-    val extra = MoniesTheme.extra
 
     TabList(listState) {
         pace?.let { p ->
@@ -264,13 +274,22 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
 
 @Composable
 private fun ActivityTab(vm: AnalyticsViewModel, listState: LazyListState) {
-    val rhythm by vm.rhythm.collectAsStateWithLifecycle()
-    val heat by vm.heat.collectAsStateWithLifecycle()
-    val bars by vm.weekdayBars.collectAsStateWithLifecycle()
-    val streak by vm.streak.collectAsStateWithLifecycle()
-    val leaders by vm.leaderboard.collectAsStateWithLifecycle()
+    val rhythmOrNull by vm.rhythm.collectAsStateWithLifecycle()
+    val heatOrNull by vm.heat.collectAsStateWithLifecycle()
+    val barsOrNull by vm.weekdayBars.collectAsStateWithLifecycle()
+    val streakOrNull by vm.streak.collectAsStateWithLifecycle()
+    val leadersOrNull by vm.leaderboard.collectAsStateWithLifecycle()
     val recurring by vm.recurring.collectAsStateWithLifecycle()
 
+    val rhythm = rhythmOrNull
+    val heat = heatOrNull
+    val bars = barsOrNull
+    val streak = streakOrNull
+    val leaders = leadersOrNull
+    if (rhythm == null || heat == null || bars == null || streak == null || leaders == null) {
+        LoadingTab(listState)
+        return
+    }
     val avgLabel = remember(rhythm.avgPerDay) { "%.1f txns".format(rhythm.avgPerDay) }
 
     TabList(listState) {
@@ -308,8 +327,10 @@ private fun ActivityTab(vm: AnalyticsViewModel, listState: LazyListState) {
         }
         item(key = "recurring") {
             SectionCard("Recurring payments") {
-                if (recurring.isEmpty()) EmptyHint("Nothing regular yet")
-                else recurring.forEach { RecurringRow(it) }
+                val rows = recurring
+                if (rows == null) EmptyHint("Checking…")
+                else if (rows.isEmpty()) EmptyHint("Nothing regular yet")
+                else rows.forEach { RecurringRow(it) }
             }
         }
     }
@@ -332,15 +353,23 @@ private fun StreakSection(streak: StreakSummary, window: ClosedRange<LocalDate>)
 private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val direction by vm.direction.collectAsStateWithLifecycle()
     val mode by vm.breakdownMode.collectAsStateWithLifecycle()
-    val breakdownRows by vm.breakdown.collectAsStateWithLifecycle()
-    val slices = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
-    val top by vm.topSubjects.collectAsStateWithLifecycle()
-    val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
+    val breakdownOrNull by vm.breakdown.collectAsStateWithLifecycle()
+    val topOrNull by vm.topSubjects.collectAsStateWithLifecycle()
     val selected by vm.selectedSlice.collectAsStateWithLifecycle()
-    val sources by vm.incomeSources.collectAsStateWithLifecycle()
-    val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
+    val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val extra = MoniesTheme.extra
     val budgets by vm.budgets.collectAsStateWithLifecycle()
+
+    val breakdownRows = breakdownOrNull
+    val top = topOrNull
+    val sources = sourcesOrNull
+    if (breakdownRows == null || top == null || sources == null) {
+        LoadingTab(listState)
+        return
+    }
+    val slices = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
+    val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
+    val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
 
     TabList(listState) {
         item(key = "direction") {
@@ -416,10 +445,18 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
 
 @Composable
 private fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
-    val balance by vm.balanceTrend.collectAsStateWithLifecycle()
-    val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
-    val costs by vm.costs.collectAsStateWithLifecycle()
-    val stats by vm.stats.collectAsStateWithLifecycle()
+    val balanceOrNull by vm.balanceTrend.collectAsStateWithLifecycle()
+    val cashFlowOrNull by vm.cashFlow.collectAsStateWithLifecycle()
+    val costsOrNull by vm.costs.collectAsStateWithLifecycle()
+    val statsOrNull by vm.stats.collectAsStateWithLifecycle()
+    val balance = balanceOrNull
+    val cashFlow = cashFlowOrNull
+    val costs = costsOrNull
+    val stats = statsOrNull
+    if (balance == null || cashFlow == null || costs == null || stats == null) {
+        LoadingTab(listState)
+        return
+    }
     val feesHeader = remember(stats) {
         val fees = stats.incomeCost + stats.expenseCost
         "You paid ${formatKes(fees)} in fees" +
@@ -811,6 +848,11 @@ private fun MultiSelectChips(
                 label = { Text(ref.name) })
         }
     }
+}
+
+@Composable
+private fun LoadingTab(listState: LazyListState) = TabList(listState) {
+    item(key = "loading") { EmptyHint("Loading…") }
 }
 
 @Composable

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,13 +35,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +67,7 @@ import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.components.TransactionListItem
-import java.text.NumberFormat
+import com.kimaita.monies.ui.util.formatAmount
 import kotlin.math.abs
 
 @Composable
@@ -70,9 +76,13 @@ fun HomeScreen(
     navController: NavController,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val filters by viewModel.filters.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.errorEvents.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     HomeScreenContent(
         modifier = modifier,
@@ -86,8 +96,8 @@ fun HomeScreen(
         onSubjectClick = { subjectId -> navController.navigate("subject/$subjectId") },
         uiState = uiState,
         filter = filters,
-        isSyncing = isSyncing
-
+        isSyncing = isSyncing,
+        snackbarHostState = snackbarHostState,
     )
 }
 
@@ -95,9 +105,10 @@ fun HomeScreen(
 @Composable
 fun HomeScreenContent(
     modifier: Modifier = Modifier,
-    uiState: HomeUiState,
+    uiState: HomeUiState?,
     filter: TimeFilter,
     isSyncing: Boolean = false,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onTimeFilterChange: (TimeFilter) -> Unit,
     onAccountSelect: (Int?) -> Unit = {},
     onViewAllTransactions: () -> Unit,
@@ -107,21 +118,15 @@ fun HomeScreenContent(
     onSettings: () -> Unit = {},
     onToggleHideBalances: () -> Unit = {},
 ) {
-    val hide = uiState.hideBalances
+    val hide = uiState?.hideBalances == true
     fun bal(v: Double) = if (hide) HIDDEN else money(v)
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
-                    title = {
-                        uiState.phoneNumber?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                    },
+                    title = { Text("Monies", style = MaterialTheme.typography.labelMedium) },
                     actions = {
                         IconButton(onClick = onSearch) {
                             Icon(
@@ -142,6 +147,12 @@ fun HomeScreenContent(
             }
         },
     ) { pad ->
+        if (uiState == null) {
+            Box(modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
         Column(
             modifier
                 .fillMaxSize()
@@ -192,7 +203,12 @@ fun HomeScreenContent(
                 Text(
                     it,
                     style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 20.sp,
+                        maxFontSize = MaterialTheme.typography.displayMedium.fontSize
+                    ),
                 )
             }
             if (uiState.accountBalances.size > 1) {
@@ -212,7 +228,7 @@ fun HomeScreenContent(
             Spacer(Modifier.height(12.dp))
             ChangePill(change = uiState.changeInTotal, filter = filter, onClick = onViewAnalytics)
 
-            if (uiState.availableFuliza != null || uiState.outstandingFuliza != null ||
+            if (((uiState.availableFuliza ?: 0.0) + (uiState.outstandingFuliza ?: 0.0)) > 0.0 ||
                 uiState.mshwariBalance != null || uiState.lockSavings != null
             ) {
                 Spacer(Modifier.height(20.dp))
@@ -365,7 +381,12 @@ private fun IoColumn(label: String, value: Double, color: Color, modifier: Modif
             money(value),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = color
+            color = color,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = 14.sp,
+                maxFontSize = MaterialTheme.typography.headlineSmall.fontSize
+            ),
         )
     }
 
@@ -385,6 +406,7 @@ private fun PeriodSegment(filter: TimeFilter, onPeriod: (TimeFilter) -> Unit) {
             val on = filter == value
             Box(
                 Modifier
+                    .minimumInteractiveComponentSize()
                     .clip(RoundedCornerShape(7.dp))
                     .background(if (on) cs.surface else Color.Transparent)
                     .clickable { onPeriod(value) }
@@ -491,7 +513,7 @@ private fun OtherBalancesPanel(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-           Icon(painterResource(R.drawable.collapse), "Expand")
+           Icon(painterResource(R.drawable.collapse), "Collapse")
         }
         if (fulizaMax > 0.0) PanelRow(divider = false) {
             RowLine(
@@ -650,7 +672,7 @@ private fun Muted(t: String) = Text(
 
 private const val HIDDEN = "••••"
 
-private fun money(v: Double): String = NumberFormat.getIntegerInstance().format(v.toLong())
+private fun money(v: Double): String = formatAmount(v)
 private fun periodWord(f: TimeFilter): String = when (f) {
     TimeFilter.DAY -> "today"; TimeFilter.WEEK -> "this week"; TimeFilter.MONTH -> "this month"
     TimeFilter.QUARTER -> "this quarter"; TimeFilter.SIX_MONTHS -> "last 6 months"

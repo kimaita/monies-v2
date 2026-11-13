@@ -1,5 +1,6 @@
 package com.kimaita.monies.ui.components
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.IconButton
-import androidx.compose.runtime.collectAsState
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.models.applyToAllOfSubject
 import androidx.compose.material3.Card
@@ -69,8 +69,8 @@ fun TransactionBottomSheet(
     onSubjectClick: () -> Unit,
     viewModel: TransactionSheetViewModel = hiltViewModel(),
 ) {
-    val categories by viewModel.categories.collectAsState()
-    val mode by viewModel.mode.collectAsState()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val mode by viewModel.mode.collectAsStateWithLifecycle()
     var pending by remember { mutableStateOf<Category?>(null) }
     val subject = transaction.subject
 

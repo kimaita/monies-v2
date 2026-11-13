@@ -37,7 +37,6 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 data class HomeUiState(
-    val phoneNumber: String? = null,
     /** The selected account's balance, or the sum across accounts when none is selected. */
     val mpesaBalance: Double = 0.0,
     val accountBalances: List<AccountBalance> = emptyList(),
@@ -46,25 +45,16 @@ data class HomeUiState(
     val selectedAccount: Int? = null,
     val hideBalances: Boolean = false,
     val incomeVsExpense: IncExp = IncExp(),
-    val transactionCount: Int = 0,
     val recentTransactions: List<Transaction> = emptyList(),
-    val largestIncome: Transaction? = null,
-    val largestExpense: Transaction? = null,
     val availableFuliza: Double? = null,
     val outstandingFuliza: Double? = null,
     val lockSavings: Double? = null,
     val mshwariBalance: Double? = null,
-    val totalTransactionAmount: Double = 0.0,
-    val totalTransactionCost: Double = 0.0,
     val changeInTotal: Double? = null,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
 )
 
 private data class PeriodData(
     val incExp: IncExp,
-    val largestIncome: Transaction?,
-    val largestExpense: Transaction?,
     val previousIncExp: IncExp?,
 )
 
@@ -93,7 +83,8 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toggleHideBalances() {
-        viewModelScope.launch { repository.setHideBalances(!uiState.value.hideBalances) }
+        val hidden = uiState.value?.hideBalances ?: return
+        viewModelScope.launch { repository.setHideBalances(!hidden) }
     }
 
     fun setTimeFilter(filter: TimeFilter) {
@@ -111,18 +102,15 @@ class HomeViewModel @Inject constructor(
 
         combine(
             repository.getIncomeVsExpense(start, end).fallbackOnError(IncExp()),
-            repository.getLargestTransaction(isInc = true, startDate = start, endDate = end)
-                .fallbackOnError(null),
-            repository.getLargestTransaction(isInc = false, startDate = start, endDate = end)
-                .fallbackOnError(null),
             previousIncExp,
-        ) { incExp, largestInc, largestExp, prevIncExp ->
-            PeriodData(incExp, largestInc, largestExp, prevIncExp)
+        ) { incExp, prevIncExp ->
+            PeriodData(incExp, prevIncExp)
         }
     }
 
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    /** Null until the first emission. */
+    val uiState: StateFlow<HomeUiState?> = combine(
         combine(
             repository.getAccountBalances().fallbackOnError(emptyList()),
             repository.selectedAccount,
@@ -145,14 +133,8 @@ class HomeViewModel @Inject constructor(
             selectedAccount = selected,
             hideBalances = hide,
             incomeVsExpense = period.incExp,
-            transactionCount = period.incExp.incomeCount + period.incExp.expenseCount,
-            totalTransactionCost = period.incExp.incomeCost + period.incExp.expenseCost,
-            totalTransactionAmount = period.incExp.income - period.incExp.expense,
             recentTransactions = recent,
-            largestIncome = period.largestIncome,
-            largestExpense = period.largestExpense,
             changeInTotal = percentChange(current = totalMoved, previous = prevMoved),
-            isLoading = false,
             availableFuliza = other.availableFuliza.takeIf { mpesaView },
             outstandingFuliza = other.outstandingFuliza.takeIf { mpesaView },
             mshwariBalance = other.mshwariBalance.takeIf { mpesaView },
@@ -161,7 +143,7 @@ class HomeViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = HomeUiState(isLoading = true),
+        initialValue = null,
     )
 
 

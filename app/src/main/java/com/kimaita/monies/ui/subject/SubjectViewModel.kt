@@ -7,7 +7,6 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.data.dao.dtos.SubjectStats
-import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.toDomainModel
 import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Subject
@@ -30,6 +29,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -80,12 +81,17 @@ class SubjectViewModel @Inject constructor(
         }.cachedIn(viewModelScope)
 
 
-    val categories: StateFlow<List<Category>> = repository.getCategories()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyList()
-        )
+    /** The subject's category name, or null when it has none. */
+    val categoryName: StateFlow<String?> = flow {
+        if (subjectId != null) {
+            emitAll(
+                combine(repository.getSubjects(subjectId), repository.getCategories()) { subjects, categories ->
+                    val id = subjects.firstOrNull()?.categoryId
+                    categories.firstOrNull { it.id == id }?.name
+                }
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _subjectQuery = MutableStateFlow("")
     val subjectQuery: StateFlow<String> = _subjectQuery.asStateFlow()

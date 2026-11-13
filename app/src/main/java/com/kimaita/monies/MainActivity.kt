@@ -3,7 +3,10 @@ package com.kimaita.monies
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -19,11 +22,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.kimaita.monies.data.DefaultTransactionsRepository
@@ -79,9 +84,17 @@ class MainActivity : ComponentActivity() {
                     repository.themeMode.collect { themeMode = it }
                 }
 
+                // The user may grant the permission in system settings, so re-check on every resume.
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                    hasRequiredPermissions = checkPermissions()
+                }
+                var askedForPermissions by rememberSaveable { mutableStateOf(false) }
                 val permissionsLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
-                ) { hasRequiredPermissions = checkPermissions() }
+                ) {
+                    askedForPermissions = true
+                    hasRequiredPermissions = checkPermissions()
+                }
 
                 when {
                     onboardingComplete == null ->
@@ -108,9 +121,15 @@ class MainActivity : ComponentActivity() {
 
                     !hasRequiredPermissions ->
                         PermissionScreen(onGrantClick = {
-                            permissionsLauncher.launch(
-                                permissionsToRequest
-                            )
+                            // After a permanent denial the system dialog no longer shows: open app settings.
+                            if (askedForPermissions && !shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS))
+                                startActivity(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", packageName, null)
+                                    )
+                                )
+                            else permissionsLauncher.launch(permissionsToRequest)
                         })
 
                     else -> {
@@ -124,9 +143,7 @@ class MainActivity : ComponentActivity() {
                         }
                         ObserveIncomingSms(smsContentObserver)
 
-                        val showImport = firstRun == true &&
-                                importProgress !is SmsSyncProgress.Done &&
-                                importProgress !is SmsSyncProgress.Failed
+                        val showImport = firstRun == true && importProgress !is SmsSyncProgress.Done
 
                         Crossfade(targetState = showImport, label = "import-handoff") { importing ->
                             when {
@@ -142,7 +159,9 @@ class MainActivity : ComponentActivity() {
                                     FirstRunImportScreen(
                                         processed = p?.processed ?: 0,
                                         total = p?.total,
-                                        year = p?.year
+                                        year = p?.year,
+                                        failed = importProgress is SmsSyncProgress.Failed,
+                                        onRetry = { SmsSyncWorker.enqueueImport(applicationContext) },
                                     )
                                 }
 

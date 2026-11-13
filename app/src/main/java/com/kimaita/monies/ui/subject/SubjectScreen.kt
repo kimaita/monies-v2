@@ -78,6 +78,7 @@ fun SubjectScreen(
     val transactions = viewModel.subjectTransactions.collectAsLazyPagingItems()
     val subject by viewModel.subjectDetails.collectAsStateWithLifecycle()
     val stats by viewModel.subjectStats.collectAsStateWithLifecycle()
+    val categoryName by viewModel.categoryName.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf(SubjectDialog.None) }
     var target by remember { mutableStateOf<NamedRef<Long>?>(null) }
@@ -162,7 +163,7 @@ fun SubjectScreen(
         incomingCount = stats.incomingCount,
         outgoingCount = stats.outgoingCount,
         totalCost = stats.totalCost,
-        category = "General",
+        category = categoryName ?: "Uncategorised",
         onBackClick = {
             navController.navigateUp()
         },

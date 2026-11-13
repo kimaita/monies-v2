@@ -1,5 +1,6 @@
 package com.kimaita.monies.ui.export
 
+import java.time.format.DateTimeFormatter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kimaita.monies.data.TransactionsRepository
@@ -9,7 +10,6 @@ import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
-import com.kimaita.monies.models.isoDateTimeFormatter
 import com.kimaita.monies.services.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,9 +45,9 @@ data class ExportSelections(
                 (if (nature != null) 1 else 0) + (if (accountId != null) 1 else 0)
 
     fun toExportFilters() = ExportFilters(
-        startDate = startDate?.atStartOfDay()?.format(isoDateTimeFormatter),
+        startDate = startDate?.atStartOfDay()?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
         endDate = endDate?.plusDays(1)?.atStartOfDay()
-            ?.format(isoDateTimeFormatter),
+            ?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
         subjectId = subjects.map { it.id }.ifEmpty { null },
         categoryId = categoryIds.toList().ifEmpty { null },
         transactionType = typeIds.toList().ifEmpty { null },
