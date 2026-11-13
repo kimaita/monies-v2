@@ -14,7 +14,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kimaita.monies.models.analytics.CashFlowWeek
 import java.time.LocalDate
@@ -23,9 +22,9 @@ import kotlin.math.ceil
 
 /** Non-interactive diverging in/out bars for the Overview bento. */
 @Composable
-fun MiniInOutBars(data: List<CashFlowWeek>, modifier: Modifier = Modifier, buckets: Int = 8) {
+fun MiniInOutBars(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
     val colors = chartColors()
-    val slice = remember(data, buckets) { data.takeLast(buckets) }
+    val slice = remember(data) { data.takeLast(8) }
     Spacer(modifier.drawWithCache {
         if (slice.isEmpty()) return@drawWithCache onDrawBehind { }
         val maxUp = slice.maxOf { it.inflow }
@@ -62,10 +61,9 @@ fun ContributionGrid(
     intensities: Map<LocalDate, Double>,
     start: LocalDate,
     end: LocalDate,
-    modifier: Modifier = Modifier,
-    cell: Dp = 13.dp,
-    gap: Dp = 3.dp,
 ) {
+    val cell = 13.dp
+    val gap = 3.dp
     val colors = chartColors()
     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
     val levels = remember(intensities, start, end) {
@@ -83,7 +81,7 @@ fun ContributionGrid(
     val radius = with(density) { CornerRadius(3.dp.toPx()) }
     val weeks = ceil(levels.size / 7f).toInt().coerceAtLeast(1)
 
-    Canvas(modifier
+    Canvas(Modifier
         .fillMaxWidth()
         .height(cell * 7 + gap * 6)) {
         val step = cellPx + gapPx

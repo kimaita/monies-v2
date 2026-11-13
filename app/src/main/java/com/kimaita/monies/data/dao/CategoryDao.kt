@@ -19,9 +19,6 @@ interface CategoryDao : BaseDao<Category> {
     )
     fun getAll(search: String? = null): Flow<List<Category>>
 
-    @Query("SELECT * FROM categories WHERE id = :id")
-    fun getCategory(id: Long): Category?
-
     // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
     // element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
     @Query(

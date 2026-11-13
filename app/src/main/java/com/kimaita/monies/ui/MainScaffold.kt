@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -96,14 +95,11 @@ fun MoniesNavHost(
         ) { entry ->
             TransactionsScreen(
                 navController = navController,
-                viewModel = hiltViewModel(),
                 openSearch = entry.arguments?.getBoolean("search") ?: false,
             )
         }
         composable("analytics") {
-            AnalyticsScreen(
-                viewModel = hiltViewModel()
-            )
+            AnalyticsScreen()
         }
         composable("settings") { SettingsScreen(navController = navController) }
         composable("settings/unrecognised") { UnrecognisedScreen(navController = navController) }
@@ -113,7 +109,7 @@ fun MoniesNavHost(
         ) {
             SubjectScreen(navController = navController)
         }
-        composable("export") { ExportScreen(viewModel = hiltViewModel()) }
+        composable("export") { ExportScreen() }
     }
 }
 

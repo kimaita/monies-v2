@@ -12,7 +12,6 @@ sealed class TimeFilter {
     object DAY : TimeFilter()
     object WEEK : TimeFilter()
     object MONTH : TimeFilter()
-    object QUARTER : TimeFilter()
     object SIX_MONTHS : TimeFilter()
     object YTD : TimeFilter()
     object ALL : TimeFilter()
@@ -42,9 +41,6 @@ fun getDatesForFilter(filter: TimeFilter): Pair<String?, String?> {
             .format(formatter)
 
         TimeFilter.MONTH -> today.minusMonths(1).format(formatter) to today.plusDays(1)
-            .format(formatter)
-
-        TimeFilter.QUARTER -> today.minusMonths(3).format(formatter) to today.plusDays(1)
             .format(formatter)
 
         TimeFilter.SIX_MONTHS -> today.minusMonths(6).format(formatter) to today.plusDays(1)

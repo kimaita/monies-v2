@@ -7,7 +7,6 @@ import com.kimaita.monies.data.dao.dtos.SourceAmount
 import com.kimaita.monies.data.dao.dtos.SubjectAmount
 import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
-import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Subject
 import com.kimaita.monies.services.SavedSubject
 import kotlinx.coroutines.flow.Flow
@@ -93,9 +92,6 @@ interface SubjectDao : BaseDao<Subject> {
 
     @Query("SELECT id, name FROM subjects WHERE mergedInto IS NULL AND name LIKE '%' || :q || '%' COLLATE NOCASE ORDER BY name LIMIT :limit")
     suspend fun searchSubjects(q: String, limit: Int = 30): List<SubjectRef>
-
-    @Query("SELECT id, name FROM subjects WHERE id = :id")
-    suspend fun getSubject(id: Long): SubjectRef?
 
     /** Subjects whose display name matches [like] (see subjectLikeOf), with their transaction count, busiest first. */
     @Query(

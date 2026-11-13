@@ -5,7 +5,6 @@ import androidx.room.Dao
 import androidx.room.Query
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
-import com.kimaita.monies.data.dao.dtos.BalanceRow
 import com.kimaita.monies.data.dao.dtos.CashFlowBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.FulizaRow
@@ -52,7 +51,6 @@ interface TransactionsDao : BaseDao<Transaction> {
     @Query(
         """
         SELECT t.* FROM transactions t
-        LEFT JOIN subjects s ON t.subject = s.id
         WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
         AND (:endDate IS NULL OR t.transactionTime <= :endDate)
         AND (:subjectId IS NULL OR t.subject = :subjectId)
@@ -66,7 +64,6 @@ interface TransactionsDao : BaseDao<Transaction> {
             CASE WHEN :sortOrder = 'DATE_ASC' THEN t.transactionTime END ASC,
             CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amount END DESC,
             CASE WHEN :sortOrder = 'AMOUNT_ASC' THEN t.amount END ASC
-        LIMIT IFNULL(:limit, -1)
         """
     )
     fun getTransactions(
@@ -80,8 +77,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         sortOrder: SortOrder?,
         fts: String? = null,
         amountQuery: String? = null,
-        subjectLike: String? = null,
-        limit: Int? = null
+        subjectLike: String? = null
     ): PagingSource<Int, TransactionWithDetails>
 
 
@@ -124,23 +120,6 @@ interface TransactionsDao : BaseDao<Transaction> {
         transactionType: List<Int>? = null,
         account: Int? = null
     ): Flow<IncExp>
-
-    @androidx.room.Transaction
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE transactionType IN (SELECT id FROM transaction_types WHERE isInc = :isInc AND isTransfer = 0)
-        AND (:startDate IS NULL OR transactionTime >= :startDate)
-        AND (:endDate IS NULL OR transactionTime <= :endDate)
-        AND (:account IS NULL OR accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
-        ORDER BY amount DESC
-        LIMIT 1
-    """
-    )
-    fun getLargestTransaction(
-        isInc: Boolean, startDate: String? = null, endDate: String? = null, account: Int? = null
-    ): Flow<TransactionWithDetails?>
-
 
     @Query(
         """

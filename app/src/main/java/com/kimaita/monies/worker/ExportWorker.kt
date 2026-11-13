@@ -128,9 +128,6 @@ class ExportWorker @AssistedInject constructor(
         search = getString(K_SEARCH),
     )
 
-    private fun Data.longOrNull(key: String): Long? =
-        if (hasKeyWithValueOfType<Long>(key)) getLong(key, 0L) else null
-
     companion object {
         const val WORK_NAME = "transaction_export"
         private const val CHANNEL_ID = "exports"

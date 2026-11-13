@@ -16,7 +16,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -31,7 +30,6 @@ val SLOT_LABELS = arrayOf("Morning", "Midday", "Evening", "Night")
 fun TimeOfDayHeatmap(
     rows: List<HeatRow>,
     modifier: Modifier = Modifier,
-    showLabels: Boolean = true,
 ) {
     val maxVal = remember(rows) { rows.flatMap { it.values }.maxOrNull()?.coerceAtLeast(1) ?: 1 }
     val emptyColor = MaterialTheme.colorScheme.surfaceContainerHighest
@@ -42,8 +40,8 @@ fun TimeOfDayHeatmap(
     val fade = remember { Animatable(0f) }
     LaunchedEffect(Unit) { fade.animateTo(1f, tween(600)) }
 
-    val rowHeight = if (showLabels) 36.dp else 22.dp
-    val headerHeight = if (showLabels) 18.dp else 0.dp
+    val rowHeight = 36.dp
+    val headerHeight = 18.dp
     Spacer(
         modifier
             .fillMaxWidth()
@@ -51,7 +49,7 @@ fun TimeOfDayHeatmap(
             .graphicsLayer { alpha = fade.value }
             .drawWithCache {
                 val style = TextStyle(fontSize = 11.sp, color = labelColor)
-                val gutter = if (showLabels) 40.dp.toPx() else 0f
+                val gutter = 40.dp.toPx()
                 val header = headerHeight.toPx()
                 val rowH = rowHeight.toPx()
                 val cols = rows.maxOfOrNull { it.values.size } ?: 0
@@ -60,13 +58,13 @@ fun TimeOfDayHeatmap(
                 val radius = CornerRadius(6.dp.toPx())
                 val cellSize = Size((colW - inset * 2).coerceAtLeast(0f), (rowH - inset * 2).coerceAtLeast(0f))
 
-                val slotLabels = if (showLabels) Array(minOf(cols, SLOT_LABELS.size)) {
+                val slotLabels = Array(minOf(cols, SLOT_LABELS.size)) {
                     measurer.measure(SLOT_LABELS[it], style)
-                } else arrayOf<TextLayoutResult>()
+                }
                 val slotPos = Array(slotLabels.size) {
                     Offset(gutter + colW * it + (colW - slotLabels[it].size.width) / 2f, 0f)
                 }
-                val dayLabels = if (showLabels) Array(rows.size) { measurer.measure(rows[it].day, style) } else arrayOf<TextLayoutResult>()
+                val dayLabels = Array(rows.size) { measurer.measure(rows[it].day, style) }
                 val dayPos = Array(dayLabels.size) {
                     Offset(0f, header + rowH * it + (rowH - dayLabels[it].size.height) / 2f)
                 }

@@ -55,7 +55,7 @@ internal fun Path.addBar(left: Float, right: Float, base: Float, tip: Float, rad
 
 /** Money in above the baseline, money out below it, and a dot at net. */
 @Composable
-fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier, plotHeight: Dp = 180.dp) {
+fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
     val colors = chartColors()
     val buckets = remember(data) { data.map { BarBucket(it.label, it.inflow, it.outflow, it.yearStart) } }
     val tooltip = remember {
@@ -68,7 +68,7 @@ fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier, plotH
         }
     }
     BarChart(
-        buckets, modifier, colors.inflow, colors.outflow, plotHeight,
+        buckets, modifier, colors.inflow, colors.outflow,
         showNet = true, tooltip = tooltip,
     )
 }

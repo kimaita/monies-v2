@@ -1,13 +1,5 @@
 package com.kimaita.monies.ui.transactions
 
-import java.time.format.DateTimeFormatter
-import android.content.ContentValues
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -21,7 +13,6 @@ import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.getDatesForFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -35,8 +26,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -84,8 +73,8 @@ class TransactionsViewModel @Inject constructor(
     }.flatMapLatest { filters ->
         val (startDate, endDate) = getDatesForFilter(filters.timeFilter)
         repository.getTransactions(
-            startDate = startDate?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            endDate = endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            startDate = startDate,
+            endDate = endDate,
             transactionFilters = filters,
         )
 

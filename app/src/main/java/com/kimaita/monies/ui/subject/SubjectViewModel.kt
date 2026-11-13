@@ -10,10 +10,8 @@ import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.database.toDomainModel
 import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Subject
-import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
-import com.kimaita.monies.models.getDatesForFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.kimaita.monies.models.export.NamedRef
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -55,13 +53,12 @@ class SubjectViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val subjectStats: StateFlow<SubjectStats> = _filters.flatMapLatest { filters ->
-        val (startDate, endDate) = getDatesForFilter(filters.timeFilter)
+    val subjectStats: StateFlow<SubjectStats> = _filters.flatMapLatest {
         if (subjectId != null) {
             repository.getSubjectStats(
                 subjectId = subjectId,
-                startDate = startDate,
-                endDate = endDate
+                startDate = null,
+                endDate = null
             )
         } else {
             flowOf(SubjectStats())
@@ -71,10 +68,9 @@ class SubjectViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val subjectTransactions: Flow<PagingData<Transaction>> =
         _filters.flatMapLatest { filters ->
-            val (startDate, endDate) = getDatesForFilter(filters.timeFilter)
             repository.getTransactions(
-                startDate = startDate,
-                endDate = endDate,
+                startDate = null,
+                endDate = null,
                 transactionFilters = filters,
             )
 
@@ -117,10 +113,6 @@ class SubjectViewModel @Inject constructor(
     fun mergeInto(target: NamedRef<Long>, onDone: () -> Unit) {
         val source = subjectId ?: return
         viewModelScope.launch { if (repository.mergeSubject(source, target.id)) onDone() }
-    }
-
-    fun setTimeFilter(filter: TimeFilter) {
-        _filters.value = _filters.value.copy(timeFilter = filter)
     }
 
     fun setSortOrder(sortOrder: SortOrder) {

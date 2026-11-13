@@ -30,15 +30,6 @@ data class DailyTotal(
     val count: Int
 )
 
-/**
- * Data class to hold the result of the top subject query.
- */
-data class TopSubject(
-    val typeName: String,
-    val subjectName: String,
-    val totalAmount: Double
-)
-
 data class SubjectStats(
     val incomingTotal: Double = 0.0,
     val outgoingTotal: Double = 0.0,
@@ -79,9 +70,6 @@ data class SubjectOccurrence(
     val subjectId: Long, val name: String, val typeName: String,
     val transactionTime: String, val amount: Double,
 )
-
-/** Minimal projection for the balance backfill pass. */
-data class BalanceRow(val id: Long, val message: String, val transactionType: Int)
 
 /** A line (root account) with its latest known balance, as read from the database. */
 data class LineBalance(

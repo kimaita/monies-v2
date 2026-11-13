@@ -26,7 +26,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kimaita.monies.R
 import com.kimaita.monies.data.dao.dtos.CategoryBudget
-import com.kimaita.monies.data.dao.dtos.SourceAmount
 import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.NamedRef
@@ -692,7 +691,7 @@ private fun TileLabel(t: String) = Text(
 @Composable
 private fun StatTile(
     label: String, value: String, color: Color,
-    modifier: Modifier = Modifier, sub: String? = null, valueMaxLines: Int = 1,
+    modifier: Modifier = Modifier, sub: String? = null,
 ) {
     BentoCard(modifier) {
         TileLabel(label)
@@ -702,7 +701,7 @@ private fun StatTile(
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = color,
-            maxLines = valueMaxLines,
+            maxLines = 1,
             minFontSize = 14.sp,
         )
         sub?.let {
