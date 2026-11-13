@@ -335,6 +335,8 @@ interface TransactionsDao : BaseDao<Transaction> {
     /**
      * One row per line (root account with transactions), in order of first activity, with the
      * latest non-null balance across every account of the line (null when it has none yet).
+     * A line whose last transaction is more than 90 days older than the newest transaction of any
+     * line is dormant (an old or borrowed SIM) and left out, so its stale balance is not counted.
      */
     @Query(
         """
@@ -345,8 +347,9 @@ interface TransactionsDao : BaseDao<Transaction> {
                 ORDER BY t.transactionTime DESC, t.id DESC LIMIT 1) AS balance
         FROM accounts a
         WHERE a.mergedInto IS NULL
-          AND EXISTS (SELECT 1 FROM transactions t
-                      WHERE t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = a.id))
+          AND (SELECT MAX(t.transactionTime) FROM transactions t
+               WHERE t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = a.id))
+              >= (SELECT strftime('%Y-%m-%dT%H:%M:%S', MAX(transactionTime), '-90 days') FROM transactions)
         ORDER BY (SELECT MIN(t.transactionTime) FROM transactions t
                   WHERE t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = a.id)),
                  a.id
