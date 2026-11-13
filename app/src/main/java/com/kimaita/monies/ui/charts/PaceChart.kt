@@ -39,7 +39,9 @@ fun PaceChart(pace: PaceSummary, modifier: Modifier = Modifier, plotHeight: Dp =
     }
     val lastDay = maxOf(pace.thisMonth.size, pace.lastMonth.size)
     val xLabels = remember(lastDay) {
-        listOf(1, (1 + lastDay) / 2, lastDay).distinct().map { it.toFloat() to it.toString() }
+        // Day 1, every fifth day, then the last; the chart drops any label that would touch its neighbour.
+        (listOf(1) + (5..lastDay step 5) + lastDay.coerceAtLeast(1)).distinct()
+            .map { it.toFloat() to it.toString() }
     }
 
     val change = pace.changePct
