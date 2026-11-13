@@ -48,9 +48,15 @@ interface SyncStore {
     suspend fun accountActivity(): List<AccountActivity>
     suspend fun setMergedInto(accountId: Int, root: Int?)
 
-    /** Inserts the subject (with its categoryId) if new; returns the id to use, following any merge. */
-    suspend fun subjectId(subject: Subject): Long
-    suspend fun subjectCategory(subjectId: Long): Int?
+    /** True when a sync saved transactions but has not yet recomputed account merges. */
+    suspend fun mergesStale(): Boolean
+    suspend fun setMergesStale(stale: Boolean)
+
+    /** Saved subjects with any of these raw names, each with the id and category to use (following any merge). */
+    suspend fun savedSubjects(rawNames: Collection<String>): List<SavedSubject>
+
+    /** Inserts a new subject with its categoryId; returns its id. */
+    suspend fun insertSubject(subject: Subject): Long
 
     /** Every category's id by [categoryKey] of its name. */
     suspend fun categoryIds(): Map<String, Int>
@@ -87,8 +93,16 @@ class RoomSyncStore(
     override suspend fun accountActivity() = accountDao.getActivity()
     override suspend fun setMergedInto(accountId: Int, root: Int?) =
         accountDao.setMergedInto(accountId, root)
-    override suspend fun subjectId(subject: Subject) = subjectDao.upsertAndGetId(subject)
-    override suspend fun subjectCategory(subjectId: Long) = subjectDao.getCategoryId(subjectId)
+
+    // No value counts as stale, so an install from before the flag recomputes once.
+    override suspend fun mergesStale() = settingsDao.getSetting(SmsSyncer.MERGES_STALE_KEY) != "0"
+    override suspend fun setMergesStale(stale: Boolean) =
+        settingsDao.saveSetting(Setting(SmsSyncer.MERGES_STALE_KEY, if (stale) "1" else "0"))
+
+    // In chunks: SQLite before Android 12 allows only 999 arguments in one query.
+    override suspend fun savedSubjects(rawNames: Collection<String>) =
+        rawNames.chunked(500).flatMap { subjectDao.findByRawNames(it) }
+    override suspend fun insertSubject(subject: Subject) = subjectDao.insert(subject)
     override suspend fun categoryIds() =
         categoryDao.getAll().first().associate { categoryKey(it.name) to it.id }
     override suspend fun insertTransactions(transactions: List<Transaction>) =
@@ -164,15 +178,20 @@ class SmsSyncer(
 
                 val batch = smsDataSource.readBatch(Provider.allSenders, afterId, limit)
                 if (batch.isEmpty()) {
-                    store.inTransaction { recomputeMerges() }
+                    // Nothing new, so the merges need work only if an earlier sync left them stale.
+                    if (store.mergesStale()) store.inTransaction { recomputeMerges() }
                     return@withContext SmsBatchResult(0, null)
                 }
 
                 val maxId = batch.maxOf { it.id ?: 0L }
                 store.inTransaction {
-                    parseAndSave(batch)
+                    val saved = parseAndSave(batch)
                     store.setCursor(maxId)
-                    if (batch.size < limit) recomputeMerges()
+                    // Merges depend on every account's span, so they are recomputed once, on the
+                    // batch that drains the inbox. A full batch may not be the last, so it only
+                    // marks them stale, and the flag survives the process being killed.
+                    if (batch.size < limit && (saved || store.mergesStale())) recomputeMerges()
+                    else if (saved) store.setMergesStale(true)
                 }
                 Timber.d("Synced %d SMS up to id %d", batch.size, maxId)
                 SmsBatchResult(count = batch.size, newestEpochMillis = batch.maxOf { it.timestamp })
@@ -203,9 +222,11 @@ class SmsSyncer(
             val root = roots[a.id]
             if (root != a.mergedInto) store.setMergedInto(a.id, root)
         }
+        store.setMergesStale(false)
     }
 
-    private suspend fun parseAndSave(messages: List<SmsParser.SmsMessage>) {
+    /** Returns true when the batch held transactions (so account spans may have changed). */
+    private suspend fun parseAndSave(messages: List<SmsParser.SmsMessage>): Boolean {
         val types = store.transactionTypes()
         val parsed = smsParser.parse(messages, types)
 
@@ -214,13 +235,22 @@ class SmsSyncer(
             Provider.forSender(it.originatingAddress)?.looksLikeTransaction(it.body) == true
         }.map { UnparsedMessage(body = it.body, address = it.originatingAddress, date = it.timestamp) }
         if (unparsed.isNotEmpty()) store.insertUnparsed(unparsed)
-        if (parsed.isEmpty()) return
+        if (parsed.isEmpty()) return false
 
         // A new subject starts in its built-in category; one already saved keeps whatever it has.
+        // The batch's saved subjects come back in one query; only new ones cost a query each.
+        // Looked up per batch, not cached across batches, so a merge or category change the user
+        // makes during a long import applies to the batches after it.
         val categoryIds = store.categoryIds()
-        val subjectIds = parsed.mapNotNull { it.second }.distinct()
-            .associateWith { store.subjectId(it.copy(categoryId = defaultCategoryId(it.rawName, categoryIds))) }
-        val subjectCategories = subjectIds.values.distinct().associateWith { store.subjectCategory(it) }
+        val parsedSubjects = parsed.mapNotNull { it.second }.distinctBy { it.rawName to it.number }
+        val savedByKey = store.savedSubjects(parsedSubjects.map { it.rawName }.distinct())
+            .associateBy { it.rawName to it.number }
+        val subjects = parsedSubjects.associate { s ->
+            val key = s.rawName to s.number
+            key to (savedByKey[key] ?: defaultCategoryId(s.rawName, categoryIds).let { category ->
+                SavedSubject(s.rawName, s.number, store.insertSubject(s.copy(categoryId = category)), category)
+            })
+        }
 
         val subscriptionById = messages.associate { it.id to it.subscriptionId }
         val typeProvider = types.associate { it.id to it.provider }
@@ -234,22 +264,27 @@ class SmsSyncer(
                     UserAccount(provider = provider, subscriptionId = subscriptionId)
                 )
             }
-            val subjectId = subject?.let { subjectIds.getValue(it) }
+            val saved = subject?.let { subjects.getValue(it.rawName to it.number) }
             txn.copy(
                 accountId = accountId,
-                subject = subjectId,
-                transactionCategory = subjectId?.let { subjectCategories[it] },
+                subject = saved?.id,
+                transactionCategory = saved?.categoryId,
             )
         }
         store.insertTransactions(toInsert)
         store.deletePairedAirtelReceipts()
+        return true
     }
 
     companion object {
         const val SMS_BATCH_SIZE = 512
         const val LAST_SMS_SYNC_ID_KEY = "last_sms_sync_id"
+        const val MERGES_STALE_KEY = "account_merges_stale"
     }
 }
+
+/** A saved subject by raw name and number, with the id and category to use: its merge target's when merged. */
+data class SavedSubject(val rawName: String, val number: String, val id: Long, val categoryId: Int?)
 
 /** An account's provider and the first and last transaction time (ISO text) it has. */
 data class AccountActivity(

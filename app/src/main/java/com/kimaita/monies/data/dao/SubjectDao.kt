@@ -9,6 +9,7 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Subject
+import com.kimaita.monies.services.SavedSubject
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -25,18 +26,18 @@ interface SubjectDao : BaseDao<Subject> {
     @Query("SELECT id, name FROM subjects WHERE id IN (:ids)")
     suspend fun getSubjects(ids: List<Long>): List<SubjectRef>
 
-    /** The id to use for this subject: its merge target when it has been merged. */
-    @Query("SELECT COALESCE(mergedInto, id) FROM subjects WHERE rawName = :rawName AND number = :number")
-    suspend fun getIdByRawNameAndNumber(rawName: String, number: String): Long?
+    /** Subjects with these raw names, each with the id and category to use: its merge target's when merged. */
+    @Query(
+        """
+        SELECT s.rawName AS rawName, s.number AS number, r.id AS id, r.categoryId AS categoryId
+        FROM subjects s JOIN subjects r ON r.id = COALESCE(s.mergedInto, s.id)
+        WHERE s.rawName IN (:rawNames)
+        """
+    )
+    suspend fun findByRawNames(rawNames: List<String>): List<SavedSubject>
 
     @Query("SELECT categoryId FROM subjects WHERE id = :id")
     suspend fun getCategoryId(id: Long): Int?
-
-
-    @Transaction
-    suspend fun upsertAndGetId(subject: Subject): Long {
-        return getIdByRawNameAndNumber(subject.rawName, subject.number) ?: insert(subject)
-    }
 
     @Query("UPDATE subjects SET name = :name WHERE id = :id")
     suspend fun rename(id: Long, name: String)

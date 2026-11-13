@@ -5,7 +5,7 @@ import com.kimaita.monies.data.database.models.Subject
 import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.Provider
-import com.kimaita.monies.utils.getSafeValue
+import com.kimaita.monies.utils.groupValue
 import com.kimaita.monies.utils.parseDateTime
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
@@ -24,8 +24,13 @@ class SmsParser @Inject constructor() {
 
     private val regexCache = ConcurrentHashMap<String, Regex>()
 
+    /**
+     * Anchored at the start of the message, as every pattern describes it from its first character.
+     * Unanchored, a pattern that does not fit is retried at every offset of the body, which made
+     * matching about ten times slower.
+     */
     private fun regexFor(pattern: String) = regexCache.getOrPut(pattern) {
-        pattern.toRegex(setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+        "^\\s*(?:$pattern)".toRegex(setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
     }
 
     fun parse(
@@ -42,6 +47,7 @@ class SmsParser @Inject constructor() {
         try {
             messages.forEach { message ->
                 var matchedType: Int? = null
+                var matchedRegex: Regex? = null
                 var matchResult: MatchResult? = null
 
                 val provider = Provider.forSender(message.originatingAddress)
@@ -49,15 +55,16 @@ class SmsParser @Inject constructor() {
                     val result = regex.find(message.body)
                     if (result != null) {
                         matchedType = type
+                        matchedRegex = regex
                         matchResult = result
                         break
                     }
                 }
 
-                if (matchedType != null && matchResult != null) {
+                if (matchedType != null && matchedRegex != null && matchResult != null) {
                     try {
                         val (transaction, newSubject) = createTransactionFromMatch(
-                            matchResult, matchedType, message
+                            matchResult, matchedRegex, matchedType, message
                         )
                         transactionList.add(Pair(transaction, newSubject))
                     } catch (e: Exception) {
@@ -76,23 +83,22 @@ class SmsParser @Inject constructor() {
     }
 
     private fun createTransactionFromMatch(
-        matchResult: MatchResult, typeId: Int, message: SmsMessage
+        matchResult: MatchResult, regex: Regex, typeId: Int, message: SmsMessage
     ): Pair<Transaction, Subject?> {
 
-        val groups = matchResult.groups as? MatchNamedGroupCollection
+        fun group(name: String) = matchResult.groupValue(regex, name)
 
-
-        val body = groups?.getSafeValue("Body")
-        val code = groups?.getSafeValue("Code")
-        val amount = groups?.getSafeValue("Amount")?.replace(",", "")?.toDoubleOrNull() ?: 0.0
-        val cost = groups?.getSafeValue("Cost")?.replace(",", "")?.toDoubleOrNull() ?: 0.0
-        val balance = (groups?.getSafeValue("Balance") ?: groups?.getSafeValue("MpesaBal"))
+        val body = group("Body")
+        val code = group("Code")
+        val amount = group("Amount")?.replace(",", "")?.toDoubleOrNull() ?: 0.0
+        val cost = group("Cost")?.replace(",", "")?.toDoubleOrNull() ?: 0.0
+        val balance = (group("Balance") ?: group("MpesaBal"))
             ?.replace(",", "")?.toDoubleOrNull()
-        val subjectName = groups?.getSafeValue("Name")?.replace(REPEATED_SPACES, " ")?.trim()
+        val subjectName = group("Name")?.replace(REPEATED_SPACES, " ")?.trim()
             ?.trimEnd('.')?.trim()?.takeIf { it.isNotEmpty() }
-        val subjectNumber = groups?.getSafeValue("Number")?.trim()
-        val date = groups?.getSafeValue("Date")
-        val time = groups?.getSafeValue("Time")
+        val subjectNumber = group("Number")?.trim()
+        val date = group("Date")
+        val time = group("Time")
         val dateTime = parseDateTime(date, time, message.timestamp)
 
         val name = subjectName ?: subjectNumber
