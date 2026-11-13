@@ -48,7 +48,7 @@ private const val AIRTEL_WHEN = """(?<Date>[\d\/]+)(?: at)? (?<Time>\d{1,2}:\d{2
  *
  * Patterns use named groups that [com.kimaita.monies.services.SmsParser] reads: Body, Code, Amount,
  * Cost, Name, Number, Date, Time, plus balance groups (Balance, then MpesaBal, becomes Transaction.balance) and the other balances (
- * MshwariBal, LockSavingsBal, AvailableFuliza, TotalLoan).
+ * MshwariBal, LockSavingsBal, AvailableFuliza, TotalLoan, LoanBal).
  * Names that need cleaning (trailing dot, repeated spaces) are cleaned by the parser, not here.
  *
  * Order matters: the parser takes the first pattern that matches, so a more specific format must
@@ -129,10 +129,10 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         name = "mshwari.loan", displayName = "M-Shwari Loan", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Your M-Shwari loan has been approved on (?<Date>[\d\/]+) (?<Time>\d{1,2}:\d{2} [AP]M) and Ksh(?<Amount>[\d,]+\.\d{2}) less excise duty has been deposited to your M-PESA account\. New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
     ),
-    // The short form ("repaid from M-PESA ... Loan balance is") states no M-PESA or M-Shwari balance.
+    // The short form ("repaid from M-PESA ... Loan balance is") states the outstanding loan (LoanBal), no M-PESA or M-Shwari balance.
     mpesa(
         name = "mshwari.loan_repayment", displayName = "M-Shwari Loan Repayment", isInc = false,
-        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Loan of Ksh(?<Amount>[\d,]+\.\d{2}) repaid from (?:your M-PESA account|M-PESA) on (?<Date>[\d\/]+) at (?<Time>\d{1,2}:\d{2} [AP]M)\. (?:M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2})\..*?New M-Shwari balance is Ksh(?<MshwariBal>[\d,]+\.\d{2})|Loan balance is Ksh[\d,]+\.\d{2})\.\s+Transaction cost Kshs?\.? ?(?<Cost>[\d,]+\.\d{2}))""",
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Loan of Ksh(?<Amount>[\d,]+\.\d{2}) repaid from (?:your M-PESA account|M-PESA) on (?<Date>[\d\/]+) at (?<Time>\d{1,2}:\d{2} [AP]M)\. (?:M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2})\..*?New M-Shwari balance is Ksh(?<MshwariBal>[\d,]+\.\d{2})|Loan balance is Ksh(?<LoanBal>[\d,]+\.\d{2}))\.\s+Transaction cost Kshs?\.? ?(?<Cost>[\d,]+\.\d{2}))""",
     ),
     mpesa(
         name = "mshwari.lock_savings.deposit", displayName = "Lock Savings Deposit", isInc = false,

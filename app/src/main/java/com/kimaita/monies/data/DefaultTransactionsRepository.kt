@@ -44,8 +44,10 @@ import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.sumLineBalances
 import com.kimaita.monies.services.FulizaEvent
+import com.kimaita.monies.services.MshwariLoanEvent
 import com.kimaita.monies.services.RecurringDetector
 import com.kimaita.monies.services.computeFuliza
+import com.kimaita.monies.services.computeMshwariLoan
 import com.kimaita.monies.utils.getSafeValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -401,14 +403,23 @@ class DefaultTransactionsRepository @Inject constructor(
             val fulizaRegex = types.filter { it.name.startsWith("fuliza.") }
                 .mapNotNull { t -> regexByType[t.id]?.let { t.name to it } }.toMap()
 
+            val loanRegex = types.firstOrNull { it.name == "mshwari.loan_repayment" }
+                ?.let { regexByType[it.id] }
+
             val savings = if (balanceTypeIds.isEmpty()) flowOf(emptyList())
             else transactionsDao.getLatestPerType(balanceTypeIds, account)
 
-            combine(savings, transactionsDao.getFulizaRows(account)) { rows, fulizaRows ->
+            combine(
+                savings,
+                transactionsDao.getFulizaRows(account),
+                transactionsDao.getMshwariLoanRows(account),
+            ) { rows, fulizaRows, loanRows ->
                 val fuliza = computeFuliza(fulizaRows.mapNotNull { fulizaEvent(it, fulizaRegex) })
+                val loan = computeMshwariLoan(loanRows.asReversed().mapNotNull { mshwariLoanEvent(it, loanRegex) })
                 extractBalances(rows, regexByType).copy(
                     availableFuliza = fuliza.available,
                     outstandingFuliza = fuliza.outstanding,
+                    mshwariLoan = loan,
                 )
             }
         }
@@ -425,6 +436,19 @@ class DefaultTransactionsRepository @Inject constructor(
         val time = runCatching { LocalDateTime.parse(row.transactionTime) }.getOrNull() ?: return null
         fun group(name: String) = groups?.getSafeValue(name)?.replace(",", "")?.toDoubleOrNull()
         return FulizaEvent(kind, time, row.amount, group("TotalLoan"), group("AvailableFuliza"))
+    }
+
+    /** A repayment states the loan (LoanBal) or says it is repaid in full; a new loan states no figure. */
+    private fun mshwariLoanEvent(row: FulizaRow, repaymentRegex: Regex?): MshwariLoanEvent? {
+        val time = runCatching { LocalDateTime.parse(row.transactionTime) }.getOrNull() ?: return null
+        if (row.typeName != "mshwari.loan_repayment") return MshwariLoanEvent(MshwariLoanEvent.Kind.UNKNOWN, time)
+        val groups = repaymentRegex?.find(row.message)?.groups as? MatchNamedGroupCollection
+        val stated = groups?.getSafeValue("LoanBal")?.replace(",", "")?.toDoubleOrNull()
+        return when {
+            stated != null -> MshwariLoanEvent(MshwariLoanEvent.Kind.STATED, time, stated)
+            row.message.contains("repaid in full", ignoreCase = true) -> MshwariLoanEvent(MshwariLoanEvent.Kind.CLEARED, time)
+            else -> MshwariLoanEvent(MshwariLoanEvent.Kind.UNKNOWN, time)
+        }
     }
 
     private fun extractBalances(

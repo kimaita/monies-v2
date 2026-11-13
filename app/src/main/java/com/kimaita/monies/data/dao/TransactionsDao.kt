@@ -432,6 +432,21 @@ interface TransactionsDao : BaseDao<Transaction> {
     )
     fun getFulizaRows(account: Int? = null): Flow<List<FulizaRow>>
 
+    /** M-Shwari loans and repayments of a line, newest first, for [com.kimaita.monies.services.computeMshwariLoan]. */
+    @Query(
+        """
+        SELECT tt.name AS typeName, t.transactionTime AS transactionTime, t.amount AS amount,
+               t.message AS message
+        FROM transactions t
+        JOIN transaction_types tt ON tt.id = t.transactionType
+        WHERE tt.name IN ('mshwari.loan', 'mshwari.loan_repayment')
+          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        ORDER BY t.transactionTime DESC, t.id DESC
+        LIMIT 50
+    """
+    )
+    fun getMshwariLoanRows(account: Int? = null): Flow<List<FulizaRow>>
+
     @Query("UPDATE transactions SET transactionCategory = :category WHERE id = :id")
     suspend fun setCategory(id: Long, category: Int?)
 
