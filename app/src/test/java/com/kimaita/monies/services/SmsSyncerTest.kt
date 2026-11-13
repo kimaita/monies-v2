@@ -6,6 +6,8 @@ import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.data.database.models.UnparsedMessage
 import com.kimaita.monies.data.database.models.UserAccount
+import com.kimaita.monies.data.database.models.categoryKey
+import com.kimaita.monies.data.database.models.getDefaultCategories
 import com.kimaita.monies.data.database.models.getDefaultTransactionTypes
 import com.kimaita.monies.models.Provider
 import kotlinx.coroutines.runBlocking
@@ -36,6 +38,7 @@ class SmsSyncerTest {
         val subjects = mutableMapOf<Pair<String, String>, Long>()
         val subjectCategories = mutableMapOf<Long, Int?>()
         val mergedInto = mutableMapOf<Long, Long>()
+        val categories = getDefaultCategories().mapIndexed { i, c -> categoryKey(c.name) to i + 1 }.toMap()
 
         override suspend fun cursor() = cursor
         override suspend fun setCursor(id: Long) { cursor = id }
@@ -60,11 +63,18 @@ class SmsSyncerTest {
             accounts[i] = accounts[i].copy(mergedInto = root)
         }
 
-        override suspend fun subjectId(subject: Subject) =
-            subjects.getOrPut(subject.rawName to subject.number) { subjects.size + 1L }
-                .let { mergedInto[it] ?: it }
+        // Like Room's insert, only a new subject takes the categoryId it is given.
+        override suspend fun subjectId(subject: Subject): Long {
+            val key = subject.rawName to subject.number
+            val id = subjects[key] ?: (subjects.size + 1L).also {
+                subjects[key] = it
+                subjectCategories[it] = subject.categoryId
+            }
+            return mergedInto[id] ?: id
+        }
 
         override suspend fun subjectCategory(subjectId: Long) = subjectCategories[subjectId]
+        override suspend fun categoryIds() = categories
         override suspend fun insertTransactions(transactions: List<Transaction>) {
             transactions.forEach { t -> if (this.transactions.none { it.message == t.message }) this.transactions += t }
         }
@@ -171,6 +181,42 @@ class SmsSyncerTest {
         run(FakeInbox(listOf(msg(1))), store)
         assertEquals(listOf(7L), store.transactions.map { it.subject })
         assertEquals(listOf(3), store.transactions.map { it.transactionCategory })
+    }
+
+    private val kplc = mpesaSamples.first { it.name == "ACME UTILITY" }.body.replace("ACME UTILITY", "KPLC PREPAID")
+
+    @Test
+    fun newSubjectsStartInTheirBuiltInCategory() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val java = mpesaSamples.first { it.type == "till" }.body.replace("PAUL KAMAU", "JAVA HOUSE VALLEY ARCADE")
+        val bus = mpesaSamples.first { it.type == "pochi" }.body.replace("Mary  Doe", "SM705")
+        val airtime = mpesaSamples.first { it.type == "airtime.own" }.body
+        val person = mpesaSamples.first { it.type == "send_money" }.body
+        val bundle = airtelSamples.first { it.type == "airtel.bundle" }.body
+        val power = "AB12CD34EF5 Confirmed. Ksh 100 successfully paid to Kenya Power and Lighting Co Ltd on 28/05/26 at 03:05 PM. Fee: Ksh 0. Bal: Ksh 1888.0."
+        run(
+            FakeInbox(
+                listOf(
+                    msg(1, kplc), msg(2, java), msg(3, bus), msg(4, airtime), msg(5, person),
+                    msg(6, bundle, "AIRTELMONEY"), msg(7, power, "AIRTELMONEY"),
+                )
+            ),
+            store,
+        )
+        val c = store.categories
+        assertEquals(
+            listOf(c["electricity"], c["meals"], c["transport"], c["airtime & data"], null, c["airtime & data"], c["electricity"]),
+            store.transactions.sortedBy { it.messageId }.map { it.transactionCategory },
+        )
+    }
+
+    @Test
+    fun aSavedSubjectKeepsTheCategoryTheUserPicked() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        store.subjects["KPLC PREPAID" to "37100000000"] = 7L
+        store.subjectCategories[7L] = store.categories.getValue("rent")
+        run(FakeInbox(listOf(msg(1, kplc))), store)
+        assertEquals(listOf(store.categories["rent"]), store.transactions.map { it.transactionCategory })
     }
 
     private fun act(id: Int, min: String, max: String, provider: String = "MPESA") =
