@@ -158,6 +158,11 @@ val mpesaSamples: List<Sample> = listOf(
         "VFP21930T1 Confirmed. Loan of Ksh714.00 repaid from your M-PESA account on 29/1/26 at 9:34 AM. M-PESA balance is Ksh1,991.69.Your loan is repaid in full, and the overpayment has been moved to your Savings Account. New M-Shwari balance is Ksh0.94. Transaction cost Kshs 0.00",
         "MPESA", "mshwari.loan_repayment", 714.0, 0.0, 1991.69, null, null, dt(2026, 1, 29, 9, 34),
     ),
+    // Short form: "repaid from M-PESA", only the loan balance is stated (no M-PESA or M-Shwari balance)
+    Sample(
+        "TCQ000EEE5 Confirmed. Loan of Ksh350.00 repaid from M-PESA on 12/4/26 at 6:45 PM. Loan balance is Ksh137.50.  Transaction cost Kshs 0.00",
+        "MPESA", "mshwari.loan_repayment", 350.0, 0.0, null, null, null, dt(2026, 4, 12, 18, 45),
+    ),
     // Reversals
     Sample(
         "EAP1L9RRM5 confirmed. Reversal of transaction BEY4E9WXSK has been successfully reversed  on 28/1/23  at 11:41 AM and Ksh10.00 is credited to your M-PESA account. New M-PESA account balance is Ksh989.34.",
@@ -170,6 +175,16 @@ val mpesaSamples: List<Sample> = listOf(
     Sample(
         "SV736QRLD8 confirmed. Your original transaction AT60263ZDC in favour of JANE    ANN    DOE has been reversed successfully on 3/12/25 at 9:02 PM  and Ksh137.00 has been credited to your M-PESA account. Your new M-PESA account balance is Ksh137.00.",
         "MPESA", "reversal", 137.0, 0.0, 137.0, "JANE ANN DOE", null, dt(2025, 12, 3, 21, 2),
+    ),
+    // Credit without a balance sentence ("completed successfully", "M-Pesa Account")
+    Sample(
+        "TCQ000FFF6 confirmed. Reversal of transaction TCQ000FFF5 has been completed successfully on 15/5/26 at 3:20 PM and Ksh63.50 has been credited to your M-Pesa Account.",
+        "MPESA", "reversal", 63.5, 0.0, null, "Reversal", null, dt(2026, 5, 15, 15, 20),
+    ),
+    // Debit: money leaves the account (double space after the code, as received)
+    Sample(
+        "TCQ000GGG7  confirmed. Reversal of transaction TCQ000GGG6 has been successfully reversed  on 16/5/26  at 9:05 PM and Ksh36.40 is debited from your M-PESA account. New M-PESA account balance is Ksh260.00.",
+        "MPESA", "reversal.debit", 36.4, 0.0, 260.0, "Reversal", null, dt(2026, 5, 16, 21, 5),
     ),
 )
 
@@ -208,6 +223,20 @@ val airtelSamples: List<Sample> = listOf(
         "15113717030 Confirmed. Ksh 80.00 successfully paid to Airtel Networks on 30/08/24 at 05:54 PM. Transaction cost Ksh 0.00. Bal: Ksh 22.00.",
         "airtelmoney", "airtel.pay", 80.0, 0.0, 22.0, "Airtel Networks", null, dt(2024, 8, 30, 17, 54),
     ),
+    // Till and paybill wordings: "Fee:" instead of "Cost", "Receiving TID" without a colon, no space before "Fee:"
+    Sample(
+        "AB1CD2EF3GH Confirmed. Ksh 250 successfully paid to Acme Traders and Sons Ltd on 05/01/26 at 02:15 PM. Fee: Ksh 0. Bal: Ksh 1500.0.",
+        "airtelmoney", "airtel.pay", 250.0, 0.0, 1500.0, "Acme Traders and Sons Ltd", null, dt(2026, 1, 5, 14, 15),
+    ),
+    Sample(
+        "CD2EF3GH4IJ Confirmed. Ksh 137 paid to     ACME WATER SERVICES for account 4000002 on 06/01/2026 at 09:30.Fee: Ksh 0. Bal:Ksh 913.0. Receiving TID TLX9Y8Z7WV.",
+        "airtelmoney", "airtel.pay", 137.0, 0.0, 913.0, "ACME WATER SERVICES", "4000002", dt(2026, 1, 6, 9, 30),
+    ),
+    // No "Confirmed.", "account" without "for", no "at" before the time, ends with the M-PESA id
+    Sample(
+        "EF3GH4IJ5KL. Ksh 167 paid to ACME GROCERIES account 5000003 on 07/01/2026 18:05. Fee Ksh 2. Bal:Ksh 640.0. MPESA ID:TLY8Z7X6WV",
+        "airtelmoney", "airtel.pay", 167.0, 2.0, 640.0, "ACME GROCERIES", "5000003", dt(2026, 1, 7, 18, 5),
+    ),
     // Received
     Sample(
         "You have received Ksh 100.00 from MPESA - ALEX DOE 254700000002. TID: 17600467400. Fee: Ksh 0.00. Bal: Ksh 428.00.",
@@ -233,6 +262,10 @@ val airtelSamples: List<Sample> = listOf(
         "B7Y30YG4MDC. You have received Ksh 2,000 from ACME BANK B2C on 05/12/25 08:50 PM. Bal: Ksh 7568.0.",
         "airtelmoney", "airtel.received", 2000.0, 0.0, 7568.0, "ACME BANK B2C", null, dt(2025, 12, 5, 20, 50),
     ),
+    Sample(
+        "GH4IJ5KL6MN. Ksh 1,500 received from JANE DOE 0700000004 on 08/01/26 at 04:40 PM.Bal: Ksh 2300.0.",
+        "airtelmoney", "airtel.received", 1500.0, 0.0, 2300.0, "JANE DOE", "0700000004", dt(2026, 1, 8, 16, 40),
+    ),
     // Airtime
     Sample(
         "10429072006 successful. Airtime top up of Ksh 10.00 to 700000005 on 10/05/23 at 02:20 PM. 25% bonus airtime received. Dial *131*1# to check bonus",
@@ -242,10 +275,27 @@ val airtelSamples: List<Sample> = listOf(
         "14168251422 successful. Airtime top up of Ksh 20.00 to 700000005 on 09/05/23 at 08:51 PM. 25% bonus airtime received. Dial *131*1# to check bonus",
         "airtelmoney", "airtel.airtime", 20.0, 0.0, null, "Airtime", "700000005", dt(2023, 5, 9, 20, 51),
     ),
+    // Short form: the line is named, there is no date, but the balance is given
+    Sample(
+        "10000000001 Successful. Airtime top up for line 700000006 of Ksh 37 is successful. 25% bonus airtime received. Bal: Ksh 52.5. Dial *131*1# to check bonus.",
+        "airtelmoney", "airtel.airtime.line", 37.0, 0.0, 52.5, "Airtime", "700000006", null,
+    ),
+    Sample(
+        "10000000002 Successful. Airtime top up of your line 700000006 of Ksh 71 is successful. 25% bonus airtime received. Bal: Ksh 95.0. Dial *131*1# to check bonus.",
+        "airtelmoney", "airtel.airtime.line", 71.0, 0.0, 95.0, "Airtime", "700000006", null,
+    ),
     // Bundle
     Sample(
         "94754018800 Confirmed. You have successfully purchased a bundle of Ksh 50 for your line via Airtel Networks Kenya Ltd on 12/12/25 at 11:36 AM. Fee: Ksh 0. Bal: Ksh 202.0.",
         "airtelmoney", "airtel.bundle", 50.0, 0.0, 202.0, "Airtel Networks Kenya Ltd", null, dt(2025, 12, 12, 11, 36),
+    ),
+    Sample(
+        "JK6LM7NO8PQ Confirmed. Bundle purchase successful of Ksh 149 via Airtel Networks Kenya Ltd on 09/01/26 at 08:10 PM. Bal: Ksh 5.0.",
+        "airtelmoney", "airtel.bundle", 149.0, 0.0, 5.0, "Airtel Networks Kenya Ltd", null, dt(2026, 1, 9, 20, 10),
+    ),
+    Sample(
+        "LM7NO8PQ9RS Confirmed. You have successfully purchased a bundle of Ksh 89 via Airtel Networks Kenya Ltd on 10/01/26 at 07:25 PM. Fee: Ksh 0. Bal: Ksh 214.0. ",
+        "airtelmoney", "airtel.bundle", 89.0, 0.0, 214.0, "Airtel Networks Kenya Ltd", null, dt(2026, 1, 10, 19, 25),
     ),
     // Withdrawal
     Sample(
