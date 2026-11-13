@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.R
@@ -93,6 +95,8 @@ fun ExportScreen(
     var showEnd by remember { mutableStateOf(false) }
 
     val running = state is ExportState.InProgress
+
+    LaunchedEffect(Unit) { if (viewModel.applyHandoff()) filtersExpanded = true }
 
 
     Scaffold(
@@ -418,6 +422,17 @@ private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
             DirChip("All", sel.nature == null) { vm.setNature(null) }
             DirChip("Money in", sel.nature == true) { vm.setNature(true) }
             DirChip("Money out", sel.nature == false) { vm.setNature(false) }
+        }
+
+        if (sel.search.isNotBlank()) {
+            FilterLabel("Search")
+            InputChip(
+                selected = true,
+                onClick = { vm.setSearch("") },
+                label = { Text(sel.search, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = {
+                    Icon(painterResource(R.drawable.close_small_24dp), null, Modifier.size(16.dp))
+                })
         }
 
         FilterLabel("Subject")

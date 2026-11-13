@@ -96,6 +96,19 @@ interface SubjectDao : BaseDao<Subject> {
     @Query("SELECT id, name FROM subjects WHERE id = :id")
     suspend fun getSubject(id: Long): SubjectRef?
 
+    /** Subjects whose display name matches [like] (see subjectLikeOf), with their transaction count, busiest first. */
+    @Query(
+        """
+        SELECT s.id AS subjectId, s.name AS name, COUNT(t.id) AS count
+        FROM subjects s
+        JOIN transactions t ON t.subject = s.id
+        WHERE s.mergedInto IS NULL AND s.name LIKE :like
+          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        GROUP BY s.id ORDER BY count DESC, s.name LIMIT :limit
+    """
+    )
+    fun matchingSubjects(like: String, account: Int? = null, limit: Int = 5): Flow<List<SubjectCount>>
+
     @Query(
         """
             SELECT s.id, s.name 

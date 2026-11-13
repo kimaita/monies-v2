@@ -125,6 +125,7 @@ class ExportWorker @AssistedInject constructor(
             K_NATURE,
             false
         ) else null,
+        search = getString(K_SEARCH),
     )
 
     private fun Data.longOrNull(key: String): Long? =
@@ -151,6 +152,7 @@ class ExportWorker @AssistedInject constructor(
         private const val K_TYPES = "f_types"
         private const val K_ACCOUNT = "f_account"
         private const val K_NATURE = "f_nature"
+        private const val K_SEARCH = "f_search"
 
         fun buildInput(format: ExportFormat, f: ExportFilters): Data {
             val b = Data.Builder().putString(KEY_FORMAT, format.name)
@@ -164,6 +166,7 @@ class ExportWorker @AssistedInject constructor(
                 ?.let { b.putIntArray(K_TYPES, it.toIntArray()) }
             f.account?.let { b.putInt(K_ACCOUNT, it) }
             f.natureFilter?.let { b.putBoolean(K_NATURE, it) }
+            f.search?.takeIf { it.isNotBlank() }?.let { b.putString(K_SEARCH, it) }
             return b.build()
         }
     }

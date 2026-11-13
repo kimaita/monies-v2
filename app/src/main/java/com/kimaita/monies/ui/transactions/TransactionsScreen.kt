@@ -2,6 +2,8 @@ package com.kimaita.monies.ui.transactions
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -49,13 +53,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.paging.LoadState
 import androidx.paging.PagingData
@@ -63,12 +70,14 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.kimaita.monies.R
+import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.ui.components.TransactionItemStyle
+import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
 import kotlinx.coroutines.flow.flowOf
@@ -78,7 +87,7 @@ import java.time.LocalDateTime
 @Composable
 fun TransactionsScreen(
     modifier: Modifier = Modifier,
-    navController: NavController,
+    navController: NavHostController,
     viewModel: TransactionsViewModel = hiltViewModel(),
     openSearch: Boolean = false,
 ) {
@@ -86,10 +95,12 @@ fun TransactionsScreen(
     val transactionTypes by viewModel.transactionTypes.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
+    val subjectMatches by viewModel.subjectMatches.collectAsStateWithLifecycle()
 
     TransactionsScreenContent(
         modifier = modifier,
         filteredTransactions = filteredTransactions,
+        subjectMatches = subjectMatches,
         transactionTypes = transactionTypes.values.toList(),
         categories = categories,
         filters = filters,
@@ -97,6 +108,10 @@ fun TransactionsScreen(
         onSetSearchQuery = viewModel::setSearchQuery,
         onSetSortOrder = viewModel::setSortOrder,
         onUpdateFilters = viewModel::updateFilters,
+        onExport = {
+            viewModel.exportResults()
+            navController.navigateToTab("export")
+        },
         onBack = { navController.popBackStack() },
         onTransactionClick = { subjectId ->
             navController.navigate("subject/$subjectId")
@@ -109,6 +124,7 @@ fun TransactionsScreen(
 fun TransactionsScreenContent(
     modifier: Modifier = Modifier,
     filteredTransactions: LazyPagingItems<Transaction>,
+    subjectMatches: List<SubjectCount> = emptyList(),
     transactionTypes: List<TransactionType>,
     categories: List<Category>,
     filters: TransactionFilters,
@@ -116,7 +132,7 @@ fun TransactionsScreenContent(
     onSetSearchQuery: (String) -> Unit,
     onSetSortOrder: (SortOrder) -> Unit,
     onUpdateFilters: (TransactionFilters) -> Unit,
-//    onExport: suspend () -> Unit,
+    onExport: () -> Unit,
     onBack: () -> Unit = {},
     onTransactionClick: (Long) -> Unit
 ) {
@@ -239,8 +255,22 @@ fun TransactionsScreenContent(
                     typeMap = typeMap,
                     onRemoveFilter = onUpdateFilters
                 )
-                Spacer(modifier = Modifier.height(16.dp))
             }
+            if (hasActiveFilters || filters.searchQuery.isNotBlank()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onExport) {
+                        Icon(painterResource(R.drawable.csv_export), null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Export these results")
+                    }
+                }
+            }
+            if (hasActiveFilters) Spacer(modifier = Modifier.height(8.dp))
             val refresh = filteredTransactions.loadState.refresh
             if (filteredTransactions.itemCount == 0 && refresh !is LoadState.NotLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -264,6 +294,9 @@ fun TransactionsScreenContent(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    items(subjectMatches, key = { "subject_${it.subjectId}" }) { match ->
+                        SubjectMatchRow(match, onClick = { onTransactionClick(match.subjectId) })
+                    }
                     items(
                         count = filteredTransactions.itemCount,
                         key = filteredTransactions.itemKey { it.id },
@@ -317,6 +350,52 @@ fun TransactionsScreenContent(
                     onFilterChange = { stagedFilters = it })
             }
         }
+    }
+}
+
+/** A subject whose name matches the search: one collapsed row that opens the subject. */
+@Composable
+private fun SubjectMatchRow(match: SubjectCount, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .padding(vertical = 4.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = match.name.firstOrNull()?.uppercase() ?: "?",
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = match.name.uppercase(),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "${match.count} transaction${if (match.count == 1) "" else "s"}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Icon(
+            painterResource(R.drawable.keyboard_arrow_right),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -409,19 +488,27 @@ fun FilterBottomSheetContent(
             ) {
                 FilterChip(
                     selected = filters.natureFilter == true,
-                    onClick = { onFilterChange(filters.copy(natureFilter = if (filters.natureFilter == true) null else true)) },
+                    onClick = {
+                        onFilterChange(
+                            filters.withNature(if (filters.natureFilter == true) null else true, transactionTypes)
+                        )
+                    },
                     label = { Text("Incoming") })
                 FilterChip(
                     selected = filters.natureFilter == false,
-                    onClick = { onFilterChange(filters.copy(natureFilter = if (filters.natureFilter == false) null else false)) },
-                    label = { Text("Out") })
+                    onClick = {
+                        onFilterChange(
+                            filters.withNature(if (filters.natureFilter == false) null else false, transactionTypes)
+                        )
+                    },
+                    label = { Text("Outgoing") })
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text("TRANSACTION TYPE", style = MaterialTheme.typography.labelMedium)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                transactionTypes.forEach { type ->
+                typesFor(filters.natureFilter, transactionTypes).forEach { type ->
                     val isSelected = filters.typeFilters.contains(type.id)
                     FilterChip(selected = isSelected, onClick = {
                         val newTypes =
@@ -462,6 +549,19 @@ fun FilterBottomSheetContent(
 
 }
 
+
+/** The types to offer for a direction: all of them when [nature] is null, else those going that way. */
+internal fun typesFor(nature: Boolean?, types: List<TransactionType>): List<TransactionType> =
+    if (nature == null) types else types.filter { it.isInc == nature }
+
+/** These filters with a new direction; selected types that go the other way are dropped. */
+internal fun TransactionFilters.withNature(
+    nature: Boolean?, types: List<TransactionType>
+): TransactionFilters {
+    if (nature == null) return copy(natureFilter = null)
+    val allowed = typesFor(nature, types).map { it.id }.toSet()
+    return copy(natureFilter = nature, typeFilters = typeFilters.filter { it in allowed })
+}
 
 @Preview(showBackground = true)
 @Composable
@@ -533,7 +633,7 @@ fun TransactionsScreenPreview() {
             onSetSearchQuery = {},
             onSetSortOrder = {},
             onUpdateFilters = {},
-//            onExport = {},
+            onExport = {},
             onTransactionClick = {})
     }
 }
