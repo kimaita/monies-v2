@@ -2,6 +2,7 @@ package com.kimaita.monies.ui.transactions
 
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.TransactionFilters
+import com.kimaita.monies.services.typeGroups
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -50,5 +51,16 @@ class TypeFilterTest {
         assertEquals("jane", result.searchQuery)
         assertEquals(listOf(7), result.categoryFilters)
         assertEquals(emptyList<Int>(), result.typeFilters)
+    }
+
+    @Test
+    fun directionNarrowsBeforeTypesAreGroupedByName() {
+        val two = TransactionType(id = 5, name = "received.bank", isInc = true, displayName = "Received")
+        val one = TransactionType(id = 6, name = "received.person", isInc = true, displayName = "Received")
+        val out = TransactionType(id = 7, name = "sent", isInc = false, displayName = "Sent")
+        val types = listOf(two, one, out)
+        assertEquals(listOf("Received", "Sent"), typeGroups(typesFor(null, types)).map { it.label })
+        assertEquals(listOf(listOf(5, 6)), typeGroups(typesFor(true, types)).map { it.ids })
+        assertEquals(listOf(listOf(7)), typeGroups(typesFor(false, types)).map { it.ids })
     }
 }

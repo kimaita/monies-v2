@@ -11,6 +11,9 @@ import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
 import com.kimaita.monies.models.export.FilterOptions
+import com.kimaita.monies.services.TypeGroup
+import com.kimaita.monies.services.countTypeChoices
+import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,7 +25,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -43,8 +45,9 @@ data class ExportSelections(
     val subjects: List<NamedRef<Long>> = emptyList(),
     val search: String = "",
 ) {
-    val activeFilterCount: Int
-        get() = subjects.size + categoryIds.size + typeIds.size +
+    /** The filters in force; [typeGroups] makes types that share a display name count once. */
+    fun activeFilterCount(typeGroups: List<TypeGroup> = emptyList()): Int =
+        subjects.size + categoryIds.size + countTypeChoices(typeIds, typeGroups) +
                 (if (nature != null) 1 else 0) + (if (accountId != null) 1 else 0) +
                 (if (search.isNotBlank()) 1 else 0)
 
@@ -82,7 +85,7 @@ class ExportViewModel @Inject constructor(
     val sel: StateFlow<ExportSelections> = _sel.asStateFlow()
 
     val options: StateFlow<FilterOptions?> =
-        flow { emit(repository.getFilterOptions()) }.stateIn(viewModelScope, started, null)
+        repository.getFilterOptions().stateIn(viewModelScope, started, null)
 
     /** Live row count for the current selection, recomputed (debounced) as filters change. */
     val count: StateFlow<Int?> = _sel
@@ -99,7 +102,7 @@ class ExportViewModel @Inject constructor(
     fun setNature(n: Boolean?) = _sel.update { it.copy(nature = n) }
     fun setAccount(id: Int?) = _sel.update { it.copy(accountId = id) }
     fun toggleCategory(id: Int) = _sel.update { it.copy(categoryIds = it.categoryIds.toggle(id)) }
-    fun toggleType(id: Int) = _sel.update { it.copy(typeIds = it.typeIds.toggle(id)) }
+    fun toggleType(group: TypeGroup) = _sel.update { it.copy(typeIds = it.typeIds.toggleGroup(group)) }
     fun addSubject(ref: NamedRef<Long>) = _sel.update {
         if (it.subjects.any { s -> s.id == ref.id }) it else it.copy(subjects = it.subjects + ref)
     }

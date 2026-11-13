@@ -124,15 +124,30 @@ fun categorySlices(rows: List<CategorySpending>, categories: List<NamedRef<Int>>
         SliceValue(r.name, r.total.toFloat(), categoryIds = categories.filter { it.name == r.name }.map { it.id })
     }.sortedByDescending { it.value }
 
+/** The types that share one display name ("Airtime"), shown as a single choice. */
+data class TypeGroup(val label: String, val ids: List<Int>)
+
+fun typeGroups(types: List<TransactionType>): List<TypeGroup> =
+    types.groupBy { it.finalDisplayName }.map { (label, group) -> TypeGroup(label, group.map { it.id }) }
+
+/** Every id of the group is selected. */
+fun TypeGroup.isSelected(selected: Set<Int>): Boolean = ids.isNotEmpty() && selected.containsAll(ids)
+
+/** Selects all of the group's ids, or deselects them when they are all selected already. */
+fun Set<Int>.toggleGroup(group: TypeGroup): Set<Int> =
+    if (group.isSelected(this)) this - group.ids.toSet() else this + group.ids
+
+/** How many choices the selected ids make up: a group counts once however many of its ids are in. */
+fun countTypeChoices(selected: Set<Int>, groups: List<TypeGroup>): Int =
+    groups.count { g -> g.ids.any { it in selected } } + selected.count { id -> groups.none { id in it.ids } }
+
 /** Rows by type, under the type's display name. Types sharing a display name ("Airtime") become one row. */
 fun typeSlices(rows: List<CategorySpending>, types: List<TransactionType>): List<SliceValue> {
-    val byName = types.associateBy { it.name }
-    return rows.groupBy { byName[it.name]?.finalDisplayName ?: it.name }
+    val labelOf = types.associate { it.name to it.finalDisplayName }
+    val idsOf = typeGroups(types).associate { it.label to it.ids }
+    return rows.groupBy { labelOf[it.name] ?: it.name }
         .map { (label, group) ->
-            SliceValue(
-                label, group.sumOf { it.total }.toFloat(),
-                typeIds = group.mapNotNull { byName[it.name]?.id },
-            )
+            SliceValue(label, group.sumOf { it.total }.toFloat(), typeIds = idsOf[label].orEmpty())
         }
         .sortedByDescending { it.value }
 }

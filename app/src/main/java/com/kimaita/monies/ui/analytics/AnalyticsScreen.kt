@@ -33,6 +33,8 @@ import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.StreakSummary
 import com.kimaita.monies.services.activeSummary
 import com.kimaita.monies.services.feeShare
+import com.kimaita.monies.services.isSelected
+import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.ui.charts.*
 import com.kimaita.monies.ui.components.AutoSizeText
 import com.kimaita.monies.ui.components.HighlightsFilter
@@ -207,33 +209,32 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                     minFontSize = 22.sp,
                 )
                 Spacer(Modifier.height(4.dp))
+                Text(
+                    "In ${formatCompactKes(stats.income)}  /  Out ${formatCompactKes(stats.expense)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 TopLine("Top in", sources.firstOrNull()?.let { it.name to it.amount })
                 TopLine("Top out", top.firstOrNull()?.let { it.name to it.amount })
             }
         }
 
-        item(key = "breakdown_stats") {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                BentoCard(
-                    Modifier.weight(1f),
-                    onClick = { onJump(AnalyticsTab.SPENDING) }) {
-                    TileLabel("Where it goes")
-                    Spacer(Modifier.height(8.dp))
-                    if (whereItGoes.isEmpty()) EmptyHint()
-                    else RankedBars(
-                        whereItGoes, MoniesTheme.extra.outflow, limit = 3, showPercent = false
-                    )
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatTile("Spent", formatCompactKes(stats.expense), extra.negative)
-                    StatTile(
-                        "Top", top.firstOrNull()?.name ?: "-",
-                        MaterialTheme.colorScheme.onSurface,
-                        sub = top.firstOrNull()?.let { formatCompactKes(it.amount) },
-                        valueMaxLines = 2,
-                    )
-                }
+        item(key = "breakdown") {
+            BentoCard(onClick = { onJump(AnalyticsTab.SPENDING) }) {
+                TileLabel("Where it goes")
+                Spacer(Modifier.height(8.dp))
+                if (whereItGoes.isEmpty()) EmptyHint()
+                else RankedBars(
+                    whereItGoes, MoniesTheme.extra.outflow, limit = 3, showPercent = false
+                )
             }
+        }
+
+        item(key = "fees") {
+            StatTile(
+                "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
+                sub = feeShareText(fees, stats.expense),
+            )
         }
 
         item(key = "cashflow") {
@@ -256,13 +257,6 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                 if (balance.size < 2) EmptyHint()
                 else BalanceTrendChart(balance, Modifier.fillMaxWidth(), plotHeight = 140.dp)
             }
-        }
-
-        item(key = "fees") {
-            StatTile(
-                "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
-                sub = feeShareText(fees, stats.expense),
-            )
         }
 
         item(key = "heat") {
@@ -544,10 +538,15 @@ private fun FiltersSheet(vm: AnalyticsViewModel, onDismiss: () -> Unit) {
 
             opts?.types?.takeIf { it.isNotEmpty() }?.let { types ->
                 Text("Type", style = MaterialTheme.typography.labelLarge)
-                MultiSelectChips(
-                    types,
-                    filters.typeFilters
-                ) { vm.setTypeFilters(filters.typeFilters.toggle(it)) }
+                val picked = filters.typeFilters.toSet()
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    types.forEach { group ->
+                        FilterChip(
+                            selected = group.isSelected(picked),
+                            onClick = { vm.setTypeFilters(picked.toggleGroup(group).toList()) },
+                            label = { Text(group.label) })
+                    }
+                }
             }
             opts?.categories?.takeIf { it.isNotEmpty() }?.let { cats ->
                 Text("Category", style = MaterialTheme.typography.labelLarge)

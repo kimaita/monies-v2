@@ -68,6 +68,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.R
 import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
+import com.kimaita.monies.services.TypeGroup
+import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.ui.export.components.ProgressPanel
 import java.time.Instant
 import java.time.LocalDate
@@ -153,7 +155,7 @@ fun ExportScreen(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    scopeLine(count, sel), style = MaterialTheme.typography.labelMedium,
+                    scopeLine(count, sel, options?.types.orEmpty()), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -192,7 +194,7 @@ fun ExportScreen(
             }
 
             if (!filtersExpanded) {
-                AddFiltersRow(sel.activeFilterCount, onClick = { filtersExpanded = true })
+                AddFiltersRow(sel.activeFilterCount(options?.types.orEmpty()), onClick = { filtersExpanded = true })
             } else {
                 FilterPanel(viewModel, onCollapse = { filtersExpanded = false })
             }
@@ -505,9 +507,9 @@ private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 types.forEach { t ->
                     FilterChip(
-                        selected = t.id in sel.typeIds,
-                        onClick = { vm.toggleType(t.id) },
-                        label = { Text(t.name) })
+                        selected = t.isSelected(sel.typeIds),
+                        onClick = { vm.toggleType(t) },
+                        label = { Text(t.label) })
                 }
             }
         }
@@ -565,13 +567,13 @@ private fun FilterLabel(t: String) =
         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
     )
 
-private fun scopeLine(count: Int?, sel: ExportSelections): String {
+private fun scopeLine(count: Int?, sel: ExportSelections, typeGroups: List<TypeGroup>): String {
     val n = count?.let { "%,d".format(it) } ?: "…"
     val date = when {
         sel.startDate == null && sel.endDate == null -> "all time"
         else -> "custom range"
     }
-    val filters = sel.activeFilterCount
+    val filters = sel.activeFilterCount(typeGroups)
     return buildString {
         append("$n transactions · $date")
         if (filters > 0) append(" · $filters filter${if (filters == 1) "" else "s"}")

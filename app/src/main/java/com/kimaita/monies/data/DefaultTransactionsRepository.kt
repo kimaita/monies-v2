@@ -47,13 +47,12 @@ import com.kimaita.monies.services.FulizaEvent
 import com.kimaita.monies.services.MshwariLoanEvent
 import com.kimaita.monies.services.RecurringDetector
 import com.kimaita.monies.services.computeFuliza
+import com.kimaita.monies.services.typeGroups
 import com.kimaita.monies.services.computeMshwariLoan
 import com.kimaita.monies.utils.getSafeValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
@@ -64,7 +63,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.getAndUpdate
@@ -372,18 +370,13 @@ class DefaultTransactionsRepository @Inject constructor(
         )
     }
 
-    override suspend fun getFilterOptions(): FilterOptions = coroutineScope {
-
-        val categories = async { categoryDao.getAll().first() }
-        val accounts = async { transactionsDao.getAccountBalances().first() }
-        val names = async { allLineNames().first() }
-        val types = async { transactionTypeDao.getAll().first() }
+    override fun getFilterOptions(): Flow<FilterOptions> = combine(
+        categoryDao.getAll(), getAccountBalances(), transactionTypeDao.getAll(),
+    ) { categories, accounts, types ->
         FilterOptions(
-            categories = categories.await().map { NamedRef(it.id, it.name) },
-            accounts = names.await().let { names ->
-                accounts.await().map { NamedRef(it.accountId, names.getValue(it.accountId)) }
-            },
-            types = types.await().map { NamedRef(it.id, it.name) },
+            categories = categories.map { NamedRef(it.id, it.name) },
+            accounts = accounts.map { NamedRef(it.accountId, it.name) },
+            types = typeGroups(types),
         )
     }
 
