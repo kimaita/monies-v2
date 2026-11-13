@@ -15,6 +15,9 @@ import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
 import com.kimaita.monies.data.dao.UnparsedMessageDao
 import com.kimaita.monies.data.database.AppDatabase
+import com.kimaita.monies.data.database.models.categoryKey
+import com.kimaita.monies.data.database.models.defaultCategoryId
+import com.kimaita.monies.data.database.models.defaultCategoryRulesVersion
 import com.kimaita.monies.data.database.models.getDefaultCategories
 import com.kimaita.monies.data.database.models.getDefaultTransactionTypes
 import com.kimaita.monies.services.SmsSyncer
@@ -111,6 +114,48 @@ class DatabaseInitializer(
     override fun onOpen(db: SupportSQLiteDatabase) {
         super.onOpen(db)
         syncDefaultTransactionTypes(db)
+        applyDefaultCategoryRules(db)
+    }
+
+    /**
+     * Puts saved subjects that have no category into their built-in one (see defaultCategoryRules),
+     * along with their transactions that have none. Runs once per version of the rules, so a category
+     * the user clears is not put back on every open; subjects created later get theirs during sync.
+     */
+    private fun applyDefaultCategoryRules(db: SupportSQLiteDatabase) {
+        val version = defaultCategoryRulesVersion
+        val saved = db.query("SELECT value FROM settings WHERE `key` = ?", arrayOf(CATEGORY_RULES_KEY))
+            .use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        if (saved == version) return
+
+        val categoryIds = HashMap<String, Int>()
+        db.query("SELECT id, name FROM categories").use { c ->
+            while (c.moveToNext()) categoryIds[categoryKey(c.getString(1))] = c.getInt(0)
+        }
+        val matches = ArrayList<Pair<Long, Int>>()
+        db.query("SELECT id, rawName FROM subjects WHERE categoryId IS NULL AND mergedInto IS NULL").use { c ->
+            while (c.moveToNext()) {
+                defaultCategoryId(c.getString(1), categoryIds)?.let { matches += c.getLong(0) to it }
+            }
+        }
+
+        db.beginTransaction()
+        try {
+            for ((subject, category) in matches) {
+                db.execSQL("UPDATE subjects SET categoryId = ? WHERE id = ?", arrayOf<Any>(category, subject))
+                db.execSQL(
+                    "UPDATE transactions SET transactionCategory = ? WHERE subject = ? AND transactionCategory IS NULL",
+                    arrayOf<Any>(category, subject)
+                )
+            }
+            db.execSQL(
+                "INSERT OR REPLACE INTO settings (`key`, value) VALUES (?, ?)",
+                arrayOf(CATEGORY_RULES_KEY, version)
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
     }
 
     /**
@@ -177,6 +222,10 @@ class DatabaseInitializer(
         } finally {
             db.endTransaction()
         }
+    }
+
+    private companion object {
+        const val CATEGORY_RULES_KEY = "category_rules_version"
     }
 
     private suspend fun populateDatabase() {

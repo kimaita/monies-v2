@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.kimaita.monies.data.SmsDataSource
 import com.kimaita.monies.data.SmsSource
 import com.kimaita.monies.data.dao.AccountDao
+import com.kimaita.monies.data.dao.CategoryDao
 import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
@@ -16,6 +17,8 @@ import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.data.database.models.UnparsedMessage
 import com.kimaita.monies.data.database.models.UserAccount
+import com.kimaita.monies.data.database.models.categoryKey
+import com.kimaita.monies.data.database.models.defaultCategoryId
 import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.SmsBatchResult
 import kotlinx.coroutines.Dispatchers
@@ -45,9 +48,13 @@ interface SyncStore {
     suspend fun accountActivity(): List<AccountActivity>
     suspend fun setMergedInto(accountId: Int, root: Int?)
 
-    /** Inserts the subject if new; returns the id to use, following any merge. */
+    /** Inserts the subject (with its categoryId) if new; returns the id to use, following any merge. */
     suspend fun subjectId(subject: Subject): Long
     suspend fun subjectCategory(subjectId: Long): Int?
+
+    /** Every category's id by [categoryKey] of its name. */
+    suspend fun categoryIds(): Map<String, Int>
+
     suspend fun insertTransactions(transactions: List<Transaction>)
 
     /** Removes an `airtel.pay.receipt` row when an `airtel.pay` row carries the same code. */
@@ -60,6 +67,7 @@ class RoomSyncStore(
     private val db: AppDatabase,
     private val transactionTypeDao: TransactionTypeDao,
     private val subjectDao: SubjectDao,
+    private val categoryDao: CategoryDao,
     private val transactionsDao: TransactionsDao,
     private val settingsDao: SettingsDao,
     private val accountDao: AccountDao,
@@ -81,6 +89,8 @@ class RoomSyncStore(
         accountDao.setMergedInto(accountId, root)
     override suspend fun subjectId(subject: Subject) = subjectDao.upsertAndGetId(subject)
     override suspend fun subjectCategory(subjectId: Long) = subjectDao.getCategoryId(subjectId)
+    override suspend fun categoryIds() =
+        categoryDao.getAll().first().associate { categoryKey(it.name) to it.id }
     override suspend fun insertTransactions(transactions: List<Transaction>) =
         transactionsDao.insertAll(transactions)
 
@@ -108,13 +118,15 @@ class SmsSyncer(
         smsParser: SmsParser,
         transactionTypeDao: TransactionTypeDao,
         subjectDao: SubjectDao,
+        categoryDao: CategoryDao,
         transactionsDao: TransactionsDao,
         settingsDao: SettingsDao,
         accountDao: AccountDao,
         unparsedDao: UnparsedMessageDao,
     ) : this(
         RoomSyncStore(
-            db, transactionTypeDao, subjectDao, transactionsDao, settingsDao, accountDao, unparsedDao
+            db, transactionTypeDao, subjectDao, categoryDao, transactionsDao, settingsDao, accountDao,
+            unparsedDao,
         ),
         smsDataSource, smsParser,
     )
@@ -204,8 +216,10 @@ class SmsSyncer(
         if (unparsed.isNotEmpty()) store.insertUnparsed(unparsed)
         if (parsed.isEmpty()) return
 
+        // A new subject starts in its built-in category; one already saved keeps whatever it has.
+        val categoryIds = store.categoryIds()
         val subjectIds = parsed.mapNotNull { it.second }.distinct()
-            .associateWith { store.subjectId(it) }
+            .associateWith { store.subjectId(it.copy(categoryId = defaultCategoryId(it.rawName, categoryIds))) }
         val subjectCategories = subjectIds.values.distinct().associateWith { store.subjectCategory(it) }
 
         val subscriptionById = messages.associate { it.id to it.subscriptionId }
