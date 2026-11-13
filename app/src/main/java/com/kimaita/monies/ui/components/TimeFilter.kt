@@ -20,24 +20,24 @@ import com.kimaita.monies.R
 import com.kimaita.monies.models.TimeFilter
 
 
+private val timeFilterOptions = listOf(
+    "TODAY" to TimeFilter.DAY,
+    "1W" to TimeFilter.WEEK,
+    "1M" to TimeFilter.MONTH,
+//        "3M" to TimeFilter.QUARTER,
+    "6M" to TimeFilter.SIX_MONTHS,
+    "YTD" to TimeFilter.YTD,
+    "ALL" to TimeFilter.ALL
+)
+
 @Composable
 fun HighlightsFilter(selectedFilter: TimeFilter, onFilterChange: (TimeFilter) -> Unit) {
-    val filters = mapOf(
-        "TODAY" to TimeFilter.DAY,
-        "1W" to TimeFilter.WEEK,
-        "1M" to TimeFilter.MONTH,
-//        "3M" to TimeFilter.QUARTER,
-        "6M" to TimeFilter.SIX_MONTHS,
-        "YTD" to TimeFilter.YTD,
-        "ALL" to TimeFilter.ALL
-    )
-
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         contentPadding = PaddingValues(horizontal = 16.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        items(filters.entries.toList()) { (label, filter) ->
+        items(timeFilterOptions, key = { it.first }) { (label, filter) ->
             val isSelected = selectedFilter == filter
 
             FilterChip(

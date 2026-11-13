@@ -15,7 +15,6 @@ import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
-import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.getDatesForFilter
@@ -88,20 +87,8 @@ class TransactionsViewModel @Inject constructor(
         _filters.value = _filters.value.copy(searchQuery = query)
     }
 
-    fun setTimeFilter(timeFilter: TimeFilter) {
-        _filters.value = _filters.value.copy(timeFilter = timeFilter)
-    }
-
-    fun setNatureFilter(isInc: Boolean?) {
-        _filters.value = _filters.value.copy(natureFilter = isInc)
-    }
-
     fun setSortOrder(sortOrder: SortOrder) {
         _filters.value = _filters.value.copy(sortOrder = sortOrder)
-    }
-
-    fun clearFilters() {
-        _filters.value = TransactionFilters()
     }
 
 }

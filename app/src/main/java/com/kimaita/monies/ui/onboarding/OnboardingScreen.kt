@@ -106,9 +106,11 @@ fun OnboardingScreen(
             }
 
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                val offset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
                 when (page) {
-                    0 -> HeroPage(active = pagerState.currentPage == 0, parallax = offset)
+                    0 -> HeroPage(
+                        active = pagerState.currentPage == 0,
+                        parallax = { (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction }
+                    )
                     1 -> AutoPage(active = pagerState.currentPage == 1)
                     2 -> DashboardPage()
                     else -> PermissionsPage(active = pagerState.currentPage == 3)
@@ -175,29 +177,30 @@ private fun PagerIndicator(pageCount: Int, currentPage: Int) {
 /* ---------- Page 1: SMS → record ---------- */
 
 @Composable
-private fun HeroPage(active: Boolean, parallax: Float) {
+private fun HeroPage(active: Boolean, parallax: () -> Float) {
     val t = remember { Animatable(0f) }
     LaunchedEffect(active) {
         if (active) {
             t.snapTo(0f); t.animateTo(1f, tween(750, easing = FastOutSlowInEasing))
         } else t.snapTo(0f)
     }
-    val p1 = (t.value * 1.7f).coerceIn(0f, 1f)
-    val p2 = ((t.value - 0.35f) / 0.65f).coerceIn(0f, 1f)
 
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {
         Box(Modifier.graphicsLayer {
-            alpha = p1; translationX = (1f - p1) * -30f + parallax * 50f
+            val p1 = (t.value * 1.7f).coerceIn(0f, 1f)
+            alpha = p1; translationX = (1f - p1) * -30f + parallax() * 50f
         }) { SmsBubble() }
         Spacer(Modifier.height(11.dp))
-        ArrowBadge(Modifier.graphicsLayer { alpha = p1 })
+        ArrowBadge(Modifier.graphicsLayer { alpha = (t.value * 1.7f).coerceIn(0f, 1f) })
         Spacer(Modifier.height(12.dp))
         Box(Modifier.graphicsLayer {
+            val p2 = ((t.value - 0.35f) / 0.65f).coerceIn(0f, 1f)
             alpha = p2; translationY = (1f - p2) * 28f; scaleX = lerp(0.96f, 1f, p2); scaleY =
             lerp(0.96f, 1f, p2)
         }) { RecordCard() }
@@ -378,6 +381,7 @@ private fun AutoPage(active: Boolean) {
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {
@@ -493,8 +497,9 @@ private fun PulseDot() {
     )
     Box(Modifier
         .size(7.dp)
+        .graphicsLayer { alpha = a }
         .clip(CircleShape)
-        .background(OnbColors.Emerald.copy(alpha = a)))
+        .background(OnbColors.Emerald))
 }
 
 /* ---------- Page 3: analytics dashboard ---------- */
@@ -539,64 +544,46 @@ private fun DashboardPage() {
 
 @Composable
 private fun BreakdownCard() {
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .onbCard(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        MiniDonut(Modifier.size(100.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            LegendItem(OnbColors.Emerald, "Groceries", "42%")
-            LegendItem(OnbColors.Coral, "Transport", "28%")
-            LegendItem(OnbColors.EmeraldDeep, "Bills", "18%")
-            LegendItem(OnbColors.Gold, "Other", "12%")
-        }
+        RankedPreviewRow("Groceries", 42, OnbColors.Emerald)
+        RankedPreviewRow("Transport", 28, OnbColors.Coral)
+        RankedPreviewRow("Bills", 18, OnbColors.EmeraldDeep)
     }
 }
 
 @Composable
-private fun LegendItem(color: Color, label: String, pct: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier
-            .size(11.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(color))
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnbColors.Ink)
-        Spacer(Modifier.weight(1f))
-        Text(pct, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, color = OnbColors.Muted)
-    }
-}
-
-@Composable
-private fun MiniDonut(modifier: Modifier = Modifier) {
-    val slices = listOf(
-        42f to OnbColors.Emerald,
-        28f to OnbColors.Coral,
-        18f to OnbColors.EmeraldDeep,
-        12f to OnbColors.Gold
-    )
-    Canvas(modifier) {
-        val stroke = size.minDimension * 0.17f
-        val arcSize = Size(size.width - stroke, size.height - stroke)
-        val topLeft = Offset(stroke / 2, stroke / 2)
-        drawArc(OnbColors.Rule, 0f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
-        var start = -90f;
-        val gap = 5f
-        slices.forEach { (pct, color) ->
-            val sweep = pct / 100f * 360f
-            drawArc(
-                color,
-                start + gap / 2,
-                sweep - gap,
-                false,
-                topLeft,
-                arcSize,
-                style = Stroke(stroke, cap = StrokeCap.Round)
+private fun RankedPreviewRow(label: String, pct: Int, color: Color) {
+    Column {
+        Row {
+            Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnbColors.Ink)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "$pct%",
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontSize = 12.sp,
+                color = OnbColors.Muted
             )
-            start += sweep
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(OnbColors.Rule)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(pct / 42f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(color)
+            )
         }
     }
 }
@@ -762,6 +749,7 @@ private fun PermissionsPage(active: Boolean) {
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {

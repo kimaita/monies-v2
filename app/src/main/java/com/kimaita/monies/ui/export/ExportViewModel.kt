@@ -7,7 +7,6 @@ import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
-import com.kimaita.monies.models.export.ExportUiState
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.isoDateTimeFormatter
@@ -73,9 +72,6 @@ class ExportViewModel @Inject constructor(
 
     private val started = SharingStarted.WhileSubscribed(5_000)
     val exportState: StateFlow<ExportState> = manager.state
-
-    private val _ui = MutableStateFlow(ExportUiState())
-    val ui: StateFlow<ExportUiState> = _ui.asStateFlow()
 
     private val _sel = MutableStateFlow(ExportSelections())
     val sel: StateFlow<ExportSelections> = _sel.asStateFlow()

@@ -4,12 +4,13 @@ import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 
 private val intFormat: NumberFormat = NumberFormat.getIntegerInstance()
 
-fun formatAmount(v: Double): String = intFormat.format(v.toLong())
-fun formatKes(v: Double): String = "KES " + intFormat.format(v.toLong())
+fun formatAmount(v: Double): String = intFormat.format(v.roundToLong())
+fun formatKes(v: Double): String = "KES " + intFormat.format(v.roundToLong())
 fun formatSignedKes(v: Double): String = (if (v >= 0) "+" else "-") + formatKes(abs(v))
 
 val dayMonthFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM")
@@ -20,7 +21,7 @@ fun formatCompactAmount(v: Double): String {
         a >= 1_000_000_000 -> trim(String.format(Locale.US, "%.2f", v / 1_000_000_000)) + "B"
         a >= 1_000_000 -> trim(String.format(Locale.US, "%.2f", v / 1_000_000)) + "M"
         a >= 100_000 -> trim(String.format(Locale.US, "%.1f", v / 1_000)) + "K"
-        else -> intFormat.format(v.toLong())
+        else -> intFormat.format(v.roundToLong())
     }
 }
 

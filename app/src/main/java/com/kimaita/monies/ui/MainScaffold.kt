@@ -1,5 +1,6 @@
 package com.kimaita.monies.ui
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -40,6 +41,7 @@ fun MainScaffold(navController: NavHostController = rememberNavController()) {
     val showBar = TopDest.entries.any { it.route == currentRoute }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         bottomBar = {
             if (showBar) NavigationBar {
                 TopDest.entries.forEach { dest ->
@@ -64,7 +66,10 @@ fun MainScaffold(navController: NavHostController = rememberNavController()) {
             }
         },
     ) { padding ->
-        MoniesNavHost(navController = navController, modifier = Modifier.padding(padding))
+        MoniesNavHost(
+            navController = navController,
+            modifier = Modifier.padding(bottom = padding.calculateBottomPadding())
+        )
     }
 }
 
@@ -110,7 +115,7 @@ fun MoniesNavHost(
         ) {
             AccountScreen(navController = navController)
         }
-        composable("export") { ExportScreen(viewModel = hiltViewModel()) { } }
+        composable("export") { ExportScreen(viewModel = hiltViewModel()) }
     }
 }
 

@@ -1,5 +1,7 @@
 package com.kimaita.monies.ui.transactions
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,7 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -36,7 +39,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -82,10 +83,9 @@ fun TransactionsScreen(
     openSearch: Boolean = false,
 ) {
     val filteredTransactions = viewModel.filteredTransactions.collectAsLazyPagingItems()
-    val transactionTypes by viewModel.transactionTypes.collectAsState()
-    val categories by viewModel.categories.collectAsState()
-    val filters by viewModel.filters.collectAsState()
-    val context = LocalContext.current
+    val transactionTypes by viewModel.transactionTypes.collectAsStateWithLifecycle()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
 
     TransactionsScreenContent(
         modifier = modifier,
@@ -97,7 +97,7 @@ fun TransactionsScreen(
         onSetSearchQuery = viewModel::setSearchQuery,
         onSetSortOrder = viewModel::setSortOrder,
         onUpdateFilters = viewModel::updateFilters,
-//        onExport = { viewModel.exportToCsv(context) },
+        onBack = { navController.popBackStack() },
         onTransactionClick = { subjectId ->
             navController.navigate("account/$subjectId")
         }
@@ -117,6 +117,7 @@ fun TransactionsScreenContent(
     onSetSortOrder: (SortOrder) -> Unit,
     onUpdateFilters: (TransactionFilters) -> Unit,
 //    onExport: suspend () -> Unit,
+    onBack: () -> Unit = {},
     onTransactionClick: (Long) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -127,6 +128,12 @@ fun TransactionsScreenContent(
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
+
+    val closeSearch = {
+        searchVisible = false
+        onSetSearchQuery("")
+    }
+    BackHandler(enabled = searchVisible, onBack = closeSearch)
 
     LaunchedEffect(searchVisible) {
         if (searchVisible) {
@@ -156,19 +163,14 @@ fun TransactionsScreenContent(
                 Text(text = "Transactions")
             }
         }, navigationIcon = {
-            if (searchVisible) {
-                IconButton(onClick = {
-                    searchVisible = false
-                    onSetSearchQuery("")
-                }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.outline_arrow_back_24),
-                        contentDescription = "Close Search"
-                    )
-                }
+            IconButton(onClick = { if (searchVisible) closeSearch() else onBack() }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.outline_arrow_back_24),
+                    contentDescription = if (searchVisible) "Close search" else "Back"
+                )
             }
         }, actions = {
-            IconButton(onClick = { searchVisible = !searchVisible }) {
+            IconButton(onClick = { if (searchVisible) closeSearch() else searchVisible = true }) {
                 Icon(
                     painter = painterResource(id = R.drawable.search), contentDescription = "Search"
                 )
@@ -239,7 +241,16 @@ fun TransactionsScreenContent(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
-            if (filteredTransactions.itemCount == 0 && filteredTransactions.loadState.refresh is LoadState.NotLoading) {
+            val refresh = filteredTransactions.loadState.refresh
+            if (filteredTransactions.itemCount == 0 && refresh !is LoadState.NotLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (refresh is LoadState.Error) {
+                        RetryRow("Couldn't load transactions", filteredTransactions::retry)
+                    } else {
+                        CircularProgressIndicator()
+                    }
+                }
+            } else if (filteredTransactions.itemCount == 0) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = "No transactions found",
@@ -267,9 +278,11 @@ fun TransactionsScreenContent(
                         }
 
                     }
-                    when (val state = filteredTransactions.loadState.append) {
+                    when (filteredTransactions.loadState.append) {
                         is LoadState.Loading -> item { CircularProgressIndicator() }
-                        is LoadState.Error -> item { Text("Error loading more...") }
+                        is LoadState.Error -> item {
+                            RetryRow("Couldn't load more", filteredTransactions::retry)
+                        }
                         else -> {}
                     }
                 }
@@ -304,6 +317,18 @@ fun TransactionsScreenContent(
                     onFilterChange = { stagedFilters = it })
             }
         }
+    }
+}
+
+@Composable
+private fun RetryRow(message: String, onRetry: () -> Unit) {
+    Row(
+        Modifier.padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(message, style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onRetry) { Text("Retry") }
     }
 }
 

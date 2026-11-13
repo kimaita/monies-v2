@@ -4,6 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -36,6 +41,7 @@ import com.kimaita.monies.ui.util.formatSignedKes
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.util.Locale
 
 enum class AnalyticsTab(val title: String) {
     OVERVIEW("Overview"), ACTIVITY("Activity"), SPENDING("Spending"), CASHFLOW("Cash flow")
@@ -46,6 +52,7 @@ enum class AnalyticsTab(val title: String) {
 fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
     var tab by rememberSaveable { mutableStateOf(AnalyticsTab.OVERVIEW) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    val listStates = AnalyticsTab.entries.associateWith { rememberLazyListState() }
 
     Scaffold(
         topBar = {
@@ -71,10 +78,10 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
             SegmentedTabs(tab) { tab = it }
             Box(Modifier.weight(1f)) {
                 when (tab) {
-                    AnalyticsTab.OVERVIEW -> OverviewTab(viewModel) { tab = it }
-                    AnalyticsTab.ACTIVITY -> ActivityTab(viewModel)
-                    AnalyticsTab.SPENDING -> SpendingTab(viewModel)
-                    AnalyticsTab.CASHFLOW -> CashFlowTab(viewModel)
+                    AnalyticsTab.OVERVIEW -> OverviewTab(viewModel, listStates.getValue(tab)) { tab = it }
+                    AnalyticsTab.ACTIVITY -> ActivityTab(viewModel, listStates.getValue(tab))
+                    AnalyticsTab.SPENDING -> SpendingTab(viewModel, listStates.getValue(tab))
+                    AnalyticsTab.CASHFLOW -> CashFlowTab(viewModel, listStates.getValue(tab))
                 }
             }
         }
@@ -118,6 +125,7 @@ private fun SegmentedTabs(selected: AnalyticsTab, onSelect: (AnalyticsTab) -> Un
             ) {
                 Text(
                     t.title,
+                    maxLines = 1,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (active) cs.onSurface else cs.onSurfaceVariant,
@@ -130,10 +138,10 @@ private fun SegmentedTabs(selected: AnalyticsTab, onSelect: (AnalyticsTab) -> Un
 /* ----------------------------- Overview (bento) ----------------------------- */
 
 @Composable
-private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) {
+private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump: (AnalyticsTab) -> Unit) {
     val stats by vm.stats.collectAsStateWithLifecycle()
     val donutValues by vm.donut.collectAsStateWithLifecycle()
-    val donut = rememberSlices(donutValues)
+    val whereItGoes = remember(donutValues) { donutValues.map { RankedRow(it.label, it.value.toDouble()) } }
     val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
     val balance by vm.balanceTrend.collectAsStateWithLifecycle()
     val heat by vm.heat.collectAsStateWithLifecycle()
@@ -143,7 +151,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) 
     val fees = remember(stats) { stats.incomeCost + stats.expenseCost }
     val extra = MoniesTheme.extra
 
-    TabList {
+    TabList(listState) {
         item(key = "net") {
             BentoCard {
                 TileLabel("Net this period")
@@ -168,20 +176,14 @@ private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) 
         item(key = "donut_stats") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BentoCard(
-                    Modifier
-                        .weight(1f)
-                        .height(168.dp),
+                    Modifier.weight(1f),
                     onClick = { onJump(AnalyticsTab.SPENDING) }) {
                     TileLabel("Where it goes")
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (donut.isEmpty()) EmptyHint()
-                        else DonutChart(
-                            donut,
-                            Modifier.fillMaxSize(),
-                            thickness = 14.dp,
-                            minSize = 0.dp
-                        )
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (whereItGoes.isEmpty()) EmptyHint()
+                    else RankedBars(
+                        whereItGoes, MoniesTheme.extra.outflow, limit = 3, showPercent = false
+                    )
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile("Spent", formatCompactKes(stats.expense), extra.negative)
@@ -209,11 +211,15 @@ private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) 
         }
 
         item(key = "balance_fees") {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                Modifier.height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 BentoCard(
                     Modifier
                         .weight(1f)
-                        .height(112.dp),
+                        .heightIn(min = 112.dp)
+                        .fillMaxHeight(),
                     onClick = { onJump(AnalyticsTab.CASHFLOW) }) {
                     TileLabel("Balance")
                     Spacer(Modifier.height(8.dp))
@@ -231,7 +237,8 @@ private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) 
                     MaterialTheme.colorScheme.onSurface,
                     Modifier
                         .weight(1f)
-                        .height(112.dp)
+                        .heightIn(min = 112.dp)
+                        .fillMaxHeight()
                 )
             }
         }
@@ -249,7 +256,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) 
 /* ----------------------------- Activity ----------------------------- */
 
 @Composable
-private fun ActivityTab(vm: AnalyticsViewModel) {
+private fun ActivityTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val rhythm by vm.rhythm.collectAsStateWithLifecycle()
     val heat by vm.heat.collectAsStateWithLifecycle()
     val bars by vm.weekdayBars.collectAsStateWithLifecycle()
@@ -259,7 +266,7 @@ private fun ActivityTab(vm: AnalyticsViewModel) {
 
     val avgLabel = remember(rhythm.avgPerDay) { "%.1f txns".format(rhythm.avgPerDay) }
 
-    TabList {
+    TabList(listState) {
         item(key = "rhythm1") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 RhythmTile("Busiest day", weekdayName(rhythm.busiestWeekday), Modifier.weight(1f))
@@ -315,16 +322,19 @@ private fun StreakSection(streak: StreakSummary, window: ClosedRange<LocalDate>)
 /* ----------------------------- Spending ----------------------------- */
 
 @Composable
-private fun SpendingTab(vm: AnalyticsViewModel) {
+private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val direction by vm.direction.collectAsStateWithLifecycle()
     val breakdown by vm.breakdown.collectAsStateWithLifecycle()
     val donutValues by vm.donut.collectAsStateWithLifecycle()
-    val donut = rememberSlices(donutValues)
+    val slices = remember(donutValues) { donutValues.map { RankedRow(it.label, it.value.toDouble()) } }
     val top by vm.topSubjects.collectAsStateWithLifecycle()
+    val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
     val selected by vm.selectedSlice.collectAsStateWithLifecycle()
     val sources by vm.incomeSources.collectAsStateWithLifecycle()
+    val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
+    val extra = MoniesTheme.extra
 
-    TabList {
+    TabList(listState) {
         item(key = "direction") {
             ToggleRow(
                 options = remember {
@@ -350,13 +360,10 @@ private fun SpendingTab(vm: AnalyticsViewModel) {
                         selected = breakdown, onSelect = vm::setBreakdown,
                     )
                     Spacer(Modifier.height(12.dp))
-                    if (donut.isEmpty()) EmptyHint()
-                    else DonutChart(
-                        donut,
-                        Modifier
-                            .fillMaxWidth()
-                            .height(240.dp),
-                        selectedLabel = selected, onSliceClick = vm::selectSlice,
+                    if (slices.isEmpty()) EmptyHint()
+                    else RankedBars(
+                        slices, extra.outflow,
+                        selected = selected, onRowClick = vm::selectSlice,
                     )
                 }
             }
@@ -376,13 +383,13 @@ private fun SpendingTab(vm: AnalyticsViewModel) {
                         )
                         Spacer(Modifier.height(8.dp))
                     }
-                    if (top.isEmpty()) EmptyHint() else TopMerchantsChart(top)
+                    if (merchants.isEmpty()) EmptyHint() else RankedBars(merchants, extra.outflow)
                 }
             }
         } else {
             item(key = "sources") {
                 SectionCard("Income sources") {
-                    if (sources.isEmpty()) EmptyHint() else IncomeSources(sources)
+                    if (sourceRows.isEmpty()) EmptyHint() else RankedBars(sourceRows, extra.inflow)
                 }
             }
         }
@@ -392,14 +399,18 @@ private fun SpendingTab(vm: AnalyticsViewModel) {
 /* ----------------------------- Cash flow ----------------------------- */
 
 @Composable
-private fun CashFlowTab(vm: AnalyticsViewModel) {
+private fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val balance by vm.balanceTrend.collectAsStateWithLifecycle()
     val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
     val costs by vm.costs.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
-    val fees = remember(stats) { stats.incomeCost + stats.expenseCost }
+    val feesHeader = remember(stats) {
+        val fees = stats.incomeCost + stats.expenseCost
+        "You paid ${formatKes(fees)} in fees" +
+                if (stats.expense > 0.0) " · ${"%.1f".format(Locale.US, fees / stats.expense * 100)}% of spending" else ""
+    }
 
-    TabList {
+    TabList(listState) {
         item(key = "trend") {
             SectionCard("Balance trend") {
                 if (balance.isEmpty()) EmptyHint()
@@ -415,9 +426,9 @@ private fun CashFlowTab(vm: AnalyticsViewModel) {
             }
         }
         item(key = "fees") {
-            SectionCard("Amounts vs fees") {
+            SectionCard("Fees") {
                 Text(
-                    "You paid ${formatKes(fees)} in fees",
+                    feesHeader,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -447,6 +458,8 @@ private fun FiltersSheet(vm: AnalyticsViewModel, onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -531,9 +544,10 @@ private fun FiltersSheet(vm: AnalyticsViewModel, onDismiss: () -> Unit) {
 /* ----------------------------- small components ----------------------------- */
 
 @Composable
-private fun TabList(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+private fun TabList(state: LazyListState, content: LazyListScope.() -> Unit) {
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = state,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
@@ -716,49 +730,13 @@ private fun DayOfWeekBars(bars: List<WeekdayBar>) {
 }
 
 @Composable
-private fun IncomeSources(sources: List<SourceAmount>) {
-    val total = remember(sources) { sources.sumOf { it.amount }.coerceAtLeast(1.0) }
-    val barColor = MoniesTheme.extra.inflow
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    val shape = remember { RoundedCornerShape(5.dp) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        sources.forEach { s ->
-            Column {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        s.name,
-                        Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(formatKes(s.amount), style = MaterialTheme.typography.labelLarge)
-                }
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .background(trackColor, shape)
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth((s.amount / total).toFloat())
-                            .fillMaxHeight()
-                            .background(barColor, shape),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun <T> ToggleRow(options: List<Pair<String, T>>, selected: T, onSelect: (T) -> Unit) {
     val cs = MaterialTheme.colorScheme
     val outer = remember { RoundedCornerShape(12.dp) }
     val inner = remember { RoundedCornerShape(9.dp) }
     Row(
         Modifier
+            .fillMaxWidth()
             .background(cs.surfaceVariant.copy(alpha = 0.5f), outer)
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -767,12 +745,14 @@ private fun <T> ToggleRow(options: List<Pair<String, T>>, selected: T, onSelect:
             val active = value == selected
             Box(
                 Modifier
+                    .weight(1f)
                     .background(if (active) cs.surface else Color.Transparent, inner)
                     .clickable { onSelect(value) }
-                    .padding(horizontal = 16.dp, vertical = 7.dp),
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    label, style = MaterialTheme.typography.labelLarge,
+                    label, maxLines = 1, style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (active) cs.onSurface else cs.onSurfaceVariant,
                 )
