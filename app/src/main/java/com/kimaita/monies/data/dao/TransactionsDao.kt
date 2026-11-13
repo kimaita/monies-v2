@@ -271,20 +271,27 @@ interface TransactionsDao : BaseDao<Transaction> {
     ): Flow<List<ActivityCell>>
 
 
+    /**
+     * The latest balance in each bucket (ties on time go to the higher id). No window functions:
+     * they need SQLite 3.25 and Android 8 to 10 ship 3.18 to 3.22. Instead the row with the highest
+     * id per time, then the row with the latest time per bucket, using SQLite's rule that bare columns
+     * in a query with one MAX() come from the row holding the maximum (the maxima here are unique).
+     */
     @Query(
         """
-    SELECT bucket, balance FROM (
-        SELECT strftime(:bucketFormat, transactionTime) AS bucket, balance,
-            ROW_NUMBER() OVER (
-                PARTITION BY strftime(:bucketFormat, transactionTime)
-                ORDER BY transactionTime DESC, id DESC
-            ) AS rn
+    WITH cells AS (
+        SELECT strftime(:bucketFormat, transactionTime) AS bucket, transactionTime AS time, id, balance
         FROM transactions
         WHERE balance IS NOT NULL
           AND (:startDate IS NULL OR transactionTime >= :startDate)
           AND (:endDate IS NULL OR transactionTime <= :endDate)
           AND (:account IS NULL OR accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
-    ) WHERE rn = 1
+    )
+    SELECT bucket, balance FROM (
+        SELECT bucket, balance, MAX(time) AS time FROM (
+            SELECT bucket, time, balance, MAX(id) AS id FROM cells GROUP BY bucket, time
+        ) GROUP BY bucket
+    )
     ORDER BY bucket ASC
 """
     )
@@ -353,22 +360,23 @@ interface TransactionsDao : BaseDao<Transaction> {
         SELECT COALESCE(a.mergedInto, a.id) AS line, t.id AS id, t.transactionTime AS time, t.balance AS balance
         FROM transactions t JOIN accounts a ON a.id = t.accountId
         WHERE t.balance IS NOT NULL AND COALESCE(a.mergedInto, a.id) IN (SELECT id FROM lines)
-    )
-    SELECT line AS lineId, bucket, balance FROM (
-        SELECT line, strftime(:bucketFormat, time) AS bucket, balance,
-            ROW_NUMBER() OVER (
-                PARTITION BY line, strftime(:bucketFormat, time) ORDER BY time DESC, id DESC
-            ) AS rn
+    ), cells AS (
+        SELECT line, strftime(:bucketFormat, time) AS bucket, time, id, balance
         FROM ledger
         WHERE (:startDate IS NULL OR time >= :startDate) AND (:endDate IS NULL OR time <= :endDate)
-    ) WHERE rn = 1
+    )
+    SELECT line AS lineId, bucket, balance FROM (
+        SELECT line, bucket, balance, MAX(time) AS time FROM (
+            SELECT line, bucket, time, balance, MAX(id) AS id FROM cells GROUP BY line, bucket, time
+        ) GROUP BY line, bucket
+    )
     UNION ALL
     SELECT line AS lineId, NULL AS bucket, balance FROM (
-        SELECT line, balance,
-            ROW_NUMBER() OVER (PARTITION BY line ORDER BY time DESC, id DESC) AS rn
-        FROM ledger
-        WHERE :startDate IS NOT NULL AND time < :startDate
-    ) WHERE rn = 1
+        SELECT line, balance, MAX(time) AS time FROM (
+            SELECT line, time, balance, MAX(id) AS id FROM ledger
+            WHERE :startDate IS NOT NULL AND time < :startDate GROUP BY line, time
+        ) GROUP BY line
+    )
 """
     )
     fun getLineBalanceBuckets(
