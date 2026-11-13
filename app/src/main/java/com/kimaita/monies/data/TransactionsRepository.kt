@@ -199,6 +199,8 @@ interface TransactionsRepository {
     // ---- Accounts ----
     /** Every line, dormant ones included. */
     fun getAccountLines(): Flow<List<AccountLine>>
+    /** The newest [limit] transactions of a line, including accounts merged into it. */
+    fun getLineSamples(accountId: Int, limit: Int): Flow<List<Transaction>>
     suspend fun renameAccount(accountId: Int, label: String?)
     suspend fun mergeAccounts(sourceId: Int, targetId: Int)
 
