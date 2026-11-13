@@ -46,6 +46,8 @@ interface TransactionsDao : BaseDao<Transaction> {
     )
     suspend fun deletePairedAirtelReceipts()
 
+    // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
+    // element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
     @androidx.room.Transaction
     @Query(
         """
@@ -54,8 +56,8 @@ interface TransactionsDao : BaseDao<Transaction> {
         WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
         AND (:endDate IS NULL OR t.transactionTime <= :endDate)
         AND (:subjectId IS NULL OR t.subject = :subjectId)
-        AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-        AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+        AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+        AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
         AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
         AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
         """ + SEARCH_FILTER + """
@@ -108,9 +110,9 @@ interface TransactionsDao : BaseDao<Transaction> {
         JOIN transaction_types AS tt ON t.transactionType = tt.id
         WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
         AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-        AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-        AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-        AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+        AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+        AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+        AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
         AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
         """
     )
@@ -162,9 +164,9 @@ interface TransactionsDao : BaseDao<Transaction> {
     SELECT t.* FROM transactions t
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
       AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
       AND (:afterId IS NULL OR t.id > :afterId)
@@ -193,9 +195,9 @@ interface TransactionsDao : BaseDao<Transaction> {
     SELECT COUNT(*) FROM transactions t
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
       AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
     """ + SEARCH_FILTER
@@ -223,9 +225,9 @@ interface TransactionsDao : BaseDao<Transaction> {
         JOIN transaction_types AS tt ON t.transactionType = tt.id
         WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
           AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-          AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-          AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-          AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+          AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+          AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+          AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
           AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
         GROUP BY bucket ORDER BY bucket ASC
     """
@@ -255,9 +257,9 @@ interface TransactionsDao : BaseDao<Transaction> {
         JOIN transaction_types AS tt ON t.transactionType = tt.id
         WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
           AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-          AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-          AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-          AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+          AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+          AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+          AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
           AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
           AND tt.isTransfer = 0
           AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
@@ -309,9 +311,9 @@ interface TransactionsDao : BaseDao<Transaction> {
     FROM transactions t
     WHERE (:startDate IS NULL OR transactionTime >= :startDate)
       AND (:endDate IS NULL OR transactionTime <= :endDate)
-      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
       AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
       AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
