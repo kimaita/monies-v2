@@ -340,7 +340,7 @@ class AnalyticsViewModel @Inject constructor(
 
     val subjectResults: StateFlow<List<NamedRef<Long>>> = _subjectQuery
         .debounce(250.milliseconds).distinctUntilChanged()
-        .mapLatest { q -> if (q.isBlank()) repository.topSubjects() else repository.searchSubjects(q.trim()) }
+        .mapLatest { q -> if (q.isBlank()) emptyList() else repository.searchSubjects(q.trim()) }
         .stateIn(viewModelScope, started, emptyList())
 
     // ---------------- helpers ----------------
