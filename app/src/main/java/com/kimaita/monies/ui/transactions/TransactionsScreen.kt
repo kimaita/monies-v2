@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -106,7 +107,7 @@ fun TransactionsScreen(
         modifier = modifier,
         filteredTransactions = filteredTransactions,
         subjectMatches = subjectMatches,
-        transactionTypes = transactionTypes.values.toList(),
+        transactionTypes = transactionTypes,
         categories = categories,
         filters = filters,
         openSearch = openSearch,
@@ -298,7 +299,7 @@ fun TransactionsScreenContent(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(subjectMatches, key = { "subject_${it.subjectId}" }) { match ->

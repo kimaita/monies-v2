@@ -17,6 +17,7 @@ import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -103,10 +105,13 @@ enum class DateBand(val label: String) {
 fun ExportSelections.band(today: LocalDate): DateBand? =
     DateBand.entries.firstOrNull { it.range(today) == (startDate to endDate) }
 
+private val dayMonthYearFmt = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private val dayMonthOnlyFmt = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+
 /** Short text for a date range, leaving the year out for dates in the current one. */
 fun rangeText(start: LocalDate?, end: LocalDate?, today: LocalDate): String {
     fun LocalDate.text(withYear: Boolean) =
-        format(DateTimeFormatter.ofPattern(if (withYear) "d MMM yyyy" else "d MMM", Locale.ENGLISH))
+        format(if (withYear) dayMonthYearFmt else dayMonthOnlyFmt)
 
     fun LocalDate.text() = text(year != today.year)
     return when {
@@ -146,12 +151,17 @@ class ExportViewModel @Inject constructor(
     val options: StateFlow<FilterOptions?> =
         repository.getFilterOptions().stateIn(viewModelScope, started, null)
 
-    /** Live row count for the current selection, recomputed (debounced) as filters change. */
+    /** Live row count for the current selection: the first at once, later ones debounced as filters change. */
     val count: StateFlow<Int?> = _sel
         .map { it.toExportFilters() }
         .distinctUntilChanged()
-        .debounce(300.milliseconds)
-        .mapLatest { runCatching { repository.countForExport(it) }.getOrNull() }
+        .withIndex()
+        .debounce { if (it.index == 0) 0L else 300L }
+        .map { it.value }
+        .mapLatest {
+            runCatching { repository.countForExport(it) }
+                .getOrElse { e -> if (e is CancellationException) throw e else null }
+        }
         .stateIn(viewModelScope, started, null)
 
     // selection setters

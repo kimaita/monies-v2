@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.milliseconds
 
 
 @HiltViewModel
@@ -39,12 +38,11 @@ class TransactionsViewModel @Inject constructor(
     val filters = _filters.asStateFlow()
 
 
-    val transactionTypes: StateFlow<Map<Int, TransactionType>> =
-        repository.getTransactionTypes().map { list -> list.associateBy { it.id } }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyMap()
-        )
+    val transactionTypes: StateFlow<List<TransactionType>> = repository.getTransactionTypes().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
 
     val categories: StateFlow<List<Category>> = repository.getCategories().stateIn(
         scope = viewModelScope,
@@ -53,7 +51,8 @@ class TransactionsViewModel @Inject constructor(
     )
 
     @OptIn(FlowPreview::class)
-    private val searchQuery = _filters.map { it.searchQuery }.distinctUntilChanged().debounce(300L.milliseconds)
+    private val searchQuery = _filters.map { it.searchQuery }.distinctUntilChanged()
+        .debounce { if (it.isEmpty()) 0L else 300L }
 
     /** Subjects whose name matches the search, shown as rows above the results. */
     @OptIn(ExperimentalCoroutinesApi::class)

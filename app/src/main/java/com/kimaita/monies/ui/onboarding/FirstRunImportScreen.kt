@@ -3,7 +3,6 @@ package com.kimaita.monies.ui.onboarding
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -113,15 +112,11 @@ fun FirstRunImportScreen(
     }
     val fractionTarget =
         total?.takeIf { it > 0 }?.let { (processed.toFloat() / it).coerceIn(0f, 1f) }
-    val fraction by animateFloatAsState(
+    // Read only inside the indicator's draw lambda, so the ring animates without recomposing.
+    val fraction = animateFloatAsState(
         targetValue = fractionTarget ?: 0f,
         animationSpec = tween(700, easing = FastOutSlowInEasing),
         label = "fraction",
-    )
-    val count by animateIntAsState(
-        targetValue = processed,
-        animationSpec = tween(700, easing = FastOutSlowInEasing),
-        label = "count",
     )
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
@@ -148,7 +143,7 @@ fun FirstRunImportScreen(
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
                 if (fractionTarget != null) {
                     CircularProgressIndicator(
-                        progress = { fraction },
+                        progress = { fraction.value },
                         modifier = Modifier.fillMaxSize(),
                         strokeWidth = 16.dp,
                         strokeCap = StrokeCap.Round,
@@ -163,7 +158,7 @@ fun FirstRunImportScreen(
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "%,d".format(count),
+                        "%,d".format(processed),
                         style = MaterialTheme.typography.displaySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
@@ -189,7 +184,7 @@ fun FirstRunImportScreen(
             if (fractionTarget != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "${(fraction * 100).roundToInt()}%",
+                    "${(fractionTarget * 100).roundToInt()}%",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )

@@ -339,47 +339,49 @@ private fun RecordCard() {
 
 /* ---------- Page 2: live rows ---------- */
 
+// Colours come from the theme, so they are read when the row draws, not held here.
 private data class AutoRowData(
-    val avatar: Color,
+    val avatar: @Composable () -> Color,
     val glyph: String,
     val tag: String,
     val name: String,
     val sub: String,
     val amount: String,
-    val amountColor: Color
+    val amountColor: @Composable () -> Color
+)
+
+private val autoRows = listOf(
+    AutoRowData(
+        { MaterialTheme.colorScheme.primary },
+        "↗",
+        "RECV",
+        "Salary",
+        "Received · just now",
+        "+48,000",
+        { MoniesTheme.extra.positive }
+    ),
+    AutoRowData(
+        { MoniesTheme.extra.outflow },
+        "↘",
+        "SEND",
+        "Naivas",
+        "Pay bill · 14:02",
+        "−1,500",
+        { MoniesTheme.extra.negative }
+    ),
+    AutoRowData(
+        { MaterialTheme.colorScheme.onPrimaryContainer },
+        "F",
+        "FULIZA",
+        "Available",
+        "Updated 2:02 PM",
+        "1,000",
+        { MaterialTheme.colorScheme.onSurface }
+    ),
 )
 
 @Composable
 private fun AutoPage(active: Boolean) {
-    val rows = listOf(
-        AutoRowData(
-            MaterialTheme.colorScheme.primary,
-            "↗",
-            "RECV",
-            "Salary",
-            "Received · just now",
-            "+48,000",
-            MoniesTheme.extra.positive
-        ),
-        AutoRowData(
-            MoniesTheme.extra.outflow,
-            "↘",
-            "SEND",
-            "Naivas",
-            "Pay bill · 14:02",
-            "−1,500",
-            MoniesTheme.extra.negative
-        ),
-        AutoRowData(
-            MaterialTheme.colorScheme.onPrimaryContainer,
-            "F",
-            "FULIZA",
-            "Available",
-            "Updated 2:02 PM",
-            "1,000",
-            MaterialTheme.colorScheme.onSurface
-        ),
-    )
     Column(
         Modifier
             .fillMaxSize()
@@ -409,7 +411,7 @@ private fun AutoPage(active: Boolean) {
         )
         Spacer(Modifier.height(24.dp))
         Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            rows.forEachIndexed { i, r ->
+            autoRows.forEachIndexed { i, r ->
                 var show by remember(active) { mutableStateOf(false) }
                 LaunchedEffect(active) {
                     if (active) {
@@ -441,7 +443,7 @@ private fun AutoRow(r: AutoRowData) {
             Modifier
                 .size(42.dp)
                 .clip(RoundedCornerShape(13.dp))
-                .background(r.avatar),
+                .background(r.avatar()),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -483,7 +485,7 @@ private fun AutoRow(r: AutoRowData) {
             fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp,
-            color = r.amountColor
+            color = r.amountColor()
         )
     }
 }

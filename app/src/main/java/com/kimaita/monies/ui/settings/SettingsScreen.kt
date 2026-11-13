@@ -57,6 +57,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val dateFmt = DateTimeFormatter.ofPattern("d MMM yyyy")
+private val messageDateFmt = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -330,7 +331,7 @@ fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewMode
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(
                         "${m.address} · " + Instant.ofEpochMilli(m.date).atZone(ZoneId.systemDefault())
-                            .format(DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")),
+                            .format(messageDateFmt),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

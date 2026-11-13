@@ -113,6 +113,8 @@ fun TransactionBottomSheet(
     }
 }
 
+private val sheetDateFmt = DateTimeFormatter.ofPattern("E MMM dd yyyy 'at' h:mma", Locale.ENGLISH)
+
 @Composable
 fun TransactionContent(
     transaction: Transaction,
@@ -122,12 +124,6 @@ fun TransactionContent(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val dateFormatter = remember {
-        DateTimeFormatter.ofPattern(
-            "E MMM dd yyyy 'at' h:mma",
-            Locale.ENGLISH
-        )
-    }
 
 
     Column(
@@ -155,7 +151,7 @@ fun TransactionContent(
             }
 
             Spacer(modifier = Modifier.height(4.dp))
-            transaction.transactionTime?.format(dateFormatter)?.let {
+            transaction.transactionTime?.format(sheetDateFmt)?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelMedium,

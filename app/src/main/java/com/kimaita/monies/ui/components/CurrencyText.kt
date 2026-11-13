@@ -11,6 +11,13 @@ import java.text.NumberFormat
 import java.util.Currency
 import kotlin.math.absoluteValue
 
+// Shared across rows. NumberFormat is not thread-safe, so this is only touched from the main
+// thread, inside composition.
+private val kesFormat: NumberFormat =
+    NumberFormat.getCurrencyInstance(java.util.Locale("en", "KE")).apply {
+        currency = Currency.getInstance("KES")
+    }
+
 @Composable
 fun CurrencyText(
     amount: Double,
@@ -18,11 +25,7 @@ fun CurrencyText(
     isInc: Boolean? = null,
     content: @Composable (text: String) -> Unit
 ) {
-    val formattedAmount = remember(amount) {
-        val format = NumberFormat.getCurrencyInstance(java.util.Locale("en", "KE"))
-        format.currency = Currency.getInstance("KES")
-        format.format(amount.absoluteValue)
-    }
+    val formattedAmount = remember(amount) { kesFormat.format(amount.absoluteValue) }
 
     val prefix = when (isInc) {
         true -> "+"

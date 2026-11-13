@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -152,7 +153,7 @@ fun SubjectScreen(
     }
 
     SubjectScreenContent(
-        modifier = modifier.padding(horizontal = 8.dp),
+        modifier = modifier,
         transactions = transactions,
         filters = filters,
         name = subject?.name ?: "",
@@ -215,6 +216,7 @@ fun SubjectScreenContent(
             modifier = modifier
                 .padding(paddingValues)
                 .fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
