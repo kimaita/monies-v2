@@ -469,19 +469,27 @@ fun FilterBottomSheetContent(
             ) {
                 FilterChip(
                     selected = filters.natureFilter == true,
-                    onClick = { onFilterChange(filters.copy(natureFilter = if (filters.natureFilter == true) null else true)) },
+                    onClick = {
+                        onFilterChange(
+                            filters.withNature(if (filters.natureFilter == true) null else true, transactionTypes)
+                        )
+                    },
                     label = { Text("Incoming") })
                 FilterChip(
                     selected = filters.natureFilter == false,
-                    onClick = { onFilterChange(filters.copy(natureFilter = if (filters.natureFilter == false) null else false)) },
-                    label = { Text("Out") })
+                    onClick = {
+                        onFilterChange(
+                            filters.withNature(if (filters.natureFilter == false) null else false, transactionTypes)
+                        )
+                    },
+                    label = { Text("Outgoing") })
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text("TRANSACTION TYPE", style = MaterialTheme.typography.labelMedium)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                transactionTypes.forEach { type ->
+                typesFor(filters.natureFilter, transactionTypes).forEach { type ->
                     val isSelected = filters.typeFilters.contains(type.id)
                     FilterChip(selected = isSelected, onClick = {
                         val newTypes =
@@ -522,6 +530,19 @@ fun FilterBottomSheetContent(
 
 }
 
+
+/** The types to offer for a direction: all of them when [nature] is null, else those going that way. */
+internal fun typesFor(nature: Boolean?, types: List<TransactionType>): List<TransactionType> =
+    if (nature == null) types else types.filter { it.isInc == nature }
+
+/** These filters with a new direction; selected types that go the other way are dropped. */
+internal fun TransactionFilters.withNature(
+    nature: Boolean?, types: List<TransactionType>
+): TransactionFilters {
+    if (nature == null) return copy(natureFilter = null)
+    val allowed = typesFor(nature, types).map { it.id }.toSet()
+    return copy(natureFilter = nature, typeFilters = typeFilters.filter { it in allowed })
+}
 
 @Preview(showBackground = true)
 @Composable
