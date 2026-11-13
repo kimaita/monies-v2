@@ -141,7 +141,7 @@ fun OnboardingScreen(
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                 ) {
                     Text(
@@ -250,7 +250,7 @@ private fun SmsBubble() {
                 withStyle(SpanStyle(color = MoniesTheme.extra.outflow)) { append("WEF6X3K9LM") }
                 append(" Confirmed. Ksh1,500.00 paid to NAIVAS LIMITED. New M-PESA balance is Ksh8,420.00.")
             },
-            fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, lineHeight = 18.sp, color = Color(0xFF34302A),
+            fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -451,7 +451,7 @@ private fun AutoRow(r: AutoRowData) {
                 fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onPrimary
             )
         }
         Column(Modifier.weight(1f)) {
@@ -837,7 +837,7 @@ private fun OnbMarker(required: Boolean) {
         fontWeight = FontWeight.Bold,
         fontSize = 9.5.sp,
         letterSpacing = 0.6.sp,
-        color = if (required) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (required) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(if (required) MoniesTheme.extra.outflow else MaterialTheme.colorScheme.surfaceContainerHigh)
