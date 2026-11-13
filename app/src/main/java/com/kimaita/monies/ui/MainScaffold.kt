@@ -1,5 +1,7 @@
 package com.kimaita.monies.ui
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -80,7 +82,17 @@ fun MoniesNavHost(
     modifier: Modifier = Modifier
 ) {
 
-    NavHost(navController = navController, startDestination = "home", modifier = modifier) {
+    // No transitions: the default 700 ms cross-fade keeps both screens composed and makes a tab tap
+    // look unanswered on a slow phone.
+    NavHost(
+        navController = navController,
+        startDestination = "home",
+        modifier = modifier,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
+    ) {
         composable("home") {
             HomeScreen(
                 navController = navController,
@@ -113,6 +125,9 @@ fun MoniesNavHost(
     }
 }
 
+
+/** Opens a screen above the current one; a double tap does not stack it twice. */
+fun NavController.navigateSingleTop(route: String) = navigate(route) { launchSingleTop = true }
 
 /**
  * Switches tab, keeping the state of Analytics and Export. Home is the start destination, so it is

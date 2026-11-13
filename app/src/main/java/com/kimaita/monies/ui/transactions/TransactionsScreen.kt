@@ -81,6 +81,7 @@ import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.services.typeGroups
 import com.kimaita.monies.ui.components.TransactionItemStyle
+import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
@@ -114,11 +115,13 @@ fun TransactionsScreen(
         onUpdateFilters = viewModel::updateFilters,
         onExport = {
             viewModel.exportResults()
+            // Pop without saving, so Transactions is not restored later and Back from Export lands on Home.
+            navController.popBackStack()
             navController.navigateToTab("export")
         },
         onBack = { navController.popBackStack() },
         onTransactionClick = { subjectId ->
-            navController.navigate("subject/$subjectId")
+            navController.navigateSingleTop("subject/$subjectId")
         }
     )
 }
