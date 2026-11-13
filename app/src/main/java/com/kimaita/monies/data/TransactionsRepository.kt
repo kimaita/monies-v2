@@ -53,6 +53,9 @@ interface TransactionsRepository {
         endDate: String?,
     ): Flow<PagingData<Transaction>>
 
+    /** Subjects whose display name matches [query], for the rows above the search results. */
+    fun getMatchingSubjects(query: String): Flow<List<SubjectCount>>
+
     /**
      * Get a list of transaction types.
      */

@@ -2,6 +2,8 @@ package com.kimaita.monies.ui.transactions
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -49,9 +53,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -63,6 +70,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.kimaita.monies.R
+import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
@@ -86,10 +94,12 @@ fun TransactionsScreen(
     val transactionTypes by viewModel.transactionTypes.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
+    val subjectMatches by viewModel.subjectMatches.collectAsStateWithLifecycle()
 
     TransactionsScreenContent(
         modifier = modifier,
         filteredTransactions = filteredTransactions,
+        subjectMatches = subjectMatches,
         transactionTypes = transactionTypes.values.toList(),
         categories = categories,
         filters = filters,
@@ -109,6 +119,7 @@ fun TransactionsScreen(
 fun TransactionsScreenContent(
     modifier: Modifier = Modifier,
     filteredTransactions: LazyPagingItems<Transaction>,
+    subjectMatches: List<SubjectCount> = emptyList(),
     transactionTypes: List<TransactionType>,
     categories: List<Category>,
     filters: TransactionFilters,
@@ -264,6 +275,9 @@ fun TransactionsScreenContent(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    items(subjectMatches, key = { "subject_${it.subjectId}" }) { match ->
+                        SubjectMatchRow(match, onClick = { onTransactionClick(match.subjectId) })
+                    }
                     items(
                         count = filteredTransactions.itemCount,
                         key = filteredTransactions.itemKey { it.id },
@@ -317,6 +331,52 @@ fun TransactionsScreenContent(
                     onFilterChange = { stagedFilters = it })
             }
         }
+    }
+}
+
+/** A subject whose name matches the search: one collapsed row that opens the subject. */
+@Composable
+private fun SubjectMatchRow(match: SubjectCount, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .padding(vertical = 4.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = match.name.firstOrNull()?.uppercase() ?: "?",
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = match.name.uppercase(),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "${match.count} transaction${if (match.count == 1) "" else "s"}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Icon(
+            painterResource(R.drawable.keyboard_arrow_right),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

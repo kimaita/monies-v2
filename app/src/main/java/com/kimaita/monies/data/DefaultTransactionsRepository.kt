@@ -24,6 +24,7 @@ import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.FulizaRow
 import com.kimaita.monies.data.dao.dtos.LineBalance
+import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.lineNames
 import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
@@ -141,6 +142,10 @@ class DefaultTransactionsRepository @Inject constructor(
         }.map { list -> list.map { it.toDomainModel() } }
     }
 
+
+    override fun getMatchingSubjects(query: String): Flow<List<SubjectCount>> = forAccount { account ->
+        subjectLikeOf(query)?.let { subjectDao.matchingSubjects(it, account) } ?: flowOf(emptyList())
+    }
 
     override fun getTransactionTypes(): Flow<List<TransactionType>> =
         transactionTypeDao.getAll()

@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.kimaita.monies.data.TransactionsRepository
+import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
@@ -62,9 +63,21 @@ class TransactionsViewModel @Inject constructor(
         initialValue = emptyList()
     )
 
-    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    @OptIn(FlowPreview::class)
+    private val searchQuery = _filters.map { it.searchQuery }.distinctUntilChanged().debounce(300L.milliseconds)
+
+    /** Subjects whose name matches the search, shown as rows above the results. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val subjectMatches: StateFlow<List<SubjectCount>> =
+        searchQuery.flatMapLatest { repository.getMatchingSubjects(it) }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val filteredTransactions: Flow<PagingData<Transaction>> = combine(
-        _filters.map { it.searchQuery }.distinctUntilChanged().debounce(300L.milliseconds),
+        searchQuery,
         _filters.map { it.copy(searchQuery = "") }.distinctUntilChanged()
     ) { query, filtersWithoutQuery ->
         filtersWithoutQuery.copy(searchQuery = query)
