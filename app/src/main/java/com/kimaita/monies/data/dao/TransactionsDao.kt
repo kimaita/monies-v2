@@ -28,6 +28,16 @@ private const val SEARCH_FILTER = """
             OR :subjectLike IS NOT NULL AND t.subject IN (SELECT id FROM subjects WHERE name LIKE :subjectLike))
 """
 
+/**
+ * The rows the recurring detector may see, on alias `t`. Used both for the rows returned and for
+ * counting rows per subject, so a subject qualifies only on rows the detector would receive.
+ */
+private const val RECURRING_ROWS = """
+        t.subject IS NOT NULL AND t.transactionTime >= :since
+        AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
+        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+"""
+
 private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
 
 // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
@@ -408,18 +418,22 @@ interface TransactionsDao : BaseDao<Transaction> {
 
     @Query(
         """
-    SELECT t.subject AS subjectId, s.name AS name, tt.name AS typeName,
+    SELECT t.subject AS subjectId, s.name AS name,
            t.transactionTime AS transactionTime, t.amount AS amount
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
-    JOIN transaction_types tt ON t.transactionType = tt.id
-    WHERE t.subject IS NOT NULL AND t.transactionTime >= :since
-      AND tt.isTransfer = 0
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+    WHERE $RECURRING_ROWS
+      AND t.subject IN (
+          SELECT t.subject FROM transactions t WHERE $RECURRING_ROWS
+          GROUP BY t.subject HAVING COUNT(*) >= :minOccurrences)
     ORDER BY t.subject ASC, t.transactionTime ASC
 """
     )
-    suspend fun getSubjectOccurrences(since: String, account: Int? = null): List<SubjectOccurrence>
+    suspend fun getSubjectOccurrences(
+        since: String,
+        minOccurrences: Int,
+        account: Int? = null
+    ): List<SubjectOccurrence>
 
     /**
      * One row per line (root account with transactions), in order of first activity, with the

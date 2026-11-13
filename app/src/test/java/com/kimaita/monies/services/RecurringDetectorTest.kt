@@ -19,7 +19,7 @@ class RecurringDetectorTest {
             "2025-01-05T08:28:00", "2025-02-05T08:30:00", "2025-03-05T09:00:00",
             "2025-04-05T08:15:00", "2025-05-05T08:28:00", "2025-06-05T08:40:00",
             "2025-07-05T08:28:00", "2025-08-05T08:28:00",
-        ).map { SubjectOccurrence(1, "ACMEUTIL", "paybill", it, 1000.0) }
+        ).map { SubjectOccurrence(1, "ACMEUTIL", it, 1000.0) }
 
         var sinceSeen: String? = null
         val dao = Proxy.newProxyInstance(
