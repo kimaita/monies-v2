@@ -21,6 +21,7 @@ import com.kimaita.monies.data.database.models.categoryKey
 import com.kimaita.monies.data.database.models.defaultCategoryId
 import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.SmsBatchResult
+import com.kimaita.monies.models.SyncTimings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -157,13 +158,20 @@ class SmsSyncer(
         smsDataSource.count(Provider.allSenders, currentCursor())
     }
 
+    /** Set once this process has checked the saved cursor against the inbox. */
+    private var cursorChecked = false
+
     /**
      * The saved cursor, reset to 0 when it is past every message in the inbox (an Auto Backup
-     * restore can bring back a cursor from another phone).
+     * restore can bring back a cursor from another phone). A restore happens before the app runs,
+     * so each process checks once: asking the SMS provider for its highest id took ~65 ms a call on
+     * a Galaxy M14, 15% of an import when it was asked on every batch.
      */
     private suspend fun currentCursor(): Long {
         val cursor = store.cursor()
-        if (cursor > 0 && cursor > smsDataSource.maxId()) {
+        if (cursor == 0L || cursorChecked) return cursor
+        cursorChecked = true
+        if (cursor > smsDataSource.maxId()) {
             store.setCursor(0)
             return 0
         }
@@ -174,27 +182,32 @@ class SmsSyncer(
     suspend fun syncBatch(limit: Int = SMS_BATCH_SIZE): SmsBatchResult =
         syncMutex.withLock {
             withContext(Dispatchers.IO) {
-                val afterId = currentCursor()
+                val timings = SyncTimings()
+                val afterId = timings.time("cursor") { currentCursor() }
 
-                val batch = smsDataSource.readBatch(Provider.allSenders, afterId, limit)
+                val batch = timings.time("read") { smsDataSource.readBatch(Provider.allSenders, afterId, limit) }
                 if (batch.isEmpty()) {
                     // Nothing new, so the merges need work only if an earlier sync left them stale.
-                    if (store.mergesStale()) store.inTransaction { recomputeMerges() }
-                    return@withContext SmsBatchResult(0, null)
+                    if (store.mergesStale()) timings.time("merges") { store.inTransaction { recomputeMerges() } }
+                    Timber.tag(LOG_TAG).i("Batch: 0 SMS; %s", timings)
+                    return@withContext SmsBatchResult(0, null, timings)
                 }
 
                 val maxId = batch.maxOf { it.id ?: 0L }
+                val timedBefore = timings.totalNanos
+                val txStart = System.nanoTime()
                 store.inTransaction {
-                    val saved = parseAndSave(batch)
+                    val saved = parseAndSave(batch, timings)
                     store.setCursor(maxId)
                     // Merges depend on every account's span, so they are recomputed once, on the
                     // batch that drains the inbox. A full batch may not be the last, so it only
                     // marks them stale, and the flag survives the process being killed.
-                    if (batch.size < limit && (saved || store.mergesStale())) recomputeMerges()
+                    if (batch.size < limit && (saved || store.mergesStale())) timings.time("merges") { recomputeMerges() }
                     else if (saved) store.setMergesStale(true)
                 }
-                Timber.d("Synced %d SMS up to id %d", batch.size, maxId)
-                SmsBatchResult(count = batch.size, newestEpochMillis = batch.maxOf { it.timestamp })
+                timings.add("other", System.nanoTime() - txStart - (timings.totalNanos - timedBefore))
+                Timber.tag(LOG_TAG).i("Batch: %d SMS up to id %d; %s", batch.size, maxId, timings)
+                SmsBatchResult(count = batch.size, newestEpochMillis = batch.maxOf { it.timestamp }, timings)
             }
         }
 
@@ -205,10 +218,19 @@ class SmsSyncer(
     suspend fun syncAll() {
         if (activeSyncs.getAndIncrement() == 0) _isSyncing.value = true
         try {
+            val run = SyncTimings()
+            var messages = 0
+            var batches = 0
+            val start = System.nanoTime()
             while (true) {
                 currentCoroutineContext().ensureActive()
-                if (syncBatch(SMS_BATCH_SIZE).count < SMS_BATCH_SIZE) break
+                val result = syncBatch(SMS_BATCH_SIZE)
+                run += result.timings
+                messages += result.count
+                batches++
+                if (result.count < SMS_BATCH_SIZE) break
             }
+            Timber.tag(LOG_TAG).i("Sync done: %s", run.runSummary(messages, batches, System.nanoTime() - start))
         } finally {
             if (activeSyncs.decrementAndGet() == 0) _isSyncing.value = false
         }
@@ -226,32 +248,45 @@ class SmsSyncer(
     }
 
     /** Returns true when the batch held transactions (so account spans may have changed). */
-    private suspend fun parseAndSave(messages: List<SmsParser.SmsMessage>): Boolean {
+    private suspend fun parseAndSave(messages: List<SmsParser.SmsMessage>, timings: SyncTimings): Boolean {
         val types = store.transactionTypes()
-        val parsed = smsParser.parse(messages, types)
-
-        val parsedIds = parsed.mapTo(HashSet()) { it.first.messageId }
-        val unparsed = messages.filter { it.id !in parsedIds }.filter {
-            Provider.forSender(it.originatingAddress)?.looksLikeTransaction(it.body) == true
-        }.map { UnparsedMessage(body = it.body, address = it.originatingAddress, date = it.timestamp) }
-        if (unparsed.isNotEmpty()) store.insertUnparsed(unparsed)
+        val (parsed, unparsed) = timings.time("parse") {
+            val parsed = smsParser.parse(messages, types)
+            val parsedIds = parsed.mapTo(HashSet()) { it.first.messageId }
+            parsed to messages.filter { it.id !in parsedIds }.filter {
+                Provider.forSender(it.originatingAddress)?.looksLikeTransaction(it.body) == true
+            }.map { UnparsedMessage(body = it.body, address = it.originatingAddress, date = it.timestamp) }
+        }
+        if (unparsed.isNotEmpty()) timings.time("save") { store.insertUnparsed(unparsed) }
         if (parsed.isEmpty()) return false
 
         // A new subject starts in its built-in category; one already saved keeps whatever it has.
         // The batch's saved subjects come back in one query; only new ones cost a query each.
         // Looked up per batch, not cached across batches, so a merge or category change the user
         // makes during a long import applies to the batches after it.
-        val categoryIds = store.categoryIds()
-        val parsedSubjects = parsed.mapNotNull { it.second }.distinctBy { it.rawName to it.number }
-        val savedByKey = store.savedSubjects(parsedSubjects.map { it.rawName }.distinct())
-            .associateBy { it.rawName to it.number }
-        val subjects = parsedSubjects.associate { s ->
-            val key = s.rawName to s.number
-            key to (savedByKey[key] ?: defaultCategoryId(s.rawName, categoryIds).let { category ->
-                SavedSubject(s.rawName, s.number, store.insertSubject(s.copy(categoryId = category)), category)
-            })
+        val subjects = timings.time("subjects") {
+            val categoryIds = store.categoryIds()
+            val parsedSubjects = parsed.mapNotNull { it.second }.distinctBy { it.rawName to it.number }
+            val savedByKey = store.savedSubjects(parsedSubjects.map { it.rawName }.distinct())
+                .associateBy { it.rawName to it.number }
+            parsedSubjects.associate { s ->
+                val key = s.rawName to s.number
+                key to (savedByKey[key] ?: defaultCategoryId(s.rawName, categoryIds).let { category ->
+                    SavedSubject(s.rawName, s.number, store.insertSubject(s.copy(categoryId = category)), category)
+                })
+            }
         }
 
+        timings.time("save") { saveTransactions(messages, parsed, types, subjects) }
+        return true
+    }
+
+    private suspend fun saveTransactions(
+        messages: List<SmsParser.SmsMessage>,
+        parsed: List<Pair<Transaction, Subject?>>,
+        types: List<TransactionType>,
+        subjects: Map<Pair<String, String>, SavedSubject>,
+    ) {
         val subscriptionById = messages.associate { it.id to it.subscriptionId }
         val typeProvider = types.associate { it.id to it.provider }
         val accountIds = HashMap<Pair<String, Int>, Int>()
@@ -273,13 +308,20 @@ class SmsSyncer(
         }
         store.insertTransactions(toInsert)
         store.deletePairedAirtelReceipts()
-        return true
     }
 
     companion object {
-        const val SMS_BATCH_SIZE = 512
+        /**
+         * Each batch costs ~200 ms on top of its messages (provider query, commit, progress), so
+         * fewer, larger batches import faster: 12,039 SMS on a Galaxy M14 took 8.4 s at 512, 6.5 s
+         * at 1024 and 4.8 s at 2048. 2048 SMS is under 1 MB, well inside the 2 MB cursor window.
+         */
+        const val SMS_BATCH_SIZE = 2048
         const val LAST_SMS_SYNC_ID_KEY = "last_sms_sync_id"
         const val MERGES_STALE_KEY = "account_merges_stale"
+
+        /** Logcat tag for sync timing lines: `adb logcat -s SmsSync`. */
+        const val LOG_TAG = "SmsSync"
     }
 }
 

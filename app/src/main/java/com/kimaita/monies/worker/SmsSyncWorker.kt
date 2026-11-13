@@ -1,9 +1,11 @@
 package com.kimaita.monies.worker
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -18,6 +20,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.kimaita.monies.R
+import com.kimaita.monies.models.SyncTimings
 import com.kimaita.monies.services.SmsSyncer
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -56,19 +59,27 @@ class SmsSyncWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val foreground = inputData.getBoolean(KEY_FOREGROUND, false)
         val batchSize = SmsSyncer.SMS_BATCH_SIZE
+        val countStart = System.nanoTime()
         val total = smsSyncer.pendingCount()
+        val countNanos = System.nanoTime() - countStart
         val zone = ZoneId.systemDefault()
         var processed = 0
         var maxYear = 0
+        val label = if (foreground) "Import" else "Sync"
 
         if (foreground) setForeground(buildForegroundInfo(0, total))
         setProgress(workDataOf(KEY_PROCESSED to 0, KEY_TOTAL to total))
-        Timber.i("SmsSyncWorker started.")
+        logStart(label, total, countNanos, batchSize)
 
+        val run = SyncTimings()
+        var batches = 0
+        val start = System.nanoTime()
         return try {
             while (true) {
                 val result = smsSyncer.syncBatch(batchSize)
                 processed += result.count
+                run += result.timings
+                batches++
 
                 result.newestEpochMillis?.let { millis ->
                     val year = Instant.ofEpochMilli(millis).atZone(zone).year
@@ -85,6 +96,8 @@ class SmsSyncWorker @AssistedInject constructor(
                 if (foreground) updateNotification(processed, total)
                 if (result.count < batchSize) break
             }
+            Timber.tag(SmsSyncer.LOG_TAG)
+                .i("%s done: %s", label, run.runSummary(processed, batches, System.nanoTime() - start))
             Result.success()
         } catch (e: CancellationException) {
             throw e
@@ -92,6 +105,20 @@ class SmsSyncWorker @AssistedInject constructor(
             Timber.e(e, "SmsSyncWorker failed.")
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
+    }
+
+    /**
+     * The phone and build a run is measured on. Debug builds are not shrunk by R8 and run in ART's
+     * debuggable mode, so CPU steps such as parse read slower than they would in a release build.
+     */
+    private fun logStart(label: String, pending: Int, countNanos: Long, batchSize: Int) {
+        val am = applicationContext.getSystemService(ActivityManager::class.java)
+        val debuggable = applicationContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        Timber.tag(SmsSyncer.LOG_TAG).i(
+            "%s start: %d SMS pending (counted in %s), batch %d; %s %s, Android %d, heap %d MB, low-RAM %b, debuggable %b",
+            label, pending, SyncTimings.ms(countNanos), batchSize, Build.MANUFACTURER, Build.MODEL,
+            Build.VERSION.SDK_INT, am.memoryClass, am.isLowRamDevice, debuggable,
+        )
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo(0, 0)
