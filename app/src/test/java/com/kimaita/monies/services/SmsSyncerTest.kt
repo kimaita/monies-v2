@@ -26,7 +26,11 @@ class SmsSyncerTest {
         override suspend fun count(senders: Collection<String>, afterId: Long) =
             readBatch(senders, afterId, Int.MAX_VALUE).size
 
-        override suspend fun maxId() = messages.maxOfOrNull { it.id ?: 0 } ?: 0L
+        var maxIdCalls = 0
+        override suspend fun maxId(): Long {
+            maxIdCalls++
+            return messages.maxOfOrNull { it.id ?: 0 } ?: 0L
+        }
     }
 
     private class FakeStore(types: List<TransactionType>) : SyncStore {
@@ -162,11 +166,11 @@ class SmsSyncerTest {
         val receipt = airtelSamples.first { it.type == "airtel.pay.receipt" }.body
         val pay = airtelSamples.first { it.type == "airtel.pay" }
         val payTypeId = 1 + getDefaultTransactionTypes().indexOfFirst { it.name == "airtel.pay" }
-        for (batchSize in listOf(512, 1)) {
+        for (batchSize in listOf(SmsSyncer.SMS_BATCH_SIZE, 1)) {
             val store = FakeStore(getDefaultTransactionTypes())
             runBlocking {
                 val s = syncer(FakeInbox(listOf(msg(1, receipt, "airtelmoney"), msg(2, pay.body, "airtelmoney"))), store)
-                if (batchSize == 512) s.syncAll() else { s.syncBatch(1); s.syncBatch(1) }
+                if (batchSize == SmsSyncer.SMS_BATCH_SIZE) s.syncAll() else { s.syncBatch(1); s.syncBatch(1) }
             }
             val row = store.transactions.single()
             assertEquals(payTypeId, row.transactionType)
@@ -313,6 +317,24 @@ class SmsSyncerTest {
             s.syncBatch(2)
         }
         assertEquals(1, store.activityReads)
+    }
+
+    @Test
+    fun theInboxIsAskedForItsHighestIdOncePerProcess() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val inbox = FakeInbox(listOf(msg(1), msg(2), msg(3)))
+        runBlocking { syncer(inbox, store).let { s -> repeat(4) { s.syncBatch(1) } } }
+        assertEquals(3, store.transactions.size)
+        assertEquals(1, inbox.maxIdCalls)
+    }
+
+    @Test
+    fun aBatchTimesEveryStep() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val result = runBlocking { syncer(FakeInbox(listOf(msg(1))), store).syncBatch() }
+        val steps = result.timings.toString().split(" ").map { it.substringBefore('=') }
+        assertEquals(listOf("cursor", "read", "parse", "subjects", "save", "merges", "other"), steps)
+        assertTrue(result.timings.runSummary(1, 1, 1_000_000).startsWith("1 SMS in 1 batches, 1.0ms"))
     }
 
     @Test
