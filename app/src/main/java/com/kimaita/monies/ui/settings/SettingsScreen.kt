@@ -45,6 +45,7 @@ import com.kimaita.monies.data.dao.dtos.AccountLine
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.ui.components.CurrencyText
+import com.kimaita.monies.ui.components.TextDialog
 import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.ui.util.copyToClipboard
@@ -402,20 +403,6 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) = Ro
 ) {
     RadioButton(selected = selected, onClick = null)
     Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
-}
-
-@Composable
-private fun TextDialog(
-    title: String, initial: String, label: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit,
-) {
-    var value by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { OutlinedTextField(value, { value = it }, label = { Text(label) }, singleLine = true) },
-        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
 }
 
 @Composable

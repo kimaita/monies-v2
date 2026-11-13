@@ -25,8 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -81,6 +79,7 @@ import com.kimaita.monies.services.TypeGroup
 import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.services.typeGroups
+import com.kimaita.monies.ui.components.SortMenu
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.navigateToTab
@@ -149,7 +148,6 @@ fun TransactionsScreenContent(
 
     var showBottomSheet by remember { mutableStateOf(false) }
     var searchVisible by rememberSaveable { mutableStateOf(openSearch) }
-    var sortMenuExpanded by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -210,38 +208,7 @@ fun TransactionsScreenContent(
 //                    contentDescription = "Export"
 //                )
 //            }
-            Box {
-                IconButton(onClick = { sortMenuExpanded = true }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.sort), contentDescription = "Sort"
-                    )
-                }
-                DropdownMenu(
-                    expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
-                    SortOrder.entries.forEach { order ->
-                        DropdownMenuItem(text = {
-                            val label = when (order) {
-                                SortOrder.DATE_DESC -> "Newest first"
-                                SortOrder.DATE_ASC -> "Oldest first"
-                                SortOrder.AMOUNT_DESC -> "Largest first"
-                                SortOrder.AMOUNT_ASC -> "Smallest first"
-                            }
-                            Text(label)
-                        }, onClick = {
-                            onSetSortOrder(order)
-                            sortMenuExpanded = false
-                        }, trailingIcon = {
-                            if (filters.sortOrder == order) {
-                                Icon(
-                                    painterResource(R.drawable.check_24px),
-                                    null,
-                                    Modifier.size(18.dp)
-                                )
-                            }
-                        })
-                    }
-                }
-            }
+            SortMenu(filters.sortOrder, onSetSortOrder)
 
         })
     }) { paddingValues ->

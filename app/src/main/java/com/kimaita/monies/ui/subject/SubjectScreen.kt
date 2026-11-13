@@ -24,8 +24,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import com.kimaita.monies.models.export.NamedRef
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +60,8 @@ import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.TransactionType
 import com.kimaita.monies.ui.components.CurrencyText
+import com.kimaita.monies.ui.components.SortMenu
+import com.kimaita.monies.ui.components.TextDialog
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
 import com.kimaita.monies.ui.theme.MoniesTheme
@@ -85,20 +85,10 @@ fun SubjectScreen(
 
     when (dialog) {
         SubjectDialog.Rename -> {
-            var text by remember { mutableStateOf(subject?.name ?: "") }
-            AlertDialog(
-                onDismissRequest = { dialog = SubjectDialog.None },
-                title = { Text("Rename") },
-                text = {
-                    OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true)
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = text.isNotBlank(),
-                        onClick = { viewModel.rename(text); dialog = SubjectDialog.None },
-                    ) { Text("Save") }
-                },
-                dismissButton = { TextButton(onClick = { dialog = SubjectDialog.None }) { Text("Cancel") } },
+            TextDialog(
+                title = "Rename", initial = subject?.name ?: "", requireText = true,
+                onDismiss = { dialog = SubjectDialog.None },
+                onConfirm = { viewModel.rename(it); dialog = SubjectDialog.None },
             )
         }
 
@@ -419,8 +409,6 @@ private fun HighlightStatItem(
 fun TransactionsHeader(
     currentSortOrder: SortOrder, onSortOrderChange: (SortOrder) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -433,40 +421,7 @@ fun TransactionsHeader(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Box {
-            IconButton(onClick = { expanded = true }) {
-                Icon(
-                    painter = painterResource(R.drawable.sort),
-                    contentDescription = "Sort",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            DropdownMenu(
-                expanded = expanded, onDismissRequest = { expanded = false }) {
-                SortOrder.entries.forEach { order ->
-                    DropdownMenuItem(text = {
-                        val label = when (order) {
-                            SortOrder.DATE_DESC -> "Newest first"
-                            SortOrder.DATE_ASC -> "Oldest first"
-                            SortOrder.AMOUNT_DESC -> "Largest first"
-                            SortOrder.AMOUNT_ASC -> "Smallest first"
-                        }
-                        Text(label)
-                    }, onClick = {
-                        onSortOrderChange(order)
-                        expanded = false
-                    }, trailingIcon = {
-                        if (currentSortOrder == order) {
-                            Icon(
-                                painterResource(R.drawable.check_24px),
-                                null,
-                                Modifier.size(18.dp)
-                            )
-                        }
-                    })
-                }
-            }
-        }
+        SortMenu(currentSortOrder, onSortOrderChange)
     }
 }
 
