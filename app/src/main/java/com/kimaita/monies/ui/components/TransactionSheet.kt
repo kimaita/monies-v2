@@ -42,10 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -56,6 +54,7 @@ import com.kimaita.monies.models.Subject
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionType
 import com.kimaita.monies.ui.theme.AppTheme
+import com.kimaita.monies.ui.util.copyToClipboard
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -122,7 +121,6 @@ fun TransactionContent(
     onCategoryChange: (Category) -> Unit,
     onSubjectClick: () -> Unit,
 ) {
-    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
 
 
@@ -226,8 +224,7 @@ fun TransactionContent(
                 }
 
                 if (!number.isNullOrBlank()) IconButton(onClick = {
-                    clipboardManager.setText(AnnotatedString(number))
-                    android.widget.Toast.makeText(context, "Phone copied", android.widget.Toast.LENGTH_SHORT).show()
+                    copyToClipboard(context, "Phone", number)
                 }) {
                     Icon(
                         painter = painterResource(R.drawable.outline_copy),
@@ -249,23 +246,13 @@ fun TransactionContent(
                 icon = painterResource(R.drawable.outline_copy),
                 label = "Message",
                 onClick = {
-                    clipboardManager.setText(AnnotatedString(transaction.message))
-                    android.widget.Toast.makeText(
-                        context,
-                        "Message copied",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    copyToClipboard(context, "Message", transaction.message)
                 })
             ActionButton(
                 icon = painterResource(R.drawable.outline_copy),
                 label = "Transaction ID",
                 onClick = {
-                    clipboardManager.setText(AnnotatedString(transaction.code))
-                    android.widget.Toast.makeText(
-                        context,
-                        "Transaction ID copied",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    copyToClipboard(context, "Transaction ID", transaction.code)
                 })
         }
     }

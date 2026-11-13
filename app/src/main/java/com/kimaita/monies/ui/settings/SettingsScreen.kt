@@ -1,7 +1,6 @@
 package com.kimaita.monies.ui.settings
 
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,11 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -50,6 +47,7 @@ import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.theme.ThemeMode
+import com.kimaita.monies.ui.util.copyToClipboard
 import com.kimaita.monies.ui.util.formatKes
 import java.time.Instant
 import java.time.LocalDateTime
@@ -307,7 +305,6 @@ fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel = 
 @Composable
 fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewModel = hiltViewModel()) {
     val messages by viewModel.unparsed.collectAsStateWithLifecycle()
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
 
     Scaffold(
@@ -338,8 +335,7 @@ fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewMode
                     Text(m.body, style = MaterialTheme.typography.bodyMedium)
                     Row {
                         TextButton(onClick = {
-                            clipboard.setText(AnnotatedString(m.body))
-                            Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
+                            copyToClipboard(context, "Message", m.body)
                         }) { Text("Copy") }
                         TextButton(onClick = {
                             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, m.body)
