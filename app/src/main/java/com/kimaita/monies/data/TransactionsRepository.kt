@@ -120,6 +120,10 @@ interface TransactionsRepository {
 
     suspend fun topSubjects(): List<NamedRef<Long>>
     suspend fun searchSubjects(trim: String): List<NamedRef<Long>>
+    suspend fun renameSubject(id: Long, name: String)
+
+    /** Moves [source]'s transactions to [target] and merges it into it; false if refused. */
+    suspend fun mergeSubject(source: Long, target: Long): Boolean
     suspend fun getSubjects(ids: List<Long>): List<NamedRef<Long>>
     suspend fun getFilterOptions(): FilterOptions
     fun getOtherBalances(): Flow<OtherBalances>

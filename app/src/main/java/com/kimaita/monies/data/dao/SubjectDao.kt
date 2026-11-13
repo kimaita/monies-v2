@@ -38,6 +38,35 @@ interface SubjectDao : BaseDao<Subject> {
         return getIdByRawNameAndNumber(subject.rawName, subject.number) ?: insert(subject)
     }
 
+    @Query("UPDATE subjects SET name = :name WHERE id = :id")
+    suspend fun rename(id: Long, name: String)
+
+    @Query("UPDATE transactions SET subject = :target WHERE subject = :source")
+    suspend fun moveTransactions(source: Long, target: Long)
+
+    @Query("UPDATE subjects SET mergedInto = :target WHERE id = :source OR mergedInto = :source")
+    suspend fun markMerged(source: Long, target: Long)
+
+    @Query("UPDATE subjects SET categoryId = :category WHERE id = :id AND categoryId IS NULL")
+    suspend fun setCategoryIfNone(id: Long, category: Int)
+
+    /**
+     * Folds [source] into [target]: its transactions move over, rows already merged into it follow,
+     * and [source] points at [target]. The target keeps its category; it takes the source's only
+     * when it has none. Returns false when the merge makes no sense (same row, or target is merged).
+     */
+    @Transaction
+    suspend fun merge(source: Long, target: Long): Boolean {
+        if (source == target || getIdByIdOrRoot(target) != target) return false
+        getCategoryId(source)?.let { setCategoryIfNone(target, it) }
+        moveTransactions(source, target)
+        markMerged(source, target)
+        return true
+    }
+
+    @Query("SELECT COALESCE(mergedInto, id) FROM subjects WHERE id = :id")
+    suspend fun getIdByIdOrRoot(id: Long): Long?
+
     @Query(
         """
     SELECT 
@@ -61,7 +90,7 @@ interface SubjectDao : BaseDao<Subject> {
 
     data class SubjectRef(val id: Long, val name: String)
 
-    @Query("SELECT id, name FROM subjects WHERE name LIKE '%' || :q || '%' COLLATE NOCASE ORDER BY name LIMIT :limit")
+    @Query("SELECT id, name FROM subjects WHERE mergedInto IS NULL AND name LIKE '%' || :q || '%' COLLATE NOCASE ORDER BY name LIMIT :limit")
     suspend fun searchSubjects(q: String, limit: Int = 30): List<SubjectRef>
 
     @Query("SELECT id, name FROM subjects WHERE id = :id")
@@ -72,6 +101,7 @@ interface SubjectDao : BaseDao<Subject> {
             SELECT s.id, s.name 
             FROM subjects s
             LEFT JOIN transactions t ON t.subject = s.id
+            WHERE s.mergedInto IS NULL
             GROUP BY s.id 
             ORDER BY COUNT(t.id) DESC 
             LIMIT :limit

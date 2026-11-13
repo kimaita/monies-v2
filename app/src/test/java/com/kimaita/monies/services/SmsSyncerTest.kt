@@ -35,6 +35,7 @@ class SmsSyncerTest {
         val unparsed = mutableListOf<UnparsedMessage>()
         val subjects = mutableMapOf<Pair<String, String>, Long>()
         val subjectCategories = mutableMapOf<Long, Int?>()
+        val mergedInto = mutableMapOf<Long, Long>()
 
         override suspend fun cursor() = cursor
         override suspend fun setCursor(id: Long) { cursor = id }
@@ -61,6 +62,7 @@ class SmsSyncerTest {
 
         override suspend fun subjectId(subject: Subject) =
             subjects.getOrPut(subject.rawName to subject.number) { subjects.size + 1L }
+                .let { mergedInto[it] ?: it }
 
         override suspend fun subjectCategory(subjectId: Long) = subjectCategories[subjectId]
         override suspend fun insertTransactions(transactions: List<Transaction>) {
@@ -217,5 +219,16 @@ class SmsSyncerTest {
         retime(1, "2024-01-01T10:00:00") // sub 1 now also active when sub 2 starts
         run(inbox, store)
         assertEquals(listOf(null, null), store.accounts.map { it.mergedInto })
+    }
+
+    @Test
+    fun aMergedSubjectsNewMessagesGoToTheTarget() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        run(FakeInbox(listOf(msg(1))), store)
+        val source = store.transactions.single().subject!!
+        val target = source + 100
+        store.mergedInto[source] = target // what SubjectDao.merge records
+        run(FakeInbox(listOf(msg(1), msg(2))), store)
+        assertEquals(target, store.transactions.last().subject)
     }
 }

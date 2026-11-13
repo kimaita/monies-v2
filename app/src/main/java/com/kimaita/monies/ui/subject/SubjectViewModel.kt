@@ -16,7 +16,14 @@ import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.getDatesForFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.kimaita.monies.models.export.NamedRef
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -79,6 +86,32 @@ class SubjectViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList()
         )
+
+    private val _subjectQuery = MutableStateFlow("")
+    val subjectQuery: StateFlow<String> = _subjectQuery.asStateFlow()
+    fun setSubjectQuery(q: String) {
+        _subjectQuery.value = q
+    }
+
+    /** Merge targets: the existing subject search, minus this subject. */
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    val subjectResults: StateFlow<List<NamedRef<Long>>> = _subjectQuery
+        .debounce(250.milliseconds).distinctUntilChanged()
+        .mapLatest { q ->
+            (if (q.isBlank()) repository.topSubjects() else repository.searchSubjects(q.trim()))
+                .filter { it.id != subjectId }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun rename(name: String) {
+        subjectId?.let { viewModelScope.launch { repository.renameSubject(it, name) } }
+    }
+
+    /** Merges this subject into [target]; [onDone] runs after a successful merge. */
+    fun mergeInto(target: NamedRef<Long>, onDone: () -> Unit) {
+        val source = subjectId ?: return
+        viewModelScope.launch { if (repository.mergeSubject(source, target.id)) onDone() }
+    }
 
     fun setTimeFilter(filter: TimeFilter) {
         _filters.value = _filters.value.copy(timeFilter = filter)

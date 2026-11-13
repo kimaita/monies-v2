@@ -16,6 +16,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import com.kimaita.monies.models.export.NamedRef
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,7 +79,77 @@ fun SubjectScreen(
     val subject by viewModel.subjectDetails.collectAsStateWithLifecycle()
     val stats by viewModel.subjectStats.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
+    var dialog by remember { mutableStateOf(SubjectDialog.None) }
+    var target by remember { mutableStateOf<NamedRef<Long>?>(null) }
 
+    when (dialog) {
+        SubjectDialog.Rename -> {
+            var text by remember { mutableStateOf(subject?.name ?: "") }
+            AlertDialog(
+                onDismissRequest = { dialog = SubjectDialog.None },
+                title = { Text("Rename") },
+                text = {
+                    OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true)
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = text.isNotBlank(),
+                        onClick = { viewModel.rename(text); dialog = SubjectDialog.None },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { dialog = SubjectDialog.None }) { Text("Cancel") } },
+            )
+        }
+
+        SubjectDialog.Pick -> {
+            val query by viewModel.subjectQuery.collectAsStateWithLifecycle()
+            val results by viewModel.subjectResults.collectAsStateWithLifecycle()
+            AlertDialog(
+                onDismissRequest = { dialog = SubjectDialog.None },
+                title = { Text("Merge into…") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = query, onValueChange = viewModel::setSubjectQuery, singleLine = true,
+                            placeholder = { Text("Search subjects…") },
+                        )
+                        LazyColumn(Modifier.heightIn(max = 280.dp)) {
+                            items(results.take(10), key = { it.id }) { ref ->
+                                Text(
+                                    ref.name,
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable { target = ref; dialog = SubjectDialog.Confirm }
+                                        .padding(vertical = 12.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { dialog = SubjectDialog.None }) { Text("Cancel") } },
+            )
+        }
+
+        SubjectDialog.Confirm -> target?.let { t ->
+            AlertDialog(
+                onDismissRequest = { dialog = SubjectDialog.None },
+                title = { Text("Merge into ${t.name}?") },
+                text = {
+                    Text("All transactions of ${subject?.name.orEmpty()} move to ${t.name}, and new messages from it will land there too.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        dialog = SubjectDialog.None
+                        viewModel.mergeInto(t) { navController.navigateUp() }
+                    }) { Text("Merge") }
+                },
+                dismissButton = { TextButton(onClick = { dialog = SubjectDialog.None }) { Text("Cancel") } },
+            )
+        }
+
+        SubjectDialog.None -> Unit
+    }
 
     SubjectScreenContent(
         modifier = modifier.padding(horizontal = 8.dp),
@@ -90,9 +167,13 @@ fun SubjectScreen(
             navController.navigateUp()
         },
         onSortOrderChange = { newOrder -> viewModel.setSortOrder(newOrder) },
+        onRenameClick = { dialog = SubjectDialog.Rename },
+        onMergeClick = { viewModel.setSubjectQuery(""); dialog = SubjectDialog.Pick },
     )
 
 }
+
+private enum class SubjectDialog { None, Rename, Pick, Confirm }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,13 +191,18 @@ fun SubjectScreenContent(
     totalCost: Double,
     onBackClick: () -> Unit,
     onSortOrderChange: (SortOrder) -> Unit,
+    onRenameClick: () -> Unit = {},
+    onMergeClick: () -> Unit = {},
 ) {
 
     val isPerson = incomingCount > 0 && outgoingCount > 0
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { }, navigationIcon = {
+            TopAppBar(title = { }, actions = {
+                TextButton(onClick = onRenameClick) { Text("Rename") }
+                TextButton(onClick = onMergeClick) { Text("Merge into…") }
+            }, navigationIcon = {
                 IconButton(onClick = { onBackClick() }) {
                     Icon(
                         painter = painterResource(R.drawable.outline_arrow_back_24),

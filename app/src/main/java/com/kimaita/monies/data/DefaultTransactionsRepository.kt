@@ -322,6 +322,13 @@ class DefaultTransactionsRepository @Inject constructor(
     override suspend fun searchSubjects(trim: String) =
         subjectDao.searchSubjects(trim).map { NamedRef(it.id, it.name) }
 
+    override suspend fun renameSubject(id: Long, name: String) = withContext(Dispatchers.IO) {
+        name.trim().takeIf { it.isNotEmpty() }?.let { subjectDao.rename(id, it) } ?: Unit
+    }
+
+    override suspend fun mergeSubject(source: Long, target: Long) =
+        withContext(Dispatchers.IO) { subjectDao.merge(source, target) }
+
     override suspend fun getSubjects(ids: List<Long>): List<NamedRef<Long>> =
         if (ids.isEmpty()) emptyList() else subjectDao.getSubjects(ids)
             .map { NamedRef(it.id, it.name) }
