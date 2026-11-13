@@ -35,7 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -48,7 +48,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,12 +75,10 @@ import com.kimaita.monies.ui.export.components.ProgressPanel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 private fun List<Int>.toggle(id: Int): List<Int> = if (id in this) this - id else this + id
 private val FORMAT_ORDER =
     listOf(ExportFormat.XLSX, ExportFormat.CSV, ExportFormat.PDF, ExportFormat.JSON)
-private val dayFmt = DateTimeFormatter.ofPattern("d MMM yyyy")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -93,10 +92,11 @@ fun ExportScreen(
     val context = LocalContext.current
 
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
-    var showStart by remember { mutableStateOf(false) }
-    var showEnd by remember { mutableStateOf(false) }
+    var showRangePicker by remember { mutableStateOf(false) }
 
-    val running = state is ExportState.InProgress
+    val today = LocalDate.now()
+    val accounts = options?.accounts.orEmpty()
+    val band = sel.band(today)
 
     LaunchedEffect(Unit) { if (viewModel.applyHandoff()) filtersExpanded = true }
 
@@ -155,7 +155,11 @@ fun ExportScreen(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    scopeLine(count, sel, options?.types.orEmpty()), style = MaterialTheme.typography.labelMedium,
+                    scopeLine(
+                        count, sel, options?.types.orEmpty(),
+                        accounts.firstOrNull { it.id == sel.accountId }?.name, today
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -175,21 +179,29 @@ fun ExportScreen(
                 }
             }
 
-            Column {
+            if (accounts.size > 1) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Account")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DirChip("All", sel.accountId == null) { viewModel.setAccount(null) }
+                    accounts.forEach { a ->
+                        DirChip(a.name, sel.accountId == a.id) { viewModel.setAccount(a.id) }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("Date range")
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DateBox(
-                        "FROM",
-                        sel.startDate,
-                        Modifier.weight(1f),
-                        onClick = { showStart = true },
-                        onClear = { viewModel.setStartDate(null) })
-                    DateBox(
-                        "TO",
-                        sel.endDate,
-                        Modifier.weight(1f),
-                        onClick = { showEnd = true },
-                        onClear = { viewModel.setEndDate(null) })
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DateBand.entries.forEach { b ->
+                        DirChip(b.label, band == b) {
+                            val (start, end) = b.range(today)
+                            viewModel.setRange(start, end)
+                        }
+                    }
+                    DirChip(
+                        if (band == null) rangeText(sel.startDate, sel.endDate, today) else "Custom…",
+                        band == null
+                    ) { showRangePicker = true }
                 }
             }
 
@@ -202,12 +214,10 @@ fun ExportScreen(
         }
     }
 
-    if (showStart) DatePickerSheet(
-        sel.startDate,
-        { showStart = false }) { viewModel.setStartDate(it); showStart = false }
-    if (showEnd) DatePickerSheet(
-        sel.endDate,
-        { showEnd = false }) { viewModel.setEndDate(it); showEnd = false }
+    if (showRangePicker) DateRangeDialog(
+        sel.startDate, sel.endDate, today,
+        onDismiss = { showRangePicker = false },
+    ) { start, end -> viewModel.setRange(start, end); showRangePicker = false }
 
     when (val s = state) {
         is ExportState.Completed -> AlertDialog(
@@ -291,50 +301,6 @@ private fun FormatCell(
     }
 }
 
-/* ---------------- date ---------------- */
-
-@Composable
-private fun DateBox(
-    label: String,
-    value: LocalDate?,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    onClear: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    Row(
-        modifier
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, cs.outlineVariant, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
-            Text(
-                value?.format(dayFmt) ?: "Any", style = MaterialTheme.typography.bodyMedium,
-                color = if (value == null) cs.onSurfaceVariant else cs.onSurface
-            )
-        }
-        if (value != null) IconButton(onClick = onClear, Modifier.size(48.dp)) {
-            Icon(
-                painterResource(R.drawable.close_small_24dp),
-                "Clear",
-                Modifier.size(18.dp),
-                tint = cs.onSurfaceVariant
-            )
-        }
-        else Icon(
-            painterResource(R.drawable.date_range),
-            null,
-            Modifier.size(18.dp),
-            tint = cs.onSurfaceVariant
-        )
-    }
-}
-
 /* ---------------- filters ---------------- */
 
 @Composable
@@ -375,7 +341,7 @@ private fun AddFiltersRow(activeCount: Int, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    "Subject, account, type, category, nature",
+                    "Subject, type, category, direction",
                     style = MaterialTheme.typography.labelSmall,
                     color = cs.onSurfaceVariant
                 )
@@ -477,19 +443,6 @@ private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
             }
         }
 
-        options?.accounts?.takeIf { it.isNotEmpty() }?.let { accounts ->
-            FilterLabel("Account")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DirChip("All", sel.accountId == null) { vm.setAccount(null) }
-                accounts.forEach { a ->
-                    DirChip(
-                        a.name,
-                        sel.accountId == a.id
-                    ) { vm.setAccount(a.id) }
-                }
-            }
-        }
-
         options?.categories?.takeIf { it.isNotEmpty() }?.let { cats ->
             FilterLabel("Categories")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -522,30 +475,41 @@ private fun DirChip(label: String, selected: Boolean, onClick: () -> Unit) =
 
 /* ---------------- date picker ---------------- */
 
+private fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun Long.toUtcDate() = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DatePickerSheet(
-    initial: LocalDate?,
+private fun DateRangeDialog(
+    start: LocalDate?,
+    end: LocalDate?,
+    today: LocalDate,
     onDismiss: () -> Unit,
-    onPick: (LocalDate) -> Unit
+    onPick: (LocalDate, LocalDate) -> Unit,
 ) {
-    val st = rememberDatePickerState(
-        initialSelectedDateMillis = initial?.atStartOfDay(ZoneOffset.UTC)?.toInstant()
-            ?.toEpochMilli()
+    val lastDay = today.toUtcMillis()
+    val st = rememberDateRangePickerState(
+        initialSelectedStartDateMillis = start?.toUtcMillis(),
+        initialSelectedEndDateMillis = if (start != null) end?.toUtcMillis() else null,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= lastDay
+        },
     )
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = {
-                st.selectedDateMillis?.let {
-                    onPick(
-                        Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
-                    )
-                }
-            }) { Text("OK") }
+            TextButton(
+                enabled = st.selectedStartDateMillis != null,
+                onClick = {
+                    st.selectedStartDateMillis?.let {
+                        val from = it.toUtcDate()
+                        onPick(from, st.selectedEndDateMillis?.toUtcDate() ?: from)
+                    }
+                },
+            ) { Text("OK") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    ) { DatePicker(st) }
+    ) { DateRangePicker(st, showModeToggle = true) }
 }
 
 /* ---------------- helpers ---------------- */
@@ -567,15 +531,19 @@ private fun FilterLabel(t: String) =
         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
     )
 
-private fun scopeLine(count: Int?, sel: ExportSelections, typeGroups: List<TypeGroup>): String {
+private fun scopeLine(
+    count: Int?,
+    sel: ExportSelections,
+    typeGroups: List<TypeGroup>,
+    accountName: String?,
+    today: LocalDate,
+): String {
     val n = count?.let { "%,d".format(it) } ?: "…"
-    val date = when {
-        sel.startDate == null && sel.endDate == null -> "all time"
-        else -> "custom range"
-    }
     val filters = sel.activeFilterCount(typeGroups)
     return buildString {
-        append("$n transactions · $date")
+        append("$n transactions")
+        accountName?.let { append(" · $it") }
+        append(" · ${sel.dateLabel(today)}")
         if (filters > 0) append(" · $filters filter${if (filters == 1) "" else "s"}")
     }
 }
