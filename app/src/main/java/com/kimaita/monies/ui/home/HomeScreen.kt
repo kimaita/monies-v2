@@ -66,6 +66,7 @@ import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.components.TransactionListItem
+import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.util.formatAmount
 import kotlin.math.abs
@@ -86,14 +87,14 @@ fun HomeScreen(
 
     HomeScreenContent(
         modifier = modifier,
-        onViewAllTransactions = { navController.navigate("transactions") },
-        onSearch = { navController.navigate("transactions?search=true") },
-        onSettings = { navController.navigate("settings") },
+        onViewAllTransactions = { navController.navigateSingleTop("transactions") },
+        onSearch = { navController.navigateSingleTop("transactions?search=true") },
+        onSettings = { navController.navigateSingleTop("settings") },
         onToggleHideBalances = viewModel::toggleHideBalances,
         onViewAnalytics = { navController.navigateToTab("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
         onAccountSelect = viewModel::selectAccount,
-        onSubjectClick = { subjectId -> navController.navigate("subject/$subjectId") },
+        onSubjectClick = { subjectId -> navController.navigateSingleTop("subject/$subjectId") },
         uiState = uiState,
         filter = filters,
         isSyncing = isSyncing,

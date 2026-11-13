@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,8 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -80,7 +79,9 @@ import com.kimaita.monies.services.TypeGroup
 import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.services.typeGroups
+import com.kimaita.monies.ui.components.SortMenu
 import com.kimaita.monies.ui.components.TransactionItemStyle
+import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
@@ -105,7 +106,7 @@ fun TransactionsScreen(
         modifier = modifier,
         filteredTransactions = filteredTransactions,
         subjectMatches = subjectMatches,
-        transactionTypes = transactionTypes.values.toList(),
+        transactionTypes = transactionTypes,
         categories = categories,
         filters = filters,
         openSearch = openSearch,
@@ -114,11 +115,13 @@ fun TransactionsScreen(
         onUpdateFilters = viewModel::updateFilters,
         onExport = {
             viewModel.exportResults()
+            // Pop without saving, so Transactions is not restored later and Back from Export lands on Home.
+            navController.popBackStack()
             navController.navigateToTab("export")
         },
         onBack = { navController.popBackStack() },
         onTransactionClick = { subjectId ->
-            navController.navigate("subject/$subjectId")
+            navController.navigateSingleTop("subject/$subjectId")
         }
     )
 }
@@ -145,7 +148,6 @@ fun TransactionsScreenContent(
 
     var showBottomSheet by remember { mutableStateOf(false) }
     var searchVisible by rememberSaveable { mutableStateOf(openSearch) }
-    var sortMenuExpanded by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -206,38 +208,7 @@ fun TransactionsScreenContent(
 //                    contentDescription = "Export"
 //                )
 //            }
-            Box {
-                IconButton(onClick = { sortMenuExpanded = true }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.sort), contentDescription = "Sort"
-                    )
-                }
-                DropdownMenu(
-                    expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
-                    SortOrder.entries.forEach { order ->
-                        DropdownMenuItem(text = {
-                            val label = when (order) {
-                                SortOrder.DATE_DESC -> "Newest first"
-                                SortOrder.DATE_ASC -> "Oldest first"
-                                SortOrder.AMOUNT_DESC -> "Largest first"
-                                SortOrder.AMOUNT_ASC -> "Smallest first"
-                            }
-                            Text(label)
-                        }, onClick = {
-                            onSetSortOrder(order)
-                            sortMenuExpanded = false
-                        }, trailingIcon = {
-                            if (filters.sortOrder == order) {
-                                Icon(
-                                    painterResource(R.drawable.check_24px),
-                                    null,
-                                    Modifier.size(18.dp)
-                                )
-                            }
-                        })
-                    }
-                }
-            }
+            SortMenu(filters.sortOrder, onSetSortOrder)
 
         })
     }) { paddingValues ->
@@ -295,7 +266,7 @@ fun TransactionsScreenContent(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(subjectMatches, key = { "subject_${it.subjectId}" }) { match ->

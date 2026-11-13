@@ -1,7 +1,6 @@
 package com.kimaita.monies.ui.settings
 
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,11 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -48,7 +45,10 @@ import com.kimaita.monies.data.dao.dtos.AccountLine
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.ui.components.CurrencyText
+import com.kimaita.monies.ui.components.TextDialog
+import com.kimaita.monies.ui.navigateSingleTop
 import com.kimaita.monies.ui.theme.ThemeMode
+import com.kimaita.monies.ui.util.copyToClipboard
 import com.kimaita.monies.ui.util.formatKes
 import java.time.Instant
 import java.time.LocalDateTime
@@ -56,6 +56,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val dateFmt = DateTimeFormatter.ofPattern("d MMM yyyy")
+private val messageDateFmt = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,7 +171,7 @@ fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel = 
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { navController.navigate("settings/unrecognised") }
+                        .clickable { navController.navigateSingleTop("settings/unrecognised") }
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                 )
             }
@@ -305,7 +306,6 @@ fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel = 
 @Composable
 fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewModel = hiltViewModel()) {
     val messages by viewModel.unparsed.collectAsStateWithLifecycle()
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
 
     Scaffold(
@@ -329,15 +329,14 @@ fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewMode
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(
                         "${m.address} · " + Instant.ofEpochMilli(m.date).atZone(ZoneId.systemDefault())
-                            .format(DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")),
+                            .format(messageDateFmt),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(m.body, style = MaterialTheme.typography.bodyMedium)
                     Row {
                         TextButton(onClick = {
-                            clipboard.setText(AnnotatedString(m.body))
-                            Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
+                            copyToClipboard(context, "Message", m.body)
                         }) { Text("Copy") }
                         TextButton(onClick = {
                             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, m.body)
@@ -404,20 +403,6 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) = Ro
 ) {
     RadioButton(selected = selected, onClick = null)
     Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
-}
-
-@Composable
-private fun TextDialog(
-    title: String, initial: String, label: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit,
-) {
-    var value by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { OutlinedTextField(value, { value = it }, label = { Text(label) }, singleLine = true) },
-        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
 }
 
 @Composable

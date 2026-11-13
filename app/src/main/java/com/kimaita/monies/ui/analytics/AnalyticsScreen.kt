@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,7 +36,6 @@ import com.kimaita.monies.services.feeShare
 import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.ui.charts.*
-import com.kimaita.monies.ui.components.AutoSizeText
 import com.kimaita.monies.ui.components.HighlightsFilter
 import com.kimaita.monies.ui.theme.MoniesTheme
 import com.kimaita.monies.ui.util.dayMonthFmt
@@ -199,13 +199,18 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             BentoCard {
                 TileLabel("Net this period")
                 Spacer(Modifier.height(6.dp))
-                AutoSizeText(
+                Text(
                     formatSignedKes(net),
                     Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = if (net >= 0) extra.positive else extra.negative,
-                    minFontSize = 22.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 22.sp,
+                        maxFontSize = MaterialTheme.typography.headlineMedium.fontSize,
+                    ),
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -696,13 +701,17 @@ private fun StatTile(
     BentoCard(modifier) {
         TileLabel(label)
         Spacer(Modifier.height(6.dp))
-        AutoSizeText(
+        Text(
             value, Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = color,
             maxLines = 1,
-            minFontSize = 14.sp,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = 14.sp,
+                maxFontSize = MaterialTheme.typography.titleLarge.fontSize,
+            ),
         )
         sub?.let {
             Text(

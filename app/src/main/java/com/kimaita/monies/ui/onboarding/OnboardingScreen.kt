@@ -12,7 +12,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,9 +67,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun OnboardingScreen(
@@ -141,12 +138,12 @@ fun OnboardingScreen(
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                 ) {
                     Text(
                         if (isLast) "Get started" else "Next",
-                        fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                        fontFamily = onbDisplay(),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp
                     )
@@ -238,7 +235,7 @@ private fun SmsBubble() {
                 .background(MaterialTheme.colorScheme.primary))
             Text(
                 "M-PESA · TODAY 2:02 PM",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontSize = 9.5.sp,
                 letterSpacing = 1.2.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -250,7 +247,7 @@ private fun SmsBubble() {
                 withStyle(SpanStyle(color = MoniesTheme.extra.outflow)) { append("WEF6X3K9LM") }
                 append(" Confirmed. Ksh1,500.00 paid to NAIVAS LIMITED. New M-PESA balance is Ksh8,420.00.")
             },
-            fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, lineHeight = 18.sp, color = Color(0xFF34302A),
+            fontFamily = onbMono(), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -264,7 +261,7 @@ private fun ArrowBadge(modifier: Modifier = Modifier) {
     ) {
         Text(
             "Monies reads it",
-            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+            fontFamily = onbMono(),
             fontWeight = FontWeight.Bold,
             fontSize = 10.5.sp,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -307,7 +304,7 @@ private fun RecordCard() {
         ) {
             Text(
                 "N",
-                fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                fontFamily = onbDisplay(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -322,14 +319,14 @@ private fun RecordCard() {
             )
             Text(
                 "Pay bill · 14:02",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Text(
             "−1,500",
-            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+            fontFamily = onbDisplay(),
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
             color = MoniesTheme.extra.negative
@@ -339,47 +336,49 @@ private fun RecordCard() {
 
 /* ---------- Page 2: live rows ---------- */
 
+// Colours come from the theme, so they are read when the row draws, not held here.
 private data class AutoRowData(
-    val avatar: Color,
+    val avatar: @Composable () -> Color,
     val glyph: String,
     val tag: String,
     val name: String,
     val sub: String,
     val amount: String,
-    val amountColor: Color
+    val amountColor: @Composable () -> Color
+)
+
+private val autoRows = listOf(
+    AutoRowData(
+        { MaterialTheme.colorScheme.primary },
+        "↗",
+        "RECV",
+        "Salary",
+        "Received · just now",
+        "+48,000",
+        { MoniesTheme.extra.positive }
+    ),
+    AutoRowData(
+        { MoniesTheme.extra.outflow },
+        "↘",
+        "SEND",
+        "Naivas",
+        "Pay bill · 14:02",
+        "−1,500",
+        { MoniesTheme.extra.negative }
+    ),
+    AutoRowData(
+        { MaterialTheme.colorScheme.onPrimaryContainer },
+        "F",
+        "FULIZA",
+        "Available",
+        "Updated 2:02 PM",
+        "1,000",
+        { MaterialTheme.colorScheme.onSurface }
+    ),
 )
 
 @Composable
 private fun AutoPage(active: Boolean) {
-    val rows = listOf(
-        AutoRowData(
-            MaterialTheme.colorScheme.primary,
-            "↗",
-            "RECV",
-            "Salary",
-            "Received · just now",
-            "+48,000",
-            MoniesTheme.extra.positive
-        ),
-        AutoRowData(
-            MoniesTheme.extra.outflow,
-            "↘",
-            "SEND",
-            "Naivas",
-            "Pay bill · 14:02",
-            "−1,500",
-            MoniesTheme.extra.negative
-        ),
-        AutoRowData(
-            MaterialTheme.colorScheme.onPrimaryContainer,
-            "F",
-            "FULIZA",
-            "Available",
-            "Updated 2:02 PM",
-            "1,000",
-            MaterialTheme.colorScheme.onSurface
-        ),
-    )
     Column(
         Modifier
             .fillMaxSize()
@@ -393,7 +392,7 @@ private fun AutoPage(active: Boolean) {
         ) {
             PulseDot(); Text(
             "LIVE",
-            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+            fontFamily = onbMono(),
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             letterSpacing = 1.sp,
@@ -409,20 +408,8 @@ private fun AutoPage(active: Boolean) {
         )
         Spacer(Modifier.height(24.dp))
         Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            rows.forEachIndexed { i, r ->
-                var show by remember(active) { mutableStateOf(false) }
-                LaunchedEffect(active) {
-                    if (active) {
-                        delay((120L * i).milliseconds); show = true
-                    } else show = false
-                }
-                AnimatedVisibility(
-                    show,
-                    enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
-                    AutoRow(
-                        r
-                    )
-                }
+            autoRows.forEachIndexed { i, r ->
+                Reveal(active, i, 280) { AutoRow(r) }
             }
         }
     }
@@ -441,15 +428,15 @@ private fun AutoRow(r: AutoRowData) {
             Modifier
                 .size(42.dp)
                 .clip(RoundedCornerShape(13.dp))
-                .background(r.avatar),
+                .background(r.avatar()),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 r.glyph,
-                fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                fontFamily = onbDisplay(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onPrimary
             )
         }
         Column(Modifier.weight(1f)) {
@@ -459,7 +446,7 @@ private fun AutoRow(r: AutoRowData) {
             ) {
                 Text(
                     r.tag,
-                    fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                    fontFamily = onbMono(),
                     fontSize = 9.5.sp,
                     letterSpacing = 0.8.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -476,14 +463,14 @@ private fun AutoRow(r: AutoRowData) {
                 )
             }
             Spacer(Modifier.height(2.dp))
-            Text(r.sub, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(r.sub, fontFamily = onbMono(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
             r.amount,
-            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+            fontFamily = onbDisplay(),
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp,
-            color = r.amountColor
+            color = r.amountColor()
         )
     }
 }
@@ -566,7 +553,7 @@ private fun RankedPreviewRow(label: String, pct: Int, color: Color) {
             Spacer(Modifier.weight(1f))
             Text(
                 "$pct%",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -601,7 +588,7 @@ private fun StatCard(
     Column(modifier.onbCard()) {
         Text(
             label,
-            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+            fontFamily = onbMono(),
             fontSize = 10.sp,
             letterSpacing = 1.2.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -609,7 +596,7 @@ private fun StatCard(
         Spacer(Modifier.height(5.dp))
         Text(
             value,
-            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+            fontFamily = onbDisplay(),
             fontWeight = FontWeight.Bold,
             fontSize = 21.sp,
             letterSpacing = (-0.5).sp,
@@ -618,7 +605,7 @@ private fun StatCard(
         if (change != null) {
             Spacer(Modifier.height(4.dp)); Text(
                 change,
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 color = MoniesTheme.extra.negative
@@ -627,7 +614,7 @@ private fun StatCard(
         if (sub != null) {
             Spacer(Modifier.height(4.dp)); Text(
                 sub,
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -647,7 +634,7 @@ private fun CashFlowCard() {
         ) {
             Text(
                 "CASH FLOW · 6 WEEKS",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontSize = 10.sp,
                 letterSpacing = 1.2.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -674,7 +661,7 @@ private fun FlowLegend(color: Color, label: String) {
             .size(9.dp)
             .clip(RoundedCornerShape(3.dp))
             .background(color))
-        Text(label, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontFamily = onbMono(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -730,7 +717,7 @@ private fun ExportChips() {
         listOf("CSV", "Excel", "PDF").forEach {
             Text(
                 it,
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontFamily = onbMono(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -767,19 +754,7 @@ private fun PermissionsPage(active: Boolean) {
         Spacer(Modifier.height(20.dp))
         Column {
             rationales.forEachIndexed { i, r ->
-                var show by remember(active) { mutableStateOf(false) }
-                LaunchedEffect(active) {
-                    if (active) {
-                        delay((120L * i).milliseconds); show = true
-                    } else show = false
-                }
-                AnimatedVisibility(
-                    show,
-                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 }) {
-                    OnbPermissionRow(
-                        r
-                    )
-                }
+                Reveal(active, i, 300) { OnbPermissionRow(r) }
             }
         }
     }
@@ -831,11 +806,11 @@ private fun OnbPermissionRow(item: PermissionRationale) {
 private fun OnbMarker(required: Boolean) {
     Text(
         if (required) "REQUIRED" else "OPTIONAL",
-        fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+        fontFamily = onbMono(),
         fontWeight = FontWeight.Bold,
         fontSize = 9.5.sp,
         letterSpacing = 0.6.sp,
-        color = if (required) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (required) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(if (required) MoniesTheme.extra.outflow else MaterialTheme.colorScheme.surfaceContainerHigh)
