@@ -31,6 +31,7 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.StreakSummary
+import com.kimaita.monies.services.activeSummary
 import com.kimaita.monies.services.feeShare
 import com.kimaita.monies.ui.charts.*
 import com.kimaita.monies.ui.components.AutoSizeText
@@ -160,7 +161,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val breakdownOrNull by vm.breakdown.collectAsStateWithLifecycle()
     val cashFlowOrNull by vm.cashFlow.collectAsStateWithLifecycle()
     val balanceOrNull by vm.balanceTrend.collectAsStateWithLifecycle()
-    val heatOrNull by vm.heat.collectAsStateWithLifecycle()
+    val activityOrNull by vm.activityRaw.collectAsStateWithLifecycle()
     val topOrNull by vm.topMerchant.collectAsStateWithLifecycle()
     val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val extra = MoniesTheme.extra
@@ -169,10 +170,10 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val breakdownRows = breakdownOrNull
     val cashFlow = cashFlowOrNull
     val balance = balanceOrNull
-    val heat = heatOrNull
+    val activity = activityOrNull
     val top = topOrNull
     val sources = sourcesOrNull
-    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || heat == null ||
+    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || activity == null ||
         top == null || sources == null
     ) {
         LoadingTab(listState)
@@ -181,6 +182,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val whereItGoes = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
     val net = remember(stats) { stats.income - stats.expense }
     val fees = remember(stats) { stats.incomeCost + stats.expenseCost }
+    val activeText = remember(activity) { activeSummary(activity) ?: "Not enough activity yet" }
 
     TabList(listState) {
         pace?.let { p ->
@@ -267,7 +269,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             BentoCard(onClick = { onJump(AnalyticsTab.ACTIVITY) }) {
                 TileLabel("When you're active")
                 Spacer(Modifier.height(8.dp))
-                if (heat.isEmpty()) EmptyHint() else TimeOfDayHeatmap(heat, showLabels = false)
+                Text(activeText, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }

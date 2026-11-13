@@ -1,5 +1,6 @@
 package com.kimaita.monies.services
 
+import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
@@ -201,5 +202,37 @@ class AnalyticsCalculationsTest {
         assertEquals(2.5, feeShare(25.0, 1000.0)!!, 1e-9)
         assertNull(feeShare(25.0, 0.0))
         assertNull(feeShare(0.0, -5.0))
+    }
+
+    private fun cell(weekday: Int, slot: Int, count: Int) = ActivityCell(weekday, slot, count)
+
+    @Test
+    fun activeSummary_tooLittleActivityIsNull() {
+        assertNull(activeSummary(emptyList()))
+        assertNull(activeSummary(listOf(cell(1, 2, 4))))
+    }
+
+    @Test
+    fun activeSummary_weekdaySlotWhenWeekdaysDominate() {
+        // 10 on weekdays is 2 a day, 1 at the weekend is 0.5 a day.
+        val cells = listOf(cell(1, 2, 5), cell(3, 2, 5), cell(6, 2, 1), cell(2, 0, 2))
+        assertEquals("Most active on weekday evenings, 5–10 pm", activeSummary(cells))
+    }
+
+    @Test
+    fun activeSummary_weekendSlotWhenWeekendDominates() {
+        val cells = listOf(cell(0, 3, 6), cell(6, 3, 6), cell(2, 3, 2))
+        assertEquals("Most active on weekend nights, 10 pm–5 am", activeSummary(cells))
+    }
+
+    @Test
+    fun activeSummary_evenSpreadNamesOnlyTheSlot() {
+        // 5 weekday and 2 weekend transactions are the same rate.
+        val cells = listOf(cell(1, 1, 5), cell(0, 1, 2), cell(2, 0, 1))
+        assertEquals("Most active in the afternoons, 12–5 pm", activeSummary(cells))
+        assertEquals(
+            "Most active in the mornings, 5 am–12 pm",
+            activeSummary(listOf(cell(1, 0, 3), cell(4, 0, 2), cell(6, 0, 1), cell(0, 0, 1))),
+        )
     }
 }

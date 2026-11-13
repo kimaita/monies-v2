@@ -225,7 +225,7 @@ class AnalyticsViewModel @Inject constructor(
     }.stateIn(viewModelScope, started, null)
 
     // ---------------- Activity tab ----------------
-    private val activityRaw: StateFlow<List<ActivityCell>?> =
+    val activityRaw: StateFlow<List<ActivityCell>?> =
         key.flatMapLatest { k ->
             repository.getActivityByTimeOfDay(
                 k.start, k.end, k.subjects, k.categories, k.types, k.nature

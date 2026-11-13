@@ -202,3 +202,26 @@ fun balancePoints(rows: List<BalanceBucket>, maxPoints: Int = 90): List<BalanceP
  * nothing was spent.
  */
 fun feeShare(fees: Double, expense: Double): Double? = if (expense > 0.0) fees / expense * 100 else null
+
+private val slotNames = listOf("mornings", "afternoons", "evenings", "nights")
+private val slotRanges = listOf("5 am–12 pm", "12–5 pm", "5–10 pm", "10 pm–5 am")
+
+/**
+ * One sentence on when the activity is, from the time-of-day cells (slot 0 morning .. 3 night,
+ * weekday 0 = Sunday): the busiest slot, and "weekday" or "weekend" when that slot's per-day rate is
+ * over 1.5 times the other's. Null when there are fewer than 5 transactions.
+ */
+fun activeSummary(cells: List<ActivityCell>): String? {
+    if (cells.sumOf { it.count } < 5) return null
+    val slot = (0..3).maxByOrNull { s -> cells.filter { it.slot == s }.sumOf { it.count } } ?: return null
+    val inSlot = cells.filter { it.slot == slot }
+    val weekdayRate = inSlot.filter { it.weekday in 1..5 }.sumOf { it.count } / 5.0
+    val weekendRate = inSlot.filter { it.weekday == 0 || it.weekday == 6 }.sumOf { it.count } / 2.0
+    val name = slotNames[slot]
+    val range = slotRanges[slot]
+    return when {
+        weekdayRate > weekendRate * 1.5 -> "Most active on weekday $name, $range"
+        weekendRate > weekdayRate * 1.5 -> "Most active on weekend $name, $range"
+        else -> "Most active in the $name, $range"
+    }
+}
