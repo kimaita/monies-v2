@@ -37,8 +37,13 @@ class SmsParserSamplesTest {
     }
 
     @Test
-    fun everyMpesaSampleParses() {
-        mpesaSamples.forEachIndexed { i, sample ->
+    fun everyMpesaSampleParses() = checkAll(mpesaSamples)
+
+    @Test
+    fun everyAirtelSampleParses() = checkAll(airtelSamples)
+
+    private fun checkAll(samples: List<Sample>) {
+        samples.forEachIndexed { i, sample ->
             try {
                 check(sample)
             } catch (e: AssertionError) {
@@ -51,6 +56,17 @@ class SmsParserSamplesTest {
     fun everyDefaultMpesaTypeHasASample() {
         val covered = mpesaSamples.map { it.type }.toSet() + "airtime.other" // no sample for this one
         assertEquals(emptySet<String>(), types.filter { it.provider == Provider.MPESA.name }.map { it.name }.toSet() - covered)
+    }
+
+    @Test
+    fun everyDefaultAirtelTypeHasASample() {
+        val covered = airtelSamples.map { it.type }.toSet()
+        assertEquals(emptySet<String>(), types.filter { it.provider == Provider.AIRTEL.name }.map { it.name }.toSet() - covered)
+    }
+
+    @Test
+    fun airtelMessagesAreNotMatchedForOtherSenders() {
+        assertTrue(parseOne(airtelSamples.first { it.type == "airtel.bundle" }.body, "MPESA").isEmpty())
     }
 
     @Test
@@ -73,7 +89,8 @@ class SmsParserSamplesTest {
         val body = mpesaSamples.first { it.type == "till" }.body
         assertEquals(1, parseOne(body, "mpesa").size)
         assertEquals(Provider.MPESA, Provider.forSender("m-shwari"))
-        assertNull(Provider.forSender("airtelmoney"))
+        assertEquals(Provider.AIRTEL, Provider.forSender("AirtelMoney"))
+        assertNull(Provider.forSender("someone"))
     }
 
     @Test

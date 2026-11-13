@@ -19,6 +19,19 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TransactionsDao : BaseDao<Transaction> {
 
+    /** One Airtel till payment sends two SMS with the same code; keep the one that names the merchant. */
+    @Query(
+        """
+        DELETE FROM transactions
+        WHERE transactionType IN (SELECT id FROM transaction_types WHERE name = 'airtel.pay.receipt')
+        AND transactionCode IN (
+            SELECT t.transactionCode FROM transactions t
+            JOIN transaction_types ty ON ty.id = t.transactionType
+            WHERE ty.name = 'airtel.pay')
+        """
+    )
+    suspend fun deletePairedAirtelReceipts()
+
     @androidx.room.Transaction
     @Query(
         """

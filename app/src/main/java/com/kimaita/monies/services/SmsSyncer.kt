@@ -50,6 +50,9 @@ interface SyncStore {
     suspend fun subjectId(subject: Subject): Long
     suspend fun subjectCategory(subjectId: Long): Int?
     suspend fun insertTransactions(transactions: List<Transaction>)
+
+    /** Removes an `airtel.pay.receipt` row when an `airtel.pay` row carries the same code. */
+    suspend fun deletePairedAirtelReceipts()
     suspend fun insertUnparsed(messages: List<UnparsedMessage>)
     suspend fun inTransaction(block: suspend () -> Unit)
 }
@@ -78,6 +81,8 @@ class RoomSyncStore(
     override suspend fun subjectCategory(subjectId: Long) = subjectDao.getCategoryId(subjectId)
     override suspend fun insertTransactions(transactions: List<Transaction>) =
         transactionsDao.insertAll(transactions)
+
+    override suspend fun deletePairedAirtelReceipts() = transactionsDao.deletePairedAirtelReceipts()
 
     override suspend fun insertUnparsed(messages: List<UnparsedMessage>) =
         unparsedDao.insertAll(messages)
@@ -210,6 +215,7 @@ class SmsSyncer(
             )
         }
         store.insertTransactions(toInsert)
+        store.deletePairedAirtelReceipts()
     }
 
     companion object {

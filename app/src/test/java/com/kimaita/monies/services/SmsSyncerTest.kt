@@ -56,6 +56,12 @@ class SmsSyncerTest {
             transactions.forEach { t -> if (this.transactions.none { it.message == t.message }) this.transactions += t }
         }
 
+        override suspend fun deletePairedAirtelReceipts() {
+            val id = { name: String -> types.first { it.name == name }.id }
+            val paid = transactions.filter { it.transactionType == id("airtel.pay") }.map { it.transactionCode }.toSet()
+            transactions.removeAll { it.transactionType == id("airtel.pay.receipt") && it.transactionCode in paid }
+        }
+
         override suspend fun insertUnparsed(messages: List<UnparsedMessage>) {
             messages.forEach { m -> if (unparsed.none { it.body == m.body }) unparsed += m }
         }
@@ -105,6 +111,35 @@ class SmsSyncerTest {
         assertEquals(2, store.transactions.size)
         assertEquals(setOf("MPESA"), store.accounts.map { it.provider }.toSet())
         assertTrue(Provider.forSender("mpesa") == Provider.MPESA)
+    }
+
+    @Test
+    fun airtelSenderInAnyCaseIsRead() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val bodies = airtelSamples.filter { it.type == "airtel.send_money" }.map { it.body }
+        run(
+            FakeInbox(listOf(msg(1, bodies[0], "AIRTELMONEY"), msg(2, bodies[1], "AirtelMoney"), msg(3, bodies[2], "airtelmoney"))),
+            store,
+        )
+        assertEquals(3, store.transactions.size)
+        assertEquals(setOf("AIRTEL"), store.accounts.map { it.provider }.toSet())
+    }
+
+    @Test
+    fun pairedTillPaymentYieldsOneRowWithTheMerchant() {
+        val receipt = airtelSamples.first { it.type == "airtel.pay.receipt" }.body
+        val pay = airtelSamples.first { it.type == "airtel.pay" }
+        val payTypeId = 1 + getDefaultTransactionTypes().indexOfFirst { it.name == "airtel.pay" }
+        for (batchSize in listOf(512, 1)) {
+            val store = FakeStore(getDefaultTransactionTypes())
+            runBlocking {
+                val s = syncer(FakeInbox(listOf(msg(1, receipt, "airtelmoney"), msg(2, pay.body, "airtelmoney"))), store)
+                if (batchSize == 512) s.syncAll() else { s.syncBatch(1); s.syncBatch(1) }
+            }
+            val row = store.transactions.single()
+            assertEquals(payTypeId, row.transactionType)
+            assertEquals(pay.name, store.subjects.entries.single { it.value == row.subject }.key.first)
+        }
     }
 
     @Test

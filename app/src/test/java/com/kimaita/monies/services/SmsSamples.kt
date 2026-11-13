@@ -52,8 +52,8 @@ val mpesaSamples: List<Sample> = listOf(
     ),
     // Send money, Pochi
     Sample(
-        "TQZA6PZV7W Confirmed. Ksh99.00 sent to JOHN  DOE 0700000001 on 5/11/24 at 8:54 PM. New M-PESA balance is Ksh613.00. Transaction cost, Ksh0.00. Amount you can transact within the day is 918,178.77. Thank you for being our valued customer, we appreciate you.",
-        "MPESA", "send_money", 99.0, 0.0, 613.00, "JOHN DOE", "0700000001", dt(2024, 11, 5, 20, 54),
+        "VJ58A7HW0F Confirmed. Ksh99.00 sent to ALEX  DOE 0700000001 on 5/11/24 at 8:54 PM. New M-PESA balance is Ksh554.21. Transaction cost, Ksh0.00. Amount you can transact within the day is 347,201.00. Thank you for being our valued customer, we appreciate you.",
+        "MPESA", "send_money", 99.0, 0.0, 554.21, "ALEX DOE", "0700000001", dt(2024, 11, 5, 20, 54),
     ),
     Sample(
         "VT60HZVMJQ Confirmed. Ksh60.00 sent to Mary  Doe on 5/11/24 at 8:05 PM. New M-PESA balance is Ksh720.07. Transaction cost, Ksh0.00. Amount you can transact within the day is 632,920.00. Sign up for Lipa Na M-PESA Till online https://m-pesaforbusiness.co.ke",
@@ -170,5 +170,86 @@ val mpesaSamples: List<Sample> = listOf(
     Sample(
         "SV736QRLD8 confirmed. Your original transaction AT60263ZDC in favour of JANE    ANN    DOE has been reversed successfully on 3/12/25 at 9:02 PM  and Ksh137.00 has been credited to your M-PESA account. Your new M-PESA account balance is Ksh137.00.",
         "MPESA", "reversal", 137.0, 0.0, 137.0, "JANE ANN DOE", null, dt(2025, 12, 3, 21, 2),
+    ),
+)
+
+val airtelSamples: List<Sample> = listOf(
+    // Send money (to a Safaricom number, to an Airtel number) and Pochi La Biashara
+    Sample(
+        "X7GEY96MH4L. Ksh 50 sent to JANE DOE 700000001 on 10/12/25 at 12:13 PM. Fee: Ksh 0. Bal: Ksh 666.0. Receiving TID: EZM4W6MSBU.",
+        "airtelmoney", "airtel.send_money", 50.0, 0.0, 666.0, "JANE DOE", "700000001", dt(2025, 12, 10, 12, 13),
+    ),
+    Sample(
+        "93Z2NCDBBFG. Ksh 300 sent to ALEX DOE 700000002 on 04/12/25 at 03:00 PM. Fee: Ksh 6. Bal: Ksh 39.0. Receiving TID: GB7750674V.",
+        "airtelmoney", "airtel.send_money", 300.0, 6.0, 39.0, "ALEX DOE", "700000002", dt(2025, 12, 4, 15, 0),
+    ),
+    Sample(
+        "65QQ1GE2CMN. Ksh 20 sent to Jane Doe 0700000001 on 17/11/25 04:18 PM. Fee: Ksh 0. Bal: Ksh 0.0.",
+        "airtelmoney", "airtel.send_money", 20.0, 0.0, 0.0, "Jane Doe", "0700000001", dt(2025, 11, 17, 16, 18),
+    ),
+    Sample(
+        "R2TJDJ24XHB. Ksh 40 sent to MARY WANJIKU 700000003 on 13/12/25 at 10:54 AM. Fee: Ksh 0. Bal: Ksh 805.0. Receiving TID: MLB0X7R2DX.",
+        "airtelmoney", "airtel.send_money", 40.0, 0.0, 805.0, "MARY WANJIKU", "700000003", dt(2025, 12, 13, 10, 54),
+    ),
+    Sample(
+        "54QXHZFBGY0. Ksh 70 sent to SAMUEL KAMAU 700000004 on 12/12/25 at 06:45 PM. Fee: Ksh 0. Bal: Ksh 419.0. Receiving TID: NYMXK2Q5KC.",
+        "airtelmoney", "airtel.send_money", 70.0, 0.0, 419.0, "SAMUEL KAMAU", "700000004", dt(2025, 12, 12, 18, 45),
+    ),
+    // Till: the receipt notice, then the notice that names the merchant (same code), then a payment to Airtel
+    Sample(
+        "Z7FH2XGBWV6. Ksh 100 paid to Lipa Na Mpesa via Airtel Money on 11/12/25 at 05:22 PM. Fee: Ksh 0. Bal: Ksh 507.0. Receiving TID: BQXP20BTS9",
+        "airtelmoney", "airtel.pay.receipt", 100.0, 0.0, 507.0, null, null, dt(2025, 12, 11, 17, 22),
+    ),
+    Sample(
+        "Z7FH2XGBWV6 Confirmed. Ksh 100 paid to ACME COLLEGE REFECTORY SECTION for account 5000001 on 11/12/2025 at 17:22. Cost Ksh 0. New Airtel Money Bal:Ksh 507.0. Receiving TXN ID BQXP20BTS9.",
+        "airtelmoney", "airtel.pay", 100.0, 0.0, 507.0, "ACME COLLEGE REFECTORY SECTION", "5000001", dt(2025, 12, 11, 17, 22),
+    ),
+    Sample(
+        "15113717030 Confirmed. Ksh 80.00 successfully paid to Airtel Networks on 30/08/24 at 05:54 PM. Transaction cost Ksh 0.00. Bal: Ksh 22.00.",
+        "airtelmoney", "airtel.pay", 80.0, 0.0, 22.0, "Airtel Networks", null, dt(2024, 8, 30, 17, 54),
+    ),
+    // Received
+    Sample(
+        "You have received Ksh 100.00 from MPESA - ALEX DOE 254700000002. TID: 17600467400. Fee: Ksh 0.00. Bal: Ksh 428.00.",
+        "airtelmoney", "airtel.received", 100.0, 0.0, 428.0, "ALEX DOE", "254700000002", null,
+    ),
+    Sample(
+        "You have received Ksh 20.00 from MPESA - ALEX DOE 254700000002. Txn ID: 16383151182. fee: Ksh 0.00. Bal: Ksh 20.00. Pay at any M-PESA Till using Airtel Money! Dial *334# or use My Airtel App>Buy goods",
+        "airtelmoney", "airtel.received", 20.0, 0.0, 20.0, "ALEX DOE", "254700000002", null,
+    ),
+    Sample(
+        "You have received Ksh 20.00 from MPESA - ALEX DOE 254700000002. Txn ID: 19139078576. fee: Ksh 0.00. Bal: Ksh 24.00. Pay at any M-PESA Till using Airtel Money! Dial *334# or use My Airtel App>Buy goods",
+        "airtelmoney", "airtel.received", 20.0, 0.0, 24.0, "ALEX DOE", "254700000002", null,
+    ),
+    Sample(
+        "TID:U6SWEZAKYQ3. Received Ksh 50 from ALEX DOE 254700000002 on 02/12/25 03:56 PM. Bal:Ksh 50.0 Sender TID:TD247CJNL2.",
+        "airtelmoney", "airtel.received", 50.0, 0.0, 50.0, "ALEX DOE", "254700000002", dt(2025, 12, 2, 15, 56),
+    ),
+    Sample(
+        "You have received Ksh 100.00 from MPESA ALEX DOE 254700000002. TID: 12817316934. Fee: Ksh 0.00. Bal: Ksh 137.00.",
+        "airtelmoney", "airtel.received", 100.0, 0.0, 137.0, "ALEX DOE", "254700000002", null,
+    ),
+    Sample(
+        "B7Y30YG4MDC. You have received Ksh 2,000 from ACME BANK B2C on 05/12/25 08:50 PM. Bal: Ksh 7568.0.",
+        "airtelmoney", "airtel.received", 2000.0, 0.0, 7568.0, "ACME BANK B2C", null, dt(2025, 12, 5, 20, 50),
+    ),
+    // Airtime
+    Sample(
+        "10429072006 successful. Airtime top up of Ksh 10.00 to 700000005 on 10/05/23 at 02:20 PM. 25% bonus airtime received. Dial *131*1# to check bonus",
+        "airtelmoney", "airtel.airtime", 10.0, 0.0, null, "Airtime", "700000005", dt(2023, 5, 10, 14, 20),
+    ),
+    Sample(
+        "14168251422 successful. Airtime top up of Ksh 20.00 to 700000005 on 09/05/23 at 08:51 PM. 25% bonus airtime received. Dial *131*1# to check bonus",
+        "airtelmoney", "airtel.airtime", 20.0, 0.0, null, "Airtime", "700000005", dt(2023, 5, 9, 20, 51),
+    ),
+    // Bundle
+    Sample(
+        "94754018800 Confirmed. You have successfully purchased a bundle of Ksh 50 for your line via Airtel Networks Kenya Ltd on 12/12/25 at 11:36 AM. Fee: Ksh 0. Bal: Ksh 202.0.",
+        "airtelmoney", "airtel.bundle", 50.0, 0.0, 202.0, "Airtel Networks Kenya Ltd", null, dt(2025, 12, 12, 11, 36),
+    ),
+    // Withdrawal
+    Sample(
+        "M6J90H86E53 Confirmed. You have withdrawn Ksh 500 from 650299 ACMESHOP EXAMPLEMALL on 04/12/25 at 11:17 AM. Fee: Ksh 25 Bal Ksh 257.0.",
+        "airtelmoney", "airtel.withdrawal", 500.0, 25.0, 257.0, "650299 ACMESHOP EXAMPLEMALL", null, dt(2025, 12, 4, 11, 17),
     ),
 )
