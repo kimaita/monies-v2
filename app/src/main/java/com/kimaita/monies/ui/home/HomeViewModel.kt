@@ -6,6 +6,7 @@ import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.models.OtherBalances
+import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.getDatesForFilter
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Duration
 import java.time.LocalDate
@@ -39,6 +41,9 @@ data class HomeUiState(
     /** The selected account's balance, or the sum across accounts when none is selected. */
     val mpesaBalance: Double = 0.0,
     val accountBalances: List<AccountBalance> = emptyList(),
+    /** Every active line, for the account chips. */
+    val accounts: List<AccountBalance> = emptyList(),
+    val selectedAccount: Int? = null,
     val incomeVsExpense: IncExp = IncExp(),
     val transactionCount: Int = 0,
     val recentTransactions: List<Transaction> = emptyList(),
@@ -82,6 +87,10 @@ class HomeViewModel @Inject constructor(
     )
     val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
 
+    fun selectAccount(id: Int?) {
+        viewModelScope.launch { repository.setSelectedAccount(id) }
+    }
+
     fun setTimeFilter(filter: TimeFilter) {
         _timeFilter.value = filter
     }
@@ -112,17 +121,21 @@ class HomeViewModel @Inject constructor(
         combine(
             repository.getAccountBalances().fallbackOnError(emptyList()),
             repository.selectedAccount,
-        ) { balances, selected -> balances.filter { it.balance != null } to selected },
+        ) { lines, selected -> Triple(lines.filter { it.balance != null }, selected, lines) },
         repository.getRecentTransactions(5).fallbackOnError(emptyList()),
         repository.getOtherBalances().fallbackOnError(OtherBalances()),
         periodData,
-    ) { (balances, selected), recent, other, period ->
+    ) { (balances, selected, lines), recent, other, period ->
         val shown = if (selected == null) balances else balances.filter { it.accountId == selected }
+        // Fuliza and M-Shwari belong to M-PESA: hide them when another provider's line is selected.
+        val mpesaView = selected == null || lines.any { it.accountId == selected && it.provider == Provider.MPESA.name }
         val totalMoved = period.incExp.income + period.incExp.expense
         val prevMoved = period.previousIncExp?.let { it.income + it.expense }
         HomeUiState(
             mpesaBalance = shown.sumOf { it.balance ?: 0.0 },
             accountBalances = balances,
+            accounts = lines,
+            selectedAccount = selected,
             incomeVsExpense = period.incExp,
             transactionCount = period.incExp.incomeCount + period.incExp.expenseCount,
             totalTransactionCost = period.incExp.incomeCost + period.incExp.expenseCost,
@@ -132,10 +145,10 @@ class HomeViewModel @Inject constructor(
             largestExpense = period.largestExpense,
             changeInTotal = percentChange(current = totalMoved, previous = prevMoved),
             isLoading = false,
-            availableFuliza = other.availableFuliza,
-            outstandingFuliza = other.outstandingFuliza,
-            mshwariBalance = other.mshwariBalance,
-            lockSavings = other.lockSavings,
+            availableFuliza = other.availableFuliza.takeIf { mpesaView },
+            outstandingFuliza = other.outstandingFuliza.takeIf { mpesaView },
+            mshwariBalance = other.mshwariBalance.takeIf { mpesaView },
+            lockSavings = other.lockSavings.takeIf { mpesaView },
         )
     }.stateIn(
         scope = viewModelScope,

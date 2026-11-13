@@ -1,4 +1,4 @@
-package com.kimaita.monies.ui.account
+package com.kimaita.monies.ui.subject
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
@@ -63,10 +63,10 @@ import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(
+fun SubjectScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    viewModel: AccountViewModel = hiltViewModel()
+    viewModel: SubjectViewModel = hiltViewModel()
 ) {
     val transactions = viewModel.subjectTransactions.collectAsLazyPagingItems()
     val subject by viewModel.subjectDetails.collectAsStateWithLifecycle()
@@ -74,7 +74,7 @@ fun AccountScreen(
     val filters by viewModel.filters.collectAsStateWithLifecycle()
 
 
-    AccountScreenContent(
+    SubjectScreenContent(
         modifier = modifier.padding(horizontal = 8.dp),
         transactions = transactions,
         filters = filters,
@@ -96,7 +96,7 @@ fun AccountScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreenContent(
+fun SubjectScreenContent(
     modifier: Modifier = Modifier,
     transactions: LazyPagingItems<Transaction>,
     filters: TransactionFilters,
@@ -413,7 +413,7 @@ fun SubjectProfilePreview() {
         val fakeTransactions = flowOf(PagingData.from(transactions)).collectAsLazyPagingItems()
 
 
-        AccountScreenContent(
+        SubjectScreenContent(
             name = "John Doe",
             number = "0701020304",
             category = "CATEGORY",
@@ -440,7 +440,7 @@ fun BusinessProfilePreview() {
         val pagingData = PagingData.from(mockList)
         val fakeTransactions = flowOf(pagingData).collectAsLazyPagingItems()
 
-        AccountScreenContent(
+        SubjectScreenContent(
             transactions = fakeTransactions,
             name = "SAFARICOM PLC",
             number = "444444",

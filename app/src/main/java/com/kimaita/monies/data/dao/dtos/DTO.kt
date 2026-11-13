@@ -93,6 +93,7 @@ data class AccountBalance(
     val accountId: Int,
     val name: String,
     val balance: Double?,
+    val provider: String,
 )
 
 /** A Fuliza transaction: type name, time (ISO text), amount, and the stored message. */

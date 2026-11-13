@@ -21,7 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kimaita.monies.R
-import com.kimaita.monies.ui.account.AccountScreen
+import com.kimaita.monies.ui.subject.SubjectScreen
 import com.kimaita.monies.ui.analytics.AnalyticsScreen
 import com.kimaita.monies.ui.export.ExportScreen
 import com.kimaita.monies.ui.home.HomeScreen
@@ -110,10 +110,10 @@ fun MoniesNavHost(
             )
         }
         composable(
-            route = "account/{subjectId}",
+            route = "subject/{subjectId}",
             arguments = listOf(navArgument("subjectId") { type = NavType.StringType })
         ) {
-            AccountScreen(navController = navController)
+            SubjectScreen(navController = navController)
         }
         composable("export") { ExportScreen(viewModel = hiltViewModel()) }
     }

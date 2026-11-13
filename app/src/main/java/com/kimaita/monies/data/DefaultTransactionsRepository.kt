@@ -16,6 +16,7 @@ import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.FulizaRow
 import com.kimaita.monies.data.dao.dtos.lineNames
+import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
 import com.kimaita.monies.data.dao.dtos.TopSubject
 import com.kimaita.monies.data.database.models.Category
@@ -47,7 +48,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -68,18 +70,24 @@ class DefaultTransactionsRepository @Inject constructor(
     private val recurringDetector: RecurringDetector
 ) : TransactionsRepository {
 
-    private val _selectedAccount = MutableStateFlow<Int?>(null)
-    override val selectedAccount: StateFlow<Int?> = _selectedAccount.asStateFlow()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val storedAccount = MutableStateFlow<Int?>(null)
+
+    /** The stored choice resolved against the current lines, so it follows merges and dormancy. */
+    override val selectedAccount: StateFlow<Int?> = combine(
+        storedAccount, accountDao.getAll(), transactionsDao.getAccountBalances()
+    ) { stored, accounts, lines ->
+        effectiveSelection(stored, accounts, lines.map { it.accountId }.toSet())
+    }.stateIn(scope, SharingStarted.Eagerly, null)
 
     init {
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            _selectedAccount.value = settingsDao.getSetting(SELECTED_ACCOUNT_KEY)?.toIntOrNull()
-                ?.let { accountDao.getRootId(it) }
+        scope.launch {
+            storedAccount.value = settingsDao.getSetting(SELECTED_ACCOUNT_KEY)?.toIntOrNull()
         }
     }
 
     override suspend fun setSelectedAccount(accountId: Int?) {
-        _selectedAccount.value = accountId
+        storedAccount.value = accountId
         withContext(Dispatchers.IO) {
             if (accountId == null) settingsDao.deleteSetting(SELECTED_ACCOUNT_KEY)
             else settingsDao.saveSetting(Setting(SELECTED_ACCOUNT_KEY, accountId.toString()))
@@ -89,7 +97,7 @@ class DefaultTransactionsRepository @Inject constructor(
     /** Re-runs [query] with the selected account each time the selection changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun <T> forAccount(query: (Int?) -> Flow<T>): Flow<T> =
-        _selectedAccount.flatMapLatest(query)
+        selectedAccount.flatMapLatest(query)
 
     override fun getRecentTransactions(limit: Int): Flow<List<Transaction>> =
         forAccount { transactionsDao.getLatestTransactions(limit, it) }
@@ -145,7 +153,7 @@ class DefaultTransactionsRepository @Inject constructor(
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
         transactionsDao.getAccountBalances().map { lines ->
             val names = lineNames(lines)
-            lines.map { AccountBalance(it.accountId, names.getValue(it.accountId), it.balance) }
+            lines.map { AccountBalance(it.accountId, names.getValue(it.accountId), it.balance, it.provider) }
         }
 
     override fun getSubjectStats(
@@ -455,7 +463,7 @@ class DefaultTransactionsRepository @Inject constructor(
     }
 
     override suspend fun getRecurringPayments() =
-        recurringDetector.detect(account = _selectedAccount.value)
+        recurringDetector.detect(account = selectedAccount.value)
 
     override suspend fun getEarliestTransactionDate(): LocalDateTime? =
         transactionsDao.getEarliestTransactionTime()?.let {
@@ -483,3 +491,14 @@ fun ftsQueryOf(query: String): String? =
 /** The query as an amount prefix when it is a number, else null. */
 fun amountQueryOf(query: String): String? =
     query.trim().replace(",", "").takeIf { it.isNotEmpty() && it.toDoubleOrNull() != null }
+
+/**
+ * Resolves a stored account id to a line id: a merged row selects its root; an unknown or dormant
+ * (not in [activeLines]) account selects nothing, i.e. All.
+ */
+internal fun effectiveSelection(
+    stored: Int?, accounts: List<UserAccount>, activeLines: Set<Int>
+): Int? {
+    val row = accounts.firstOrNull { it.id == stored } ?: return null
+    return (row.mergedInto ?: row.id).takeIf { it in activeLines }
+}

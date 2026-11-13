@@ -99,7 +99,7 @@ fun TransactionsScreen(
         onUpdateFilters = viewModel::updateFilters,
         onBack = { navController.popBackStack() },
         onTransactionClick = { subjectId ->
-            navController.navigate("account/$subjectId")
+            navController.navigate("subject/$subjectId")
         }
     )
 }

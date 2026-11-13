@@ -1,4 +1,4 @@
-package com.kimaita.monies.ui.account
+package com.kimaita.monies.ui.subject
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
-class AccountViewModel @Inject constructor(
+class SubjectViewModel @Inject constructor(
     private val repository: TransactionsRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {

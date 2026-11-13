@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +80,8 @@ fun HomeScreen(
         onSearch = { navController.navigate("transactions?search=true") },
         onViewAnalytics = { navController.navigate("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
-        onSubjectClick = { subjectId -> navController.navigate("account/$subjectId") },
+        onAccountSelect = viewModel::selectAccount,
+        onSubjectClick = { subjectId -> navController.navigate("subject/$subjectId") },
         uiState = uiState,
         filter = filters,
         isSyncing = isSyncing
@@ -95,6 +97,7 @@ fun HomeScreenContent(
     filter: TimeFilter,
     isSyncing: Boolean = false,
     onTimeFilterChange: (TimeFilter) -> Unit,
+    onAccountSelect: (Int?) -> Unit = {},
     onViewAllTransactions: () -> Unit,
     onViewAnalytics: () -> Unit,
     onSubjectClick: (Long) -> Unit,
@@ -136,6 +139,25 @@ fun HomeScreenContent(
         ) {
             Spacer(Modifier.height(8.dp))
 
+            if (uiState.accounts.size > 1) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = uiState.selectedAccount == null,
+                        onClick = { onAccountSelect(null) },
+                        label = { Text("All") })
+                    uiState.accounts.forEach { a ->
+                        FilterChip(
+                            selected = uiState.selectedAccount == a.accountId,
+                            onClick = { onAccountSelect(a.accountId) },
+                            label = { Text(a.name) })
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
             Text(
                 if (uiState.accountBalances.size > 1) "BALANCE" else "M-PESA BALANCE",
                 style = MaterialTheme.typography.labelSmall,
@@ -165,13 +187,17 @@ fun HomeScreenContent(
             Spacer(Modifier.height(12.dp))
             ChangePill(change = uiState.changeInTotal, filter = filter, onClick = onViewAnalytics)
 
-            Spacer(Modifier.height(20.dp))
-            OtherBalances(
-                availableFuliza = uiState.availableFuliza,
-                outstandingFuliza = uiState.outstandingFuliza,
-                mshwariBalance = uiState.mshwariBalance,
-                lockSavings = uiState.lockSavings,
-            )
+            if (uiState.availableFuliza != null || uiState.outstandingFuliza != null ||
+                uiState.mshwariBalance != null || uiState.lockSavings != null
+            ) {
+                Spacer(Modifier.height(20.dp))
+                OtherBalances(
+                    availableFuliza = uiState.availableFuliza,
+                    outstandingFuliza = uiState.outstandingFuliza,
+                    mshwariBalance = uiState.mshwariBalance,
+                    lockSavings = uiState.lockSavings,
+                )
+            }
 
             Spacer(Modifier.height(20.dp))
             InOutCard(

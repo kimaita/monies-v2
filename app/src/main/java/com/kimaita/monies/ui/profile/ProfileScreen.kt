@@ -36,7 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.kimaita.monies.R
-import com.kimaita.monies.ui.account.AccountViewModel
+import com.kimaita.monies.ui.subject.SubjectViewModel
 import com.kimaita.monies.ui.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
