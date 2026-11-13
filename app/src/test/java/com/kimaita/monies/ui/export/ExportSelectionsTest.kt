@@ -95,6 +95,18 @@ class ExportSelectionsTest {
     }
 
     @Test
+    fun shortChipLabels() {
+        val today = date(2026, 11, 14)
+        assertEquals(
+            listOf("MTD", "OCT", "3M", "YTD", "2025", "ALL"),
+            DateBand.entries.map { it.shortLabel(today) },
+        )
+        // In January, last month and last year both name the previous year's December and year.
+        assertEquals("DEC", DateBand.LAST_MONTH.shortLabel(date(2026, 1, 15)))
+        assertEquals("2025", DateBand.LAST_YEAR.shortLabel(date(2026, 1, 15)))
+    }
+
+    @Test
     fun lastMonthInJanuaryIsDecember() {
         assertEquals(date(2025, 12, 1) to date(2025, 12, 31), DateBand.LAST_MONTH.on(2026, 1, 15))
         assertEquals(date(2026, 1, 1) to date(2026, 1, 15), DateBand.THIS_MONTH.on(2026, 1, 15))

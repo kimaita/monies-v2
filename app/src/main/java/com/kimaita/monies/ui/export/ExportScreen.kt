@@ -39,6 +39,7 @@ import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -64,7 +65,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.R
 import com.kimaita.monies.models.export.ExportFormat
@@ -191,16 +195,18 @@ fun ExportScreen(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("Date range")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DateBand.entries.forEach { b ->
-                        DirChip(b.label, band == b) {
+                        BandChip(b.shortLabel(today), b.label, band == b) {
                             val (start, end) = b.range(today)
                             viewModel.setRange(start, end)
                         }
                     }
-                    DirChip(
-                        if (band == null) rangeText(sel.startDate, sel.endDate, today) else "Custom…",
-                        band == null
+                    // Custom: a calendar icon, or the picked dates once a custom range is in force.
+                    val custom = band == null
+                    BandChip(
+                        if (custom) rangeText(sel.startDate, sel.endDate, today) else null,
+                        "Custom range", custom, icon = true,
                     ) { showRangePicker = true }
                 }
             }
@@ -472,6 +478,27 @@ private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
 @Composable
 private fun DirChip(label: String, selected: Boolean, onClick: () -> Unit) =
     FilterChip(selected = selected, onClick = onClick, label = { Text(label) })
+
+/** A compact date chip like Home's 1M / YTD ones; [description] is what TalkBack reads. */
+@Composable
+private fun BandChip(
+    text: String?,
+    description: String,
+    selected: Boolean,
+    icon: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val calendar = @Composable {
+        Icon(painterResource(R.drawable.date_range), null, Modifier.size(FilterChipDefaults.IconSize))
+    }
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = description },
+        leadingIcon = if (icon && text != null) calendar else null,
+        label = { if (text != null) Text(text, fontSize = 12.sp) else calendar() },
+    )
+}
 
 /* ---------------- date picker ---------------- */
 

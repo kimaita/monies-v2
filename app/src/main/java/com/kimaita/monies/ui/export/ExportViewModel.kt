@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.TextStyle
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -65,14 +66,27 @@ data class ExportSelections(
     )
 }
 
-/** Ready-made date ranges for Export; a range that matches none of them is a custom one. */
+/**
+ * Ready-made date ranges for Export; a range that matches none of them is a custom one.
+ * Order is chip order, shortest span first like Home's chips; on a tie (1 Jan) the first wins.
+ */
 enum class DateBand(val label: String) {
-    ALL_TIME("All time"),
     THIS_MONTH("This month"),
     LAST_MONTH("Last month"),
     LAST_3_MONTHS("Last 3 months"),
     THIS_YEAR("This year"),
-    LAST_YEAR("Last year");
+    LAST_YEAR("Last year"),
+    ALL_TIME("All time");
+
+    /** Chip text in the style of Home's 1M / YTD chips: "MTD", "OCT", "3M", "YTD", "2025", "ALL". */
+    fun shortLabel(today: LocalDate): String = when (this) {
+        THIS_MONTH -> "MTD"
+        LAST_MONTH -> today.minusMonths(1).month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase(Locale.ENGLISH)
+        LAST_3_MONTHS -> "3M"
+        THIS_YEAR -> "YTD"
+        LAST_YEAR -> (today.year - 1).toString()
+        ALL_TIME -> "ALL"
+    }
 
     /** Inclusive first and last day, or null for no limit. */
     fun range(today: LocalDate): Pair<LocalDate?, LocalDate?> = when (this) {
