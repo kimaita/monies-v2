@@ -227,7 +227,7 @@ interface TransactionsDao : BaseDao<Transaction> {
                CASE
                    WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 5 AND 11 THEN 0
                    WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 12 AND 16 THEN 1
-                   WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 17 AND 20 THEN 2
+                   WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 17 AND 21 THEN 2
                    ELSE 3
                END AS slot,
                COUNT(*) AS count
@@ -277,37 +277,14 @@ interface TransactionsDao : BaseDao<Transaction> {
 
     @Query(
         """
-    SELECT CAST(strftime('%w', t.transactionTime) AS INTEGER) AS weekday,
-        CASE
-            WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 5 AND 11 THEN 0
-            WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 12 AND 16 THEN 1
-            WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 17 AND 21 THEN 2
-            ELSE 3
-        END AS slot,
-        COUNT(*) AS count
-    FROM transactions t
-    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
-      AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
-      AND (:account IS NULL OR t.accountId = :account)
-    GROUP BY weekday, slot
-"""
-    )
-    fun getActivityByTimeOfDay(
-        startDate: String?,
-        endDate: String?,
-        natureFilter: Boolean?,
-        account: Int? = null
-    ): Flow<List<ActivityCell>>
-
-    @Query(
-        """
     SELECT CAST(strftime('%w', transactionTime) AS INTEGER) AS weekday,
         COUNT(*) AS count, SUM(amount) AS total
     FROM transactions t
     WHERE (:startDate IS NULL OR transactionTime >= :startDate)
       AND (:endDate IS NULL OR transactionTime <= :endDate)
+      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
       AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
       AND (:account IS NULL OR t.accountId = :account)
@@ -315,10 +292,9 @@ interface TransactionsDao : BaseDao<Transaction> {
 """
     )
     fun getWeekdayCounts(
-        startDate: String?,
-        endDate: String?,
-        natureFilter: Boolean?,
-        account: Int? = null
+        startDate: String? = null, endDate: String? = null,
+        subjectId: List<Long>? = null, categoryId: List<Int>? = null,
+        transactionType: List<Int>? = null, natureFilter: Boolean? = null, account: Int? = null,
     ): Flow<List<WeekdayCount>>
 
     @Query(

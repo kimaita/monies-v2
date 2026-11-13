@@ -129,12 +129,6 @@ class DefaultTransactionsRepository @Inject constructor(
         subjectDao.getSubjects(subjectID)
 
 
-    override fun getTypeSpending(
-        startDate: String?, endDate: String?
-    ): Flow<List<CategorySpending>> =
-        forAccount { transactionTypeDao.getTypeSpending(startDate, endDate, account = it) }
-
-
     override fun getLargestTransaction(
         isInc: Boolean, startDate: String?, endDate: String?
     ): Flow<Transaction?> =
@@ -230,6 +224,7 @@ class DefaultTransactionsRepository @Inject constructor(
         startDate: String?,
         endDate: String?,
         subjectId: List<Long>?,
+        categoryId: List<Int>?,
         transactionType: List<Int>?,
         natureFilter: Boolean?
     ) = forAccount {
@@ -237,6 +232,7 @@ class DefaultTransactionsRepository @Inject constructor(
             startDate,
             endDate,
             subjectId,
+            categoryId,
             transactionType,
             natureFilter,
             it
@@ -248,9 +244,12 @@ class DefaultTransactionsRepository @Inject constructor(
         endDate: String?,
         subjectId: List<Long>?,
         categoryId: List<Int>?,
+        transactionType: List<Int>?,
         natureFilter: Boolean?
     ) = forAccount {
-        transactionTypeDao.getTypeSpending(startDate, endDate, subjectId, categoryId, natureFilter, it)
+        transactionTypeDao.getTypeSpending(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, it
+        )
     }
 
     override fun getActivityByTimeOfDay(
@@ -367,11 +366,18 @@ class DefaultTransactionsRepository @Inject constructor(
     override fun getBalanceTrend(bucketFormat: String, startDate: String?, endDate: String?) =
         forAccount { transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate, it) }
 
-    override fun getActivityByTimeOfDay(startDate: String?, endDate: String?, natureFilter: Boolean?) =
-        forAccount { transactionsDao.getActivityByTimeOfDay(startDate, endDate, natureFilter, it) }
-
-    override fun getWeekdayCounts(startDate: String?, endDate: String?, natureFilter: Boolean?) =
-        forAccount { transactionsDao.getWeekdayCounts(startDate, endDate, natureFilter, it) }
+    override fun getWeekdayCounts(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?
+    ) = forAccount {
+        transactionsDao.getWeekdayCounts(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, it
+        )
+    }
 
     override fun getDailyTotals(startDate: String?, endDate: String?, natureFilter: Boolean?) =
         forAccount { transactionsDao.getDailyTotals(startDate, endDate, natureFilter, it) }
@@ -379,21 +385,43 @@ class DefaultTransactionsRepository @Inject constructor(
     override fun getTopSubjectsByAmount(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
         transactionType: List<Int>?,
-        transactionCategory: List<Int>?,
         natureFilter: Boolean?,
         limit: Int
     ) = forAccount {
         subjectDao.getTopSubjectsByAmount(
-            startDate, endDate, transactionType, transactionCategory, natureFilter, limit, it
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, limit, it
         )
     }
 
-    override fun getTopSubjectsByCount(startDate: String?, endDate: String?, limit: Int) =
-        forAccount { subjectDao.getTopSubjectsByCount(startDate, endDate, limit, it) }
+    override fun getTopSubjectsByCount(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?,
+        limit: Int
+    ) = forAccount {
+        subjectDao.getTopSubjectsByCount(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, limit, it
+        )
+    }
 
-    override fun getIncomeBySource(startDate: String?, endDate: String?, limit: Int) =
-        forAccount { subjectDao.getIncomeBySource(startDate, endDate, limit, it) }
+    override fun getIncomeBySource(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        limit: Int
+    ) = forAccount {
+        subjectDao.getIncomeBySource(
+            startDate, endDate, subjectId, categoryId, transactionType, limit, it
+        )
+    }
 
     override suspend fun getRecurringPayments() =
         recurringDetector.detect(account = _selectedAccount.value)

@@ -23,6 +23,7 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
               AND (:endDate IS NULL OR t.transactionTime <= :endDate)
               AND (:subjectId IS NULL OR t.subject IN (:subjectId))
               AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+              AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
               AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
               AND tt.isTransfer = 0
               AND (:account IS NULL OR t.accountId = :account)
@@ -32,7 +33,8 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
     )
     fun getTypeSpending(
         startDate: String? = null, endDate: String? = null,
-        subjectId: List<Long>? = null, categoryId: List<Int>? = null, natureFilter: Boolean? = null,
+        subjectId: List<Long>? = null, categoryId: List<Int>? = null,
+        transactionType: List<Int>? = null, natureFilter: Boolean? = null,
         account: Int? = null,
     ): Flow<List<CategorySpending>>
 }

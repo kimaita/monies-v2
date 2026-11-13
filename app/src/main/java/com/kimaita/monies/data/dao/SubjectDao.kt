@@ -87,8 +87,9 @@ interface SubjectDao : BaseDao<Subject> {
     JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
       AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
-      AND (:transactionCategory IS NULL OR t.transactionCategory IN (:transactionCategory))
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
       AND (:account IS NULL OR t.accountId = :account)
@@ -98,8 +99,9 @@ interface SubjectDao : BaseDao<Subject> {
     fun getTopSubjectsByAmount(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
         transactionType: List<Int>?,
-        transactionCategory: List<Int>?,
         natureFilter: Boolean?,
         limit: Int,
         account: Int? = null,
@@ -113,6 +115,10 @@ interface SubjectDao : BaseDao<Subject> {
     JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
       AND (:account IS NULL OR t.accountId = :account)
     GROUP BY s.id ORDER BY count DESC LIMIT :limit
@@ -121,6 +127,10 @@ interface SubjectDao : BaseDao<Subject> {
     fun getTopSubjectsByCount(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?,
         limit: Int,
         account: Int? = null
     ): Flow<List<SubjectCount>>
@@ -134,6 +144,9 @@ interface SubjectDao : BaseDao<Subject> {
     WHERE tt.isInc = 1 AND tt.isTransfer = 0
       AND (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
       AND (:account IS NULL OR t.accountId = :account)
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
@@ -141,6 +154,9 @@ interface SubjectDao : BaseDao<Subject> {
     fun getIncomeBySource(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
         limit: Int,
         account: Int? = null
     ): Flow<List<SourceAmount>>

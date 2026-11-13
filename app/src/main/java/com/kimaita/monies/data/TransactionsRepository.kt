@@ -66,13 +66,15 @@ interface TransactionsRepository {
         startDate: String?,
         endDate: String?,
         subjectId: List<Long>? = null,
+        categoryId: List<Int>? = null,
         transactionType: List<Int>? = null,
         natureFilter: Boolean? = null
     ): Flow<List<CategorySpending>>
 
     fun getTypeSpending(
         startDate: String?, endDate: String?,
-        subjectId: List<Long>? = null, categoryId: List<Int>? = null, natureFilter: Boolean? = null
+        subjectId: List<Long>? = null, categoryId: List<Int>? = null,
+        transactionType: List<Int>? = null, natureFilter: Boolean? = null
     ): Flow<List<CategorySpending>>
 
     fun getActivityByTimeOfDay(
@@ -96,7 +98,6 @@ interface TransactionsRepository {
      */
     fun getSubjects(subjectID: Long): Flow<List<Subject>>
 
-    fun getTypeSpending(startDate: String?, endDate: String?): Flow<List<CategorySpending>>
     fun getLargestTransaction(
         isInc: Boolean,
         startDate: String? = null,
@@ -131,16 +132,13 @@ interface TransactionsRepository {
         endDate: String?
     ): Flow<List<BalanceBucket>>
 
-    fun getActivityByTimeOfDay(
-        startDate: String?,
-        endDate: String?,
-        natureFilter: Boolean?
-    ): Flow<List<ActivityCell>>
-
     fun getWeekdayCounts(
         startDate: String?,
         endDate: String?,
-        natureFilter: Boolean?
+        subjectId: List<Long>? = null,
+        categoryId: List<Int>? = null,
+        transactionType: List<Int>? = null,
+        natureFilter: Boolean? = null
     ): Flow<List<WeekdayCount>>
 
     fun getDailyTotals(
@@ -152,8 +150,9 @@ interface TransactionsRepository {
     fun getTopSubjectsByAmount(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
         transactionType: List<Int>?,
-        transactionCategory: List<Int>?,
         natureFilter: Boolean?,
         limit: Int
     ): Flow<List<SubjectAmount>>
@@ -161,12 +160,19 @@ interface TransactionsRepository {
     fun getTopSubjectsByCount(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?,
         limit: Int
     ): Flow<List<SubjectCount>>
 
     fun getIncomeBySource(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
         limit: Int
     ): Flow<List<SourceAmount>>
 

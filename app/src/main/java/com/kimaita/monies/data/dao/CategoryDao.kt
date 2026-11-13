@@ -29,6 +29,7 @@ interface CategoryDao : BaseDao<Category> {
             WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
               AND (:endDate IS NULL OR t.transactionTime <= :endDate)
               AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+              AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
               AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
               AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
               AND tt.isTransfer = 0
@@ -38,7 +39,7 @@ interface CategoryDao : BaseDao<Category> {
     )
     fun getCategorySpending(
         startDate: String? = null, endDate: String? = null, subjectId: List<Long>? = null,
-        transactionType: List<Int>? = null, natureFilter: Boolean? = null, account: Int? = null,
+        categoryId: List<Int>? = null, transactionType: List<Int>? = null, natureFilter: Boolean? = null, account: Int? = null,
     ): Flow<List<CategorySpending>>
 
 }
