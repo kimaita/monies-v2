@@ -11,18 +11,18 @@ import javax.inject.Inject
 class SmsDataSource @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    /** One keyset page of provider SMS with _ID > afterId, ordered ascending. */
+    /** One keyset page of SMS from the given senders (case-insensitive) with _ID > afterId, ordered ascending. */
     suspend fun readBatch(
-        providers: Collection<String>,
+        senders: Collection<String>,
         afterId: Long,
         limit: Int,
     ): List<SmsParser.SmsMessage> = withContext(Dispatchers.IO) {
-        if (providers.isEmpty()) return@withContext emptyList()
+        if (senders.isEmpty()) return@withContext emptyList()
 
-        val placeholders = providers.joinToString(",") { "?" }
+        val placeholders = senders.joinToString(",") { "?" }
         val selection =
-            "${Telephony.Sms.Inbox.ADDRESS} IN ($placeholders) AND ${Telephony.Sms.Inbox._ID} > ?"
-        val args = (providers.map { it } + afterId.toString()).toTypedArray()
+            "${Telephony.Sms.Inbox.ADDRESS} COLLATE NOCASE IN ($placeholders) AND ${Telephony.Sms.Inbox._ID} > ?"
+        val args = (senders + afterId.toString()).toTypedArray()
         val projection = arrayOf(
             Telephony.Sms.Inbox._ID, Telephony.Sms.Inbox.BODY,
             Telephony.Sms.Inbox.ADDRESS, Telephony.Sms.Inbox.DATE,
@@ -52,13 +52,13 @@ class SmsDataSource @Inject constructor(
     }
 
 
-    suspend fun count(providers: Collection<String>, afterId: Long): Int =
+    suspend fun count(senders: Collection<String>, afterId: Long): Int =
         withContext(Dispatchers.IO) {
-            if (providers.isEmpty()) return@withContext 0
-            val placeholders = providers.joinToString(",") { "?" }
+            if (senders.isEmpty()) return@withContext 0
+            val placeholders = senders.joinToString(",") { "?" }
             val selection =
-                "${Telephony.Sms.Inbox.ADDRESS} IN ($placeholders) AND ${Telephony.Sms.Inbox._ID} > ?"
-            val args = (providers.map { it } + afterId.toString()).toTypedArray()
+                "${Telephony.Sms.Inbox.ADDRESS} COLLATE NOCASE IN ($placeholders) AND ${Telephony.Sms.Inbox._ID} > ?"
+            val args = (senders + afterId.toString()).toTypedArray()
             context.contentResolver.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
                 arrayOf(Telephony.Sms.Inbox._ID),

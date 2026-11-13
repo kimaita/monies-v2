@@ -11,9 +11,6 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
     @Query("SELECT * FROM transaction_types")
     fun getAll(): Flow<List<TransactionType>>
 
-    @Query("SELECT provider FROM transaction_types")
-    fun getProviders(): List<String>
-
     /**
      * Gets the total spending for each transaction type within a given date range.
      */

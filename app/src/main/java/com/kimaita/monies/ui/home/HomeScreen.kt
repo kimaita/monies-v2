@@ -156,7 +156,6 @@ fun HomeScreenContent(
                 availableFuliza = uiState.availableFuliza,
                 outstandingFuliza = uiState.outstandingFuliza,
                 mshwariBalance = uiState.mshwariBalance,
-                mshwariLoan = uiState.mshwariLoan,
                 lockSavings = uiState.lockSavings,
             )
 
@@ -340,14 +339,12 @@ fun OtherBalances(
     availableFuliza: Double?,
     outstandingFuliza: Double?,
     mshwariBalance: Double?,
-    mshwariLoan: Double?,
     lockSavings: Double?,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val fulizaMax = (availableFuliza ?: 0.0) + (outstandingFuliza ?: 0.0)
     val hasFuliza = fulizaMax > 0.0
     val owedFuliza = (outstandingFuliza ?: 0.0) > 0.0
-    val hasLoan = (mshwariLoan ?: 0.0) > 0.0
 
     Column(
         Modifier
@@ -375,7 +372,6 @@ fun OtherBalances(
                         }
                     }
                     mshwariBalance?.let { Pill { Svc("M-Shwari"); Strong(money(it)) } }
-                    if (hasLoan) Pill { Svc("M-Shwari loan"); Owe(money(mshwariLoan!!)) }
                     lockSavings?.let { Pill { Svc("Lock"); Strong(money(it)) } }
                     Pill(onClick = { expanded = true }) {
                         Text(
@@ -392,8 +388,6 @@ fun OtherBalances(
                     fulizaMax,
                     owedFuliza,
                     mshwariBalance,
-                    mshwariLoan,
-                    hasLoan,
                     lockSavings,
                     onCollapse = { expanded = false })
             }
@@ -404,7 +398,7 @@ fun OtherBalances(
 @Composable
 private fun OtherBalancesPanel(
     availableFuliza: Double?, outstandingFuliza: Double?, fulizaMax: Double, owedFuliza: Boolean,
-    mshwariBalance: Double?, mshwariLoan: Double?, hasLoan: Boolean, lockSavings: Double?,
+    mshwariBalance: Double?, lockSavings: Double?,
     onCollapse: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -465,7 +459,6 @@ private fun OtherBalancesPanel(
             )
         }
         mshwariBalance?.let { PanelRow { RowLine("M-Shwari balance", money(it)) } }
-        if (hasLoan) PanelRow { RowLine("M-Shwari loan", money(mshwariLoan ?: 0.0), owed = true) }
         lockSavings?.let { PanelRow { RowLine("Lock savings", money(it)) } }
         Spacer(Modifier.height(8.dp))
     }

@@ -104,16 +104,21 @@ class DatabaseInitializer(
      * `transactions.message`. The cursor is only rewound if it exists, so a first run stays one.
      */
     private fun syncDefaultTransactionTypes(db: SupportSQLiteDatabase) {
-        data class Row(val id: Long, val pattern: String?, val isInc: Boolean, val displayName: String?)
+        data class Row(
+            val id: Long, val pattern: String?, val isInc: Boolean, val displayName: String?,
+            val isTransfer: Boolean, val provider: String,
+        )
 
         val existing = HashMap<String, Row>()
-        db.query("SELECT id, name, pattern, isInc, displayName FROM transaction_types").use { c ->
+        db.query("SELECT id, name, pattern, isInc, displayName, isTransfer, provider FROM transaction_types").use { c ->
             while (c.moveToNext()) {
                 existing[c.getString(1)] = Row(
                     id = c.getLong(0),
                     pattern = c.getString(2),
                     isInc = c.getInt(3) != 0,
                     displayName = c.getString(4),
+                    isTransfer = c.getInt(5) != 0,
+                    provider = c.getString(6),
                 )
             }
         }
@@ -126,15 +131,18 @@ class DatabaseInitializer(
                     put("pattern", type.pattern)
                     put("isInc", if (type.isInc) 1 else 0)
                     put("displayName", type.displayName)
+                    put("isTransfer", if (type.isTransfer) 1 else 0)
+                    put("provider", type.provider)
                 }
                 val row = existing[type.name]
                 if (row == null) {
                     values.put("name", type.name)
-                    values.put("provider", type.provider)
                     values.put("isActive", if (type.isActive) 1 else 0)
                     db.insert("transaction_types", SQLiteDatabase.CONFLICT_IGNORE, values)
                     changed = true
-                } else if (row.pattern != type.pattern || row.isInc != type.isInc || row.displayName != type.displayName) {
+                } else if (row.pattern != type.pattern || row.isInc != type.isInc || row.displayName != type.displayName ||
+                    row.isTransfer != type.isTransfer || row.provider != type.provider
+                ) {
                     db.update(
                         "transaction_types", SQLiteDatabase.CONFLICT_REPLACE, values,
                         "id = ?", arrayOf(row.id)

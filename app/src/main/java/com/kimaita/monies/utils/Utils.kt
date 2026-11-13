@@ -6,16 +6,22 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private val DATE_TIME_FORMATS = listOf(
+    DateTimeFormatter.ofPattern("d/M/yy h:mm a", Locale.ENGLISH),
+    DateTimeFormatter.ofPattern("d/M/yyyy H:mm", Locale.ENGLISH),
+)
+
 fun parseDateTime(
     dateStr: String?, timeStr: String?, fallbackTimestamp: Long
 ): LocalDateTime {
     if (dateStr != null && timeStr != null) {
-        try {
-            val combinedString = "$dateStr $timeStr"
-            val formatter = DateTimeFormatter.ofPattern("d/M/yy h:mm a", Locale.ENGLISH)
-            return LocalDateTime.parse(combinedString, formatter)
-        } catch (e: Exception) {
-            // Fallback if parsing fails
+        val combinedString = "$dateStr $timeStr"
+        for (formatter in DATE_TIME_FORMATS) {
+            try {
+                return LocalDateTime.parse(combinedString, formatter)
+            } catch (e: Exception) {
+                // Try the next format
+            }
         }
     }
     return LocalDateTime.ofInstant(

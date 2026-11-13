@@ -41,7 +41,6 @@ data class HomeUiState(
     val largestExpense: Transaction? = null,
     val availableFuliza: Double? = null,
     val outstandingFuliza: Double? = null,
-    val mshwariLoan: Double? = null,
     val lockSavings: Double? = null,
     val mshwariBalance: Double? = null,
     val totalTransactionAmount: Double = 0.0,
@@ -127,7 +126,6 @@ class HomeViewModel @Inject constructor(
             outstandingFuliza = other.outstandingFuliza,
             mshwariBalance = other.mshwariBalance,
             lockSavings = other.lockSavings,
-            mshwariLoan = other.mshwariLoan,
         )
     }.stateIn(
         scope = viewModelScope,

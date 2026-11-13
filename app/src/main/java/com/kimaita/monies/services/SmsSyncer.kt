@@ -1,7 +1,6 @@
 package com.kimaita.monies.services
 
 import androidx.room.withTransaction
-import com.kimaita.monies.data.BalanceExtractor
 import com.kimaita.monies.data.SmsDataSource
 import com.kimaita.monies.data.dao.AccountDao
 import com.kimaita.monies.data.dao.SettingsDao
@@ -11,6 +10,7 @@ import com.kimaita.monies.data.dao.TransactionsDao
 import com.kimaita.monies.data.database.AppDatabase
 import com.kimaita.monies.data.database.models.Setting
 import com.kimaita.monies.data.database.models.UserAccount
+import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.SmsBatchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -48,21 +48,17 @@ class SmsSyncer @Inject constructor(
 
     /** Messages waiting to be scanned — the first-run progress denominator. */
     suspend fun pendingCount(): Int = withContext(Dispatchers.IO) {
-        val providers = transactionTypeDao.getProviders().toSet()
-        if (providers.isEmpty()) return@withContext 0
         val afterId = settingsDao.getSetting(LAST_SMS_SYNC_ID_KEY)?.toLongOrNull() ?: 0L
-        smsDataSource.count(providers, afterId)
+        smsDataSource.count(Provider.allSenders, afterId)
     }
 
 
     /** Reads, parses, and persists one keyset page; advances the cursor atomically. Returns messages read. */
     suspend fun syncBatch(limit: Int = SMS_BATCH_SIZE): SmsBatchResult =
         withContext(Dispatchers.IO) {
-            val providers = transactionTypeDao.getProviders().toSet()
-            if (providers.isEmpty()) return@withContext SmsBatchResult(0, null)
             val afterId = settingsDao.getSetting(LAST_SMS_SYNC_ID_KEY)?.toLongOrNull() ?: 0L
 
-            val batch = smsDataSource.readBatch(providers, afterId, limit)
+            val batch = smsDataSource.readBatch(Provider.allSenders, afterId, limit)
             if (batch.isEmpty()) return@withContext SmsBatchResult(0, null)
 
             val maxId = batch.maxOf { it.id ?: 0L }
@@ -92,7 +88,6 @@ class SmsSyncer @Inject constructor(
 
     private suspend fun parseAndSave(messages: List<SmsParser.SmsMessage>) {
         val types = transactionTypeDao.getAll().first()
-        val typesById = types.associateBy { it.id }
         val parsed = smsParser.parse(messages, types)
         if (parsed.isEmpty()) return
 
@@ -104,9 +99,8 @@ class SmsSyncer @Inject constructor(
             ?: accountDao.insert(UserAccount(provider = "MPESA", subscriptionId = -1)).toInt()
 
         val toInsert = parsed.map { (txn, subject) ->
-            val withSubject = (if (subject != null) txn.copy(subject = subjectIds.getValue(subject)) else txn)
+            (if (subject != null) txn.copy(subject = subjectIds.getValue(subject)) else txn)
                 .copy(accountId = accountId)
-            withSubject.copy(balance = BalanceExtractor.extract(withSubject.message, typesById[withSubject.transactionType]?.pattern))
         }
         transactionsDao.insertAll(toInsert)
     }

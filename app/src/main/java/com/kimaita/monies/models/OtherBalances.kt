@@ -3,7 +3,6 @@ package com.kimaita.monies.models
 data class OtherBalances(
     val mshwariBalance: Double? = null,
     val lockSavings: Double? = null,
-    val mshwariLoan: Double? = null,
     val availableFuliza: Double? = null,
     val outstandingFuliza: Double? = null,
 )
@@ -14,5 +13,4 @@ enum class BalanceField(val group: String) {
     LOCK_SAVINGS("LockSavingsBal"),
     AVAILABLE_FULIZA("AvailableFuliza"),
     OUTSTANDING_FULIZA("TotalLoan"),
-    MSHWARI_LOAN("MshwariLoan"),
 }

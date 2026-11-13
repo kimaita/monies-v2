@@ -329,7 +329,6 @@ class DefaultTransactionsRepository @Inject constructor(
             lockSavings = best[BalanceField.LOCK_SAVINGS]?.first,
             availableFuliza = best[BalanceField.AVAILABLE_FULIZA]?.first,
             outstandingFuliza = best[BalanceField.OUTSTANDING_FULIZA]?.first,
-            mshwariLoan = best[BalanceField.MSHWARI_LOAN]?.first,
         )
     }
 
