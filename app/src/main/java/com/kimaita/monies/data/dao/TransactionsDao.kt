@@ -3,6 +3,7 @@ package com.kimaita.monies.data.dao
 import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Query
+import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.BalanceRow
@@ -19,6 +20,19 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TransactionsDao : BaseDao<Transaction> {
 
+    /** One Airtel till payment sends two SMS with the same code; keep the one that names the merchant. */
+    @Query(
+        """
+        DELETE FROM transactions
+        WHERE transactionType IN (SELECT id FROM transaction_types WHERE name = 'airtel.pay.receipt')
+        AND transactionCode IN (
+            SELECT t.transactionCode FROM transactions t
+            JOIN transaction_types ty ON ty.id = t.transactionType
+            WHERE ty.name = 'airtel.pay')
+        """
+    )
+    suspend fun deletePairedAirtelReceipts()
+
     @androidx.room.Transaction
     @Query(
         """
@@ -31,10 +45,8 @@ interface TransactionsDao : BaseDao<Transaction> {
         AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
         AND (:account IS NULL OR t.accountId = :account)
         AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
-        AND (:searchQuery IS NULL OR :searchQuery = '' OR 
-            s.name LIKE '%' || :searchQuery || '%' OR 
-            t.transactionTime LIKE '%' || :searchQuery || '%' OR 
-            CAST(t.amount AS TEXT) LIKE '%' || :searchQuery || '%')
+        AND (:fts IS NULL OR t.id IN (SELECT rowid FROM transactions_fts WHERE transactions_fts MATCH :fts))
+        AND (:amountQuery IS NULL OR CAST(t.amount AS TEXT) LIKE :amountQuery || '%')
         ORDER BY 
             CASE WHEN :sortOrder = 'DATE_DESC' THEN t.transactionTime END DESC,
             CASE WHEN :sortOrder = 'DATE_ASC' THEN t.transactionTime END ASC,
@@ -52,7 +64,8 @@ interface TransactionsDao : BaseDao<Transaction> {
         account: Int? = null,
         natureFilter: Boolean?,
         sortOrder: SortOrder?,
-        searchQuery: String? = null,
+        fts: String? = null,
+        amountQuery: String? = null,
         limit: Int? = null
     ): PagingSource<Int, TransactionWithDetails>
 
@@ -61,22 +74,23 @@ interface TransactionsDao : BaseDao<Transaction> {
     @Query(
         """
         SELECT * FROM transactions
+        WHERE (:account IS NULL OR accountId = :account)
         ORDER BY transactionTime DESC
         LIMIT :limit
     """
     )
-    fun getLatestTransactions(limit: Int): Flow<List<TransactionWithDetails>>
+    fun getLatestTransactions(limit: Int, account: Int? = null): Flow<List<TransactionWithDetails>>
 
 
     @Query(
         """
         SELECT
-            SUM(CASE WHEN tt.isInc = 1 THEN t.amount ELSE 0 END) AS income,
+            SUM(CASE WHEN tt.isInc = 1 AND tt.isTransfer = 0 THEN t.amount ELSE 0 END) AS income,
             SUM(CASE WHEN tt.isInc = 1 THEN t.cost ELSE 0 END) AS incomeCost,
-            SUM(CASE WHEN tt.isInc = 1 THEN 1 ELSE 0 END) AS incomeCount,
-            SUM(CASE WHEN tt.isInc = 0 THEN t.amount ELSE 0 END) AS expense,
+            SUM(CASE WHEN tt.isInc = 1 AND tt.isTransfer = 0 THEN 1 ELSE 0 END) AS incomeCount,
+            SUM(CASE WHEN tt.isInc = 0 AND tt.isTransfer = 0 THEN t.amount ELSE 0 END) AS expense,
             SUM(CASE WHEN tt.isInc = 0 THEN t.cost ELSE 0 END) AS expenseCost,
-            SUM(CASE WHEN tt.isInc = 0 THEN 1 ELSE 0 END) AS expenseCount
+            SUM(CASE WHEN tt.isInc = 0 AND tt.isTransfer = 0 THEN 1 ELSE 0 END) AS expenseCount
         FROM transactions AS t
         JOIN transaction_types AS tt ON t.transactionType = tt.id
         WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
@@ -84,6 +98,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         AND (:subjectId IS NULL OR t.subject IN (:subjectId))
         AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
         AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+        AND (:account IS NULL OR t.accountId = :account)
         """
     )
     fun getIncomeVsExpense(
@@ -91,22 +106,24 @@ interface TransactionsDao : BaseDao<Transaction> {
         endDate: String? = null,
         subjectId: List<Long>? = null,
         categoryId: List<Int>? = null,
-        transactionType: List<Int>? = null
+        transactionType: List<Int>? = null,
+        account: Int? = null
     ): Flow<IncExp>
 
     @androidx.room.Transaction
     @Query(
         """
         SELECT * FROM transactions
-        WHERE transactionType IN (SELECT id FROM transaction_types WHERE isInc = :isInc)
+        WHERE transactionType IN (SELECT id FROM transaction_types WHERE isInc = :isInc AND isTransfer = 0)
         AND (:startDate IS NULL OR transactionTime >= :startDate)
         AND (:endDate IS NULL OR transactionTime <= :endDate)
+        AND (:account IS NULL OR accountId = :account)
         ORDER BY amount DESC
         LIMIT 1
     """
     )
     fun getLargestTransaction(
-        isInc: Boolean, startDate: String? = null, endDate: String? = null
+        isInc: Boolean, startDate: String? = null, endDate: String? = null, account: Int? = null
     ): Flow<TransactionWithDetails?>
 
 
@@ -117,13 +134,14 @@ interface TransactionsDao : BaseDao<Transaction> {
             SELECT transactionType, MAX(transactionTime) AS maxTime
             FROM transactions
             WHERE transactionType IN (:typeIds)
+              AND (:account IS NULL OR accountId = :account)
             GROUP BY transactionType
         ) AS latest
           ON t.transactionType = latest.transactionType
          AND t.transactionTime = latest.maxTime
     """
     )
-    fun getLatestPerType(typeIds: List<Int>): Flow<List<Transaction>>
+    fun getLatestPerType(typeIds: List<Int>, account: Int? = null): Flow<List<Transaction>>
 
     @androidx.room.Transaction
     @Query(
@@ -178,8 +196,8 @@ interface TransactionsDao : BaseDao<Transaction> {
     @Query(
         """
         SELECT strftime(:bucketFormat, t.transactionTime) AS bucket,
-               SUM(CASE WHEN tt.isInc = 1 THEN t.amount ELSE 0 END) AS income,
-               SUM(CASE WHEN tt.isInc = 0 THEN t.amount ELSE 0 END) AS expense,
+               SUM(CASE WHEN tt.isInc = 1 AND tt.isTransfer = 0 THEN t.amount ELSE 0 END) AS income,
+               SUM(CASE WHEN tt.isInc = 0 AND tt.isTransfer = 0 THEN t.amount ELSE 0 END) AS expense,
                SUM(t.cost) AS cost
         FROM transactions AS t
         JOIN transaction_types AS tt ON t.transactionType = tt.id
@@ -188,6 +206,7 @@ interface TransactionsDao : BaseDao<Transaction> {
           AND (:subjectId IS NULL OR t.subject IN (:subjectId))
           AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
           AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+          AND (:account IS NULL OR t.accountId = :account)
         GROUP BY bucket ORDER BY bucket ASC
     """
     )
@@ -198,6 +217,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         subjectId: List<Long>? = null,
         categoryId: List<Int>? = null,
         transactionType: List<Int>? = null,
+        account: Int? = null,
     ): Flow<List<CashFlowBucket>>
 
 
@@ -207,7 +227,7 @@ interface TransactionsDao : BaseDao<Transaction> {
                CASE
                    WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 5 AND 11 THEN 0
                    WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 12 AND 16 THEN 1
-                   WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 17 AND 20 THEN 2
+                   WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 17 AND 21 THEN 2
                    ELSE 3
                END AS slot,
                COUNT(*) AS count
@@ -219,13 +239,15 @@ interface TransactionsDao : BaseDao<Transaction> {
           AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
           AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
           AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
+          AND tt.isTransfer = 0
+          AND (:account IS NULL OR t.accountId = :account)
         GROUP BY weekday, slot
     """
     )
     fun getActivityByTimeOfDay(
         startDate: String? = null, endDate: String? = null,
         subjectId: List<Long>? = null, categoryId: List<Int>? = null,
-        transactionType: List<Int>? = null, natureFilter: Boolean? = null,
+        transactionType: List<Int>? = null, natureFilter: Boolean? = null, account: Int? = null,
     ): Flow<List<ActivityCell>>
 
 
@@ -241,6 +263,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         WHERE balance IS NOT NULL
           AND (:startDate IS NULL OR transactionTime >= :startDate)
           AND (:endDate IS NULL OR transactionTime <= :endDate)
+          AND (:account IS NULL OR accountId = :account)
     ) WHERE rn = 1
     ORDER BY bucket ASC
 """
@@ -248,31 +271,9 @@ interface TransactionsDao : BaseDao<Transaction> {
     fun getBalanceByBucket(
         bucketFormat: String,
         startDate: String?,
-        endDate: String?
-    ): Flow<List<BalanceBucket>>
-
-    @Query(
-        """
-    SELECT CAST(strftime('%w', t.transactionTime) AS INTEGER) AS weekday,
-        CASE
-            WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 5 AND 11 THEN 0
-            WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 12 AND 16 THEN 1
-            WHEN CAST(strftime('%H', t.transactionTime) AS INTEGER) BETWEEN 17 AND 21 THEN 2
-            ELSE 3
-        END AS slot,
-        COUNT(*) AS count
-    FROM transactions t
-    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
-    GROUP BY weekday, slot
-"""
-    )
-    fun getActivityByTimeOfDay(
-        startDate: String?,
         endDate: String?,
-        natureFilter: Boolean?
-    ): Flow<List<ActivityCell>>
+        account: Int? = null
+    ): Flow<List<BalanceBucket>>
 
     @Query(
         """
@@ -281,14 +282,19 @@ interface TransactionsDao : BaseDao<Transaction> {
     FROM transactions t
     WHERE (:startDate IS NULL OR transactionTime >= :startDate)
       AND (:endDate IS NULL OR transactionTime <= :endDate)
+      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
+      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
+      AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
+      AND (:account IS NULL OR t.accountId = :account)
     GROUP BY weekday ORDER BY weekday
 """
     )
     fun getWeekdayCounts(
-        startDate: String?,
-        endDate: String?,
-        natureFilter: Boolean?
+        startDate: String? = null, endDate: String? = null,
+        subjectId: List<Long>? = null, categoryId: List<Int>? = null,
+        transactionType: List<Int>? = null, natureFilter: Boolean? = null, account: Int? = null,
     ): Flow<List<WeekdayCount>>
 
     @Query(
@@ -298,13 +304,16 @@ interface TransactionsDao : BaseDao<Transaction> {
     WHERE (:startDate IS NULL OR transactionTime >= :startDate)
       AND (:endDate IS NULL OR transactionTime <= :endDate)
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
+      AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
+      AND (:account IS NULL OR t.accountId = :account)
     GROUP BY day ORDER BY day ASC
 """
     )
     fun getDailyTotals(
         startDate: String?,
         endDate: String?,
-        natureFilter: Boolean?
+        natureFilter: Boolean?,
+        account: Int? = null
     ): Flow<List<DailyTotal>>
 
     @Query(
@@ -315,10 +324,26 @@ interface TransactionsDao : BaseDao<Transaction> {
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE t.subject IS NOT NULL AND t.transactionTime >= :since
+      AND tt.isTransfer = 0
+      AND (:account IS NULL OR t.accountId = :account)
     ORDER BY t.subject ASC, t.transactionTime ASC
 """
     )
-    suspend fun getSubjectOccurrences(since: String): List<SubjectOccurrence>
+    suspend fun getSubjectOccurrences(since: String, account: Int? = null): List<SubjectOccurrence>
+
+    /** The latest non-null balance of each account (null when it has none yet). */
+    @Query(
+        """
+        SELECT a.id AS accountId, a.provider AS provider, a.subscriptionId AS subscriptionId,
+               a.label AS label,
+               (SELECT t.balance FROM transactions t
+                WHERE t.accountId = a.id AND t.balance IS NOT NULL
+                ORDER BY t.transactionTime DESC, t.id DESC LIMIT 1) AS balance
+        FROM accounts a
+        ORDER BY a.id
+    """
+    )
+    fun getAccountBalances(): Flow<List<AccountBalance>>
 
     @Query("SELECT MIN(transactionTime) FROM transactions")
     suspend fun getEarliestTransactionTime(): String?

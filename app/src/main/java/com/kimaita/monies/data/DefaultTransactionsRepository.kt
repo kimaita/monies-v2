@@ -11,6 +11,7 @@ import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
+import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.SubjectStats
@@ -28,22 +29,28 @@ import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
-import com.kimaita.monies.models.isoDateTimeFormatter
 import com.kimaita.monies.services.RecurringDetector
 import com.kimaita.monies.utils.getSafeValue
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 class DefaultTransactionsRepository @Inject constructor(
@@ -56,8 +63,30 @@ class DefaultTransactionsRepository @Inject constructor(
     private val recurringDetector: RecurringDetector
 ) : TransactionsRepository {
 
+    private val _selectedAccount = MutableStateFlow<Int?>(null)
+    override val selectedAccount: StateFlow<Int?> = _selectedAccount.asStateFlow()
+
+    init {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            _selectedAccount.value = settingsDao.getSetting(SELECTED_ACCOUNT_KEY)?.toIntOrNull()
+        }
+    }
+
+    override suspend fun setSelectedAccount(accountId: Int?) {
+        _selectedAccount.value = accountId
+        withContext(Dispatchers.IO) {
+            if (accountId == null) settingsDao.deleteSetting(SELECTED_ACCOUNT_KEY)
+            else settingsDao.saveSetting(Setting(SELECTED_ACCOUNT_KEY, accountId.toString()))
+        }
+    }
+
+    /** Re-runs [query] with the selected account each time the selection changes. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun <T> forAccount(query: (Int?) -> Flow<T>): Flow<T> =
+        _selectedAccount.flatMapLatest(query)
+
     override fun getRecentTransactions(limit: Int): Flow<List<Transaction>> =
-        transactionsDao.getLatestTransactions(limit)
+        forAccount { transactionsDao.getLatestTransactions(limit, it) }
             .map { list -> list.map { it.toDomainModel() } }
 
     override fun getTransactions(
@@ -65,22 +94,28 @@ class DefaultTransactionsRepository @Inject constructor(
         startDate: String?,
         endDate: String?,
     ): Flow<PagingData<Transaction>> {
-        return Pager(
-            config = PagingConfig(
-                pageSize = 50, enablePlaceholders = false, prefetchDistance = 10
-            ), pagingSourceFactory = {
-                transactionsDao.getTransactions(
-                    startDate,
-                    endDate,
-                    transactionFilters?.subjectFilter,
-                    transactionFilters?.categoryFilters?.takeIf { it.isNotEmpty() },
-                    transactionFilters?.typeFilters?.takeIf { it.isNotEmpty() },
-                    transactionFilters?.accountFilter,
-                    transactionFilters?.natureFilter,
-                    transactionFilters?.sortOrder,
-                    transactionFilters?.searchQuery
-                )
-            }).flow.map { list -> list.map { it.toDomainModel() } }
+        val query = transactionFilters?.searchQuery.orEmpty()
+        val amountQuery = amountQueryOf(query)
+        val fts = if (amountQuery == null) ftsQueryOf(query) else null
+        return forAccount { selected ->
+            Pager(
+                config = PagingConfig(
+                    pageSize = 50, enablePlaceholders = false, prefetchDistance = 10
+                ), pagingSourceFactory = {
+                    transactionsDao.getTransactions(
+                        startDate,
+                        endDate,
+                        transactionFilters?.subjectFilter,
+                        transactionFilters?.categoryFilters?.takeIf { it.isNotEmpty() },
+                        transactionFilters?.typeFilters?.takeIf { it.isNotEmpty() },
+                        transactionFilters?.accountFilter ?: selected,
+                        transactionFilters?.natureFilter,
+                        transactionFilters?.sortOrder,
+                        fts,
+                        amountQuery
+                    )
+                }).flow
+        }.map { list -> list.map { it.toDomainModel() } }
     }
 
 
@@ -94,41 +129,22 @@ class DefaultTransactionsRepository @Inject constructor(
         subjectDao.getSubjects(subjectID)
 
 
-    override fun getTypeSpending(
-        startDate: String?, endDate: String?
-    ): Flow<List<CategorySpending>> = transactionTypeDao.getTypeSpending(startDate, endDate)
-
-
     override fun getLargestTransaction(
         isInc: Boolean, startDate: String?, endDate: String?
-    ): Flow<Transaction?> = transactionsDao.getLargestTransaction(isInc, startDate, endDate)
+    ): Flow<Transaction?> =
+        forAccount { transactionsDao.getLargestTransaction(isInc, startDate, endDate, it) }
         .map { it?.toDomainModel() }
 
 
-    override fun getMpesaBalance(): Flow<Double> {
-        return transactionsDao.getLatestTransactions(3).map { latestTransactions ->
-            if (latestTransactions.isNotEmpty()) {
-                val transaction = latestTransactions.first()
-                val regex = transaction.type.pattern?.toRegex(RegexOption.DOT_MATCHES_ALL)
-                val results = regex?.find(transaction.transaction.message)
-                try {
-                    val bal = results?.groups["Balance"] ?: results?.groups["MpesaBal"]
-                    bal?.value?.replace(",", "")?.toDouble() ?: 0.0
-                } catch (_: IllegalArgumentException) {
-                    0.0
-                }
-            } else {
-                0.0
-            }
-        }
-    }
-
+    override fun getAccountBalances(): Flow<List<AccountBalance>> =
+        transactionsDao.getAccountBalances()
 
     override fun getSubjectStats(
         subjectId: Long,
         startDate: String?,
         endDate: String?
-    ): Flow<SubjectStats> = subjectDao.getSubjectStats(subjectId, startDate, endDate)
+    ): Flow<SubjectStats> =
+        forAccount { subjectDao.getSubjectStats(subjectId, startDate, endDate, it) }
 
 
     override suspend fun forEachExportBatch(
@@ -174,14 +190,16 @@ class DefaultTransactionsRepository @Inject constructor(
         subjectId: List<Long>?,
         categoryId: List<Int>?,
         transactionType: List<Int>?
-    ) =
+    ) = forAccount {
         transactionsDao.getIncomeVsExpense(
             startDate,
             endDate,
             subjectId,
             categoryId,
-            transactionType
+            transactionType,
+            it
         )
+    }
 
     override fun getCashFlow(
         bucketFormat: String,
@@ -190,39 +208,49 @@ class DefaultTransactionsRepository @Inject constructor(
         subjectId: List<Long>?,
         categoryId: List<Int>?,
         transactionType: List<Int>?
-    ) =
+    ) = forAccount {
         transactionsDao.getCashFlow(
             bucketFormat,
             startDate,
             endDate,
             subjectId,
             categoryId,
-            transactionType
+            transactionType,
+            it
         )
+    }
 
     override fun getCategorySpending(
         startDate: String?,
         endDate: String?,
         subjectId: List<Long>?,
+        categoryId: List<Int>?,
         transactionType: List<Int>?,
         natureFilter: Boolean?
-    ) =
+    ) = forAccount {
         categoryDao.getCategorySpending(
             startDate,
             endDate,
             subjectId,
+            categoryId,
             transactionType,
-            natureFilter
+            natureFilter,
+            it
         )
+    }
 
     override fun getTypeSpending(
         startDate: String?,
         endDate: String?,
         subjectId: List<Long>?,
         categoryId: List<Int>?,
+        transactionType: List<Int>?,
         natureFilter: Boolean?
-    ) =
-        transactionTypeDao.getTypeSpending(startDate, endDate, subjectId, categoryId, natureFilter)
+    ) = forAccount {
+        transactionTypeDao.getTypeSpending(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, it
+        )
+    }
 
     override fun getActivityByTimeOfDay(
         startDate: String?,
@@ -231,15 +259,17 @@ class DefaultTransactionsRepository @Inject constructor(
         categoryId: List<Int>?,
         transactionType: List<Int>?,
         natureFilter: Boolean?
-    ) =
+    ) = forAccount {
         transactionsDao.getActivityByTimeOfDay(
             startDate,
             endDate,
             subjectId,
             categoryId,
             transactionType,
-            natureFilter
+            natureFilter,
+            it
         )
+    }
 
     /**
      * Checks if the initial sync has been performed.
@@ -281,13 +311,13 @@ class DefaultTransactionsRepository @Inject constructor(
         FilterOptions(
             categories = categories.await().map { NamedRef(it.id, it.name) },
             accounts = accounts.await()
-                .map { NamedRef(it.subscriptionId, it.carrier + ' ' + it.number) },
+                .map { NamedRef(it.id, it.label ?: it.provider) },
             types = types.await().map { NamedRef(it.id, it.name) },
         )
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getOtherBalances(): Flow<OtherBalances> =
+    override fun getOtherBalances(): Flow<OtherBalances> = forAccount { account ->
         transactionTypeDao.getAll().flatMapLatest { types ->
 
             val regexByType: Map<Int, Regex> = types.mapNotNull { t ->
@@ -300,10 +330,11 @@ class DefaultTransactionsRepository @Inject constructor(
             }.map { it.id }
 
             if (balanceTypeIds.isEmpty()) flowOf(OtherBalances())
-            else transactionsDao.getLatestPerType(balanceTypeIds).map { rows ->
+            else transactionsDao.getLatestPerType(balanceTypeIds, account).map { rows ->
                 extractBalances(rows, regexByType)
             }
         }
+    }
 
     private fun extractBalances(
         rows: List<com.kimaita.monies.data.database.models.Transaction>,
@@ -329,50 +360,95 @@ class DefaultTransactionsRepository @Inject constructor(
             lockSavings = best[BalanceField.LOCK_SAVINGS]?.first,
             availableFuliza = best[BalanceField.AVAILABLE_FULIZA]?.first,
             outstandingFuliza = best[BalanceField.OUTSTANDING_FULIZA]?.first,
-            mshwariLoan = best[BalanceField.MSHWARI_LOAN]?.first,
         )
     }
 
     override fun getBalanceTrend(bucketFormat: String, startDate: String?, endDate: String?) =
-        transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate)
+        forAccount { transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate, it) }
 
-    override fun getActivityByTimeOfDay(startDate: String?, endDate: String?, natureFilter: Boolean?) =
-        transactionsDao.getActivityByTimeOfDay(startDate, endDate, natureFilter)
-
-    override fun getWeekdayCounts(startDate: String?, endDate: String?, natureFilter: Boolean?) =
-        transactionsDao.getWeekdayCounts(startDate, endDate, natureFilter)
+    override fun getWeekdayCounts(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?
+    ) = forAccount {
+        transactionsDao.getWeekdayCounts(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, it
+        )
+    }
 
     override fun getDailyTotals(startDate: String?, endDate: String?, natureFilter: Boolean?) =
-        transactionsDao.getDailyTotals(startDate, endDate, natureFilter)
+        forAccount { transactionsDao.getDailyTotals(startDate, endDate, natureFilter, it) }
 
     override fun getTopSubjectsByAmount(
         startDate: String?,
         endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
         transactionType: List<Int>?,
-        transactionCategory: List<Int>?,
         natureFilter: Boolean?,
         limit: Int
-    ) =
-        subjectDao.getTopSubjectsByAmount(startDate, endDate, transactionType, transactionCategory, natureFilter, limit)
+    ) = forAccount {
+        subjectDao.getTopSubjectsByAmount(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, limit, it
+        )
+    }
 
-    override fun getTopSubjectsByCount(startDate: String?, endDate: String?, limit: Int) =
-        subjectDao.getTopSubjectsByCount(startDate, endDate, limit)
+    override fun getTopSubjectsByCount(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        natureFilter: Boolean?,
+        limit: Int
+    ) = forAccount {
+        subjectDao.getTopSubjectsByCount(
+            startDate, endDate, subjectId, categoryId, transactionType, natureFilter, limit, it
+        )
+    }
 
-    override fun getIncomeBySource(startDate: String?, endDate: String?, limit: Int) =
-        subjectDao.getIncomeBySource(startDate, endDate, limit)
+    override fun getIncomeBySource(
+        startDate: String?,
+        endDate: String?,
+        subjectId: List<Long>?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        limit: Int
+    ) = forAccount {
+        subjectDao.getIncomeBySource(
+            startDate, endDate, subjectId, categoryId, transactionType, limit, it
+        )
+    }
 
-    override suspend fun getRecurringPayments() = recurringDetector.detect()
+    override suspend fun getRecurringPayments() =
+        recurringDetector.detect(account = _selectedAccount.value)
 
     override suspend fun getEarliestTransactionDate(): LocalDateTime? =
         transactionsDao.getEarliestTransactionTime()?.let {
-            runCatching { LocalDateTime.parse(it, isoDateTimeFormatter) }.getOrNull()
+            runCatching { LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }.getOrNull()
         }
 
     companion object {
         const val ONBOARDING_COMPLETE_KEY = "onboarding_complete"
+        const val SELECTED_ACCOUNT_KEY = "selected_account"
         const val EXPORT_PAGE_SIZE = 500
         private val BALANCE_REGEX_OPTIONS =
             setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
     }
 
 }
+
+/** The FTS4 MATCH expression for a search box: each word, stripped to letters and digits, as a prefix. Null when empty. */
+fun ftsQueryOf(query: String): String? =
+    query.trim().split(Regex("\\s+"))
+        .map { token -> token.filter { it.isLetterOrDigit() } }
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { "$it*" }
+        .ifEmpty { null }
+
+/** The query as an amount prefix when it is a number, else null. */
+fun amountQueryOf(query: String): String? =
+    query.trim().replace(",", "").takeIf { it.isNotEmpty() && it.toDoubleOrNull() != null }

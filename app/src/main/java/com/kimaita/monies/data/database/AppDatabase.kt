@@ -10,12 +10,14 @@ import com.kimaita.monies.data.dao.SettingsDao
 import com.kimaita.monies.data.dao.SubjectDao
 import com.kimaita.monies.data.dao.TransactionTypeDao
 import com.kimaita.monies.data.dao.TransactionsDao
+import com.kimaita.monies.data.dao.UnparsedMessageDao
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.Setting
 import com.kimaita.monies.data.database.models.Subject
 import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionFts
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.data.database.models.UnparsedMessage
 import com.kimaita.monies.data.database.models.UserAccount
 
 
@@ -30,8 +32,9 @@ import com.kimaita.monies.data.database.models.UserAccount
         Subject::class,
         UserAccount::class,
         TransactionType::class,
-        Setting::class
-    ], version = 1, exportSchema = false
+        Setting::class,
+        UnparsedMessage::class
+    ], version = 2, exportSchema = true
 )
 @TypeConverters(DateTimeConverters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -41,4 +44,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun subjectDao(): SubjectDao
     abstract fun settingsDao(): SettingsDao
     abstract fun accountDao(): AccountDao
+    abstract fun unparsedMessageDao(): UnparsedMessageDao
 }

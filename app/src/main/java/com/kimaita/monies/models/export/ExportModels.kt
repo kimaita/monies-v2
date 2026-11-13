@@ -2,7 +2,6 @@ package com.kimaita.monies.models.export
 
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.getDatesForFilter
-import com.kimaita.monies.models.isoDateTimeFormatter
 
 
 data class ExportFilters(

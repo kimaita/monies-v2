@@ -4,9 +4,11 @@ package com.kimaita.monies.services
 import com.kimaita.monies.data.database.models.Subject
 import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.Provider
 import com.kimaita.monies.utils.getSafeValue
 import com.kimaita.monies.utils.parseDateTime
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,8 +17,16 @@ import javax.inject.Singleton
 class SmsParser @Inject constructor() {
 
     data class SmsMessage(
-        val body: String, val id: Long?, val originatingAddress: String, val timestamp: Long
+        val body: String, val id: Long?, val originatingAddress: String, val timestamp: Long,
+        /** SIM the message arrived on; -1 = unknown. */
+        val subscriptionId: Int = -1,
     )
+
+    private val regexCache = ConcurrentHashMap<String, Regex>()
+
+    private fun regexFor(pattern: String) = regexCache.getOrPut(pattern) {
+        pattern.toRegex(setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+    }
 
     fun parse(
         messages: List<SmsMessage>, transactionTypes: List<TransactionType>
@@ -24,21 +34,18 @@ class SmsParser @Inject constructor() {
 
         val transactionList = mutableListOf<Pair<Transaction, Subject?>>()
 
-        val compiledPatterns = transactionTypes.mapNotNull { type ->
-            type.pattern?.let { pat ->
-                Pair(
-                    type.id,
-                    pat.toRegex(setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
-                )
-            }
-        }
+        // Only a message's own provider's patterns are tried; a sender nobody knows is never matched.
+        val patternsByProvider = transactionTypes
+            .filter { it.pattern != null }
+            .groupBy({ it.provider }, { Pair(it.id, regexFor(it.pattern!!)) })
 
         try {
             messages.forEach { message ->
                 var matchedType: Int? = null
                 var matchResult: MatchResult? = null
 
-                for ((type, regex) in compiledPatterns) {
+                val provider = Provider.forSender(message.originatingAddress)
+                for ((type, regex) in patternsByProvider[provider?.name].orEmpty()) {
                     val result = regex.find(message.body)
                     if (result != null) {
                         matchedType = type
@@ -79,7 +86,10 @@ class SmsParser @Inject constructor() {
         val code = groups?.getSafeValue("Code")
         val amount = groups?.getSafeValue("Amount")?.replace(",", "")?.toDoubleOrNull() ?: 0.0
         val cost = groups?.getSafeValue("Cost")?.replace(",", "")?.toDoubleOrNull() ?: 0.0
-        val subjectName = groups?.getSafeValue("Name")?.trim()
+        val balance = (groups?.getSafeValue("Balance") ?: groups?.getSafeValue("MpesaBal"))
+            ?.replace(",", "")?.toDoubleOrNull()
+        val subjectName = groups?.getSafeValue("Name")?.replace(REPEATED_SPACES, " ")?.trim()
+            ?.trimEnd('.')?.trim()?.takeIf { it.isNotEmpty() }
         val subjectNumber = groups?.getSafeValue("Number")?.trim()
         val date = groups?.getSafeValue("Date")
         val time = groups?.getSafeValue("Time")
@@ -87,7 +97,7 @@ class SmsParser @Inject constructor() {
 
         val name = subjectName ?: subjectNumber
         val newSubject = name?.let { name ->
-            Subject(name = name, number = subjectNumber ?: "")
+            Subject(rawName = name, name = name, number = subjectNumber ?: "")
         }
         val transaction = Transaction(
             amount = amount,
@@ -95,13 +105,18 @@ class SmsParser @Inject constructor() {
             message = body ?: message.body,
             messageId = message.id,
             cost = cost,
+            balance = balance,
             transactionTime = dateTime,
             currency = "KES",
             subject = null,
             transactionType = typeId,
             transactionCategory = null,
-            accountId = 0
+            accountId = 0 // placeholder; SmsSyncer sets the real account
         )
         return Pair(transaction, newSubject)
+    }
+
+    private companion object {
+        val REPEATED_SPACES = Regex("\\s{2,}")
     }
 }

@@ -11,9 +11,6 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
     @Query("SELECT * FROM transaction_types")
     fun getAll(): Flow<List<TransactionType>>
 
-    @Query("SELECT provider FROM transaction_types")
-    fun getProviders(): List<String>
-
     /**
      * Gets the total spending for each transaction type within a given date range.
      */
@@ -26,13 +23,18 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
               AND (:endDate IS NULL OR t.transactionTime <= :endDate)
               AND (:subjectId IS NULL OR t.subject IN (:subjectId))
               AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
+              AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
               AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
+              AND tt.isTransfer = 0
+              AND (:account IS NULL OR t.accountId = :account)
             GROUP BY tt.id
             ORDER BY total DESC
         """
     )
     fun getTypeSpending(
         startDate: String? = null, endDate: String? = null,
-        subjectId: List<Long>? = null, categoryId: List<Int>? = null, natureFilter: Boolean? = null,
+        subjectId: List<Long>? = null, categoryId: List<Int>? = null,
+        transactionType: List<Int>? = null, natureFilter: Boolean? = null,
+        account: Int? = null,
     ): Flow<List<CategorySpending>>
 }

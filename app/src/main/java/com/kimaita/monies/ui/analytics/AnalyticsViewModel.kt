@@ -62,7 +62,6 @@ class AnalyticsViewModel @Inject constructor(
 
     private val started = SharingStarted.WhileSubscribed(5_000)
     private val onceStarted = SharingStarted.Lazily
-    private val isoDateTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     private val _filters = MutableStateFlow(TransactionFilters(timeFilter = TimeFilter.MONTH))
     val filters: StateFlow<TransactionFilters> = _filters.asStateFlow()
@@ -98,29 +97,25 @@ class AnalyticsViewModel @Inject constructor(
     }
 
     // ---------------- derived keys ----------------
-    private val dates: Flow<Pair<String?, String?>> =
-        _filters.map { getDatesForFilter(it.timeFilter) }.distinctUntilChanged()
-
-    private data class CompKey(
+    private data class FilterKey(
         val start: String?, val end: String?, val bucket: String,
         val subjects: List<Long>?, val categories: List<Int>?, val types: List<Int>?,
+        val nature: Boolean?,
     )
 
-    private val compKey: Flow<CompKey> = _filters.map { f ->
+    private val key: Flow<FilterKey> = _filters.map { f ->
         val (s, e) = getDatesForFilter(f.timeFilter)
-        CompKey(
-            s,
-            e,
-            bucketFormatFor(f.timeFilter),
+        FilterKey(
+            s, e, bucketFormatFor(f.timeFilter),
             f.subjectFilters.ifEmpty { null },
             f.categoryFilters.ifEmpty { null },
-            f.typeFilters.ifEmpty { null })
+            f.typeFilters.ifEmpty { null },
+            f.natureFilter
+        )
     }.distinctUntilChanged()
 
-    private val natureFlow: Flow<Boolean?> = _filters.map { it.natureFilter }.distinctUntilChanged()
-
     // ---------------- Cash flow tab: balance, flow, costs ----------------
-    private val cashFlowRaw: StateFlow<List<CashFlowBucket>> = compKey.flatMapLatest { k ->
+    private val cashFlowRaw: StateFlow<List<CashFlowBucket>> = key.flatMapLatest { k ->
         repository.getCashFlow(k.bucket, k.start, k.end, k.subjects, k.categories, k.types)
     }.stateIn(viewModelScope, started, emptyList())
 
@@ -154,16 +149,22 @@ class AnalyticsViewModel @Inject constructor(
         BalancePoint(bucketLabel(bucket, tf), balance)
 
     // ---------------- headline stats (net / in / out / fees) ----------------
-    val stats: StateFlow<IncExp> = dates.flatMapLatest { (s, e) ->
-        repository.getIncomeVsExpense(s, e)
+    val stats: StateFlow<IncExp> = key.flatMapLatest { k ->
+        repository.getIncomeVsExpense(k.start, k.end, k.subjects, k.categories, k.types)
     }.stateIn(viewModelScope, started, IncExp())
 
     // ---------------- Spending tab: donut, subjects (cross-filtered), income tree ----------------
     private val categorySpending =
-        dates.flatMapLatest { (s, e) -> repository.getCategorySpending(s, e) }
-            .stateIn(viewModelScope, started, emptyList())
-    private val typeSpending = dates.flatMapLatest { (s, e) -> repository.getTypeSpending(s, e) }
-        .stateIn(viewModelScope, started, emptyList())
+        key.flatMapLatest { k ->
+            repository.getCategorySpending(
+                k.start, k.end, k.subjects, k.categories, k.types, natureFilter = false
+            )
+        }.stateIn(viewModelScope, started, emptyList())
+    private val typeSpending = key.flatMapLatest { k ->
+        repository.getTypeSpending(
+            k.start, k.end, k.subjects, k.categories, k.types, natureFilter = false
+        )
+    }.stateIn(viewModelScope, started, emptyList())
 
     val donut: StateFlow<List<SliceValue>> =
         combine(_breakdown, categorySpending, typeSpending) { mode, cat, type ->
@@ -177,7 +178,7 @@ class AnalyticsViewModel @Inject constructor(
         flow { emit(repository.getFilterOptions()) }.stateIn(viewModelScope, onceStarted, null)
 
     private data class SpendKey(
-        val dates: Pair<String?, String?>,
+        val key: FilterKey,
         val mode: Breakdown,
         val slice: String?,
         val opts: FilterOptions?
@@ -185,40 +186,44 @@ class AnalyticsViewModel @Inject constructor(
 
     val topSubjects: StateFlow<List<MerchantSpend>> =
         combine(
-            dates,
+            key,
             _breakdown,
             _selectedSlice,
             filterOptions
-        ) { d, mode, slice, opts -> SpendKey(d, mode, slice, opts) }
+        ) { fk, mode, slice, opts -> SpendKey(fk, mode, slice, opts) }
             .flatMapLatest { k ->
-                val (s, e) = k.dates
                 val catId =
                     if (k.mode == Breakdown.CATEGORY) k.opts?.categories?.firstOrNull { it.name == k.slice }?.id else null
                 val typeId =
                     if (k.mode == Breakdown.TYPE) k.opts?.types?.firstOrNull { it.name == k.slice }?.id else null
                 repository.getTopSubjectsByAmount(
-                    s,
-                    e,
-                    typeId?.let { listOf(it) },
-                    catId?.let { listOf(it) },
+                    k.key.start,
+                    k.key.end,
+                    k.key.subjects,
+                    catId?.let { listOf(it) } ?: k.key.categories,
+                    typeId?.let { listOf(it) } ?: k.key.types,
                     natureFilter = false,
                     limit = 8,
                 ).map { list -> list.map { MerchantSpend(it.name, it.amount) } }
             }.stateIn(viewModelScope, started, emptyList())
 
-    val incomeSources: StateFlow<List<SourceAmount>> = dates.flatMapLatest { (s, e) ->
-        repository.getIncomeBySource(s, e, 8)
+    val incomeSources: StateFlow<List<SourceAmount>> = key.flatMapLatest { k ->
+        repository.getIncomeBySource(k.start, k.end, k.subjects, k.categories, k.types, 8)
     }.stateIn(viewModelScope, started, emptyList())
 
     // ---------------- Activity tab ----------------
     private val activityRaw: StateFlow<List<ActivityCell>> =
-        combine(dates, natureFlow) { d, n -> d to n }.flatMapLatest { (d, n) ->
-            repository.getActivityByTimeOfDay(d.first, d.second, n)
+        key.flatMapLatest { k ->
+            repository.getActivityByTimeOfDay(
+                k.start, k.end, k.subjects, k.categories, k.types, k.nature
+            )
         }.stateIn(viewModelScope, started, emptyList())
 
     private val weekdayRaw: StateFlow<List<WeekdayCount>> =
-        combine(dates, natureFlow) { d, n -> d to n }.flatMapLatest { (d, n) ->
-            repository.getWeekdayCounts(d.first, d.second, n)
+        key.flatMapLatest { k ->
+            repository.getWeekdayCounts(
+                k.start, k.end, k.subjects, k.categories, k.types, k.nature
+            )
         }.stateIn(viewModelScope, started, emptyList())
 
     val heat: StateFlow<List<HeatRow>> = activityRaw.map { toHeatRows(it) }
@@ -227,8 +232,10 @@ class AnalyticsViewModel @Inject constructor(
     val weekdayBars: StateFlow<List<WeekdayBar>> = weekdayRaw.map { toWeekdayBars(it) }
         .stateIn(viewModelScope, started, emptyList())
 
-    val leaderboard: StateFlow<List<SubjectCount>> = dates.flatMapLatest { (s, e) ->
-        repository.getTopSubjectsByCount(s, e, 10)
+    val leaderboard: StateFlow<List<SubjectCount>> = key.flatMapLatest { k ->
+        repository.getTopSubjectsByCount(
+            k.start, k.end, k.subjects, k.categories, k.types, k.nature, 10
+        )
     }.stateIn(viewModelScope, started, emptyList())
 
     // Streak is its own fixed 13-week window (independent of the time chip), expense days only.
@@ -237,8 +244,8 @@ class AnalyticsViewModel @Inject constructor(
     val streakWindow: ClosedRange<LocalDate> = streakStart..streakEnd
     private val streakDaily = repository
         .getDailyTotals(
-            streakStart.atStartOfDay().format(isoDateTime),
-            streakEnd.plusDays(1).atStartOfDay().format(isoDateTime),
+            streakStart.atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            streakEnd.plusDays(1).atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             natureFilter = false
         )
         .stateIn(viewModelScope, started, emptyList())
@@ -275,7 +282,7 @@ class AnalyticsViewModel @Inject constructor(
 
 
     val recurring: StateFlow<List<RecurringPayment>> =
-        flow { emit(repository.getRecurringPayments()) }.stateIn(
+        repository.selectedAccount.mapLatest { repository.getRecurringPayments() }.stateIn(
             viewModelScope,
             onceStarted,
             emptyList()

@@ -16,15 +16,16 @@ import kotlin.math.sqrt
 class RecurringDetector @Inject constructor(
     private val transactionsDao: TransactionsDao,
 ) {
-    private val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private val fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME
 
     suspend fun detect(
         now: LocalDateTime = LocalDateTime.now(),
         lookbackMonths: Long = 12,
         minOccurrences: Int = 7,
+        account: Int? = null,
     ): List<RecurringPayment> = withContext(Dispatchers.IO) {
         val since = now.minusMonths(lookbackMonths).format(fmt)
-        transactionsDao.getSubjectOccurrences(since)
+        transactionsDao.getSubjectOccurrences(since, account)
             .groupBy { it.subjectId }
             .values
             .mapNotNull { analyze(it, now, minOccurrences) }

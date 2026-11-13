@@ -9,7 +9,8 @@ import androidx.room.PrimaryKey
 data class Category(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
-    val description: String? = null
+    val description: String? = null,
+    val monthlyBudget: Double? = null
 )
 
 fun getDefaultCategories(): List<Category> {

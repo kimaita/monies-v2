@@ -55,6 +55,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kimaita.monies.R
+import com.kimaita.monies.models.Provider
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
@@ -137,7 +138,7 @@ fun HomeScreenContent(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                "M-PESA BALANCE",
+                if (uiState.accountBalances.size > 1) "BALANCE" else "M-PESA BALANCE",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -148,6 +149,20 @@ fun HomeScreenContent(
                     fontWeight = FontWeight.ExtraBold
                 )
             }
+            if (uiState.accountBalances.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    uiState.accountBalances.forEach { account ->
+                        Pill {
+                            Svc(account.label ?: Provider.entries.firstOrNull { it.name == account.provider }?.displayName ?: account.provider)
+                            Strong(money(account.balance ?: 0.0))
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             ChangePill(change = uiState.changeInTotal, filter = filter, onClick = onViewAnalytics)
 
@@ -156,7 +171,6 @@ fun HomeScreenContent(
                 availableFuliza = uiState.availableFuliza,
                 outstandingFuliza = uiState.outstandingFuliza,
                 mshwariBalance = uiState.mshwariBalance,
-                mshwariLoan = uiState.mshwariLoan,
                 lockSavings = uiState.lockSavings,
             )
 
@@ -340,14 +354,12 @@ fun OtherBalances(
     availableFuliza: Double?,
     outstandingFuliza: Double?,
     mshwariBalance: Double?,
-    mshwariLoan: Double?,
     lockSavings: Double?,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val fulizaMax = (availableFuliza ?: 0.0) + (outstandingFuliza ?: 0.0)
     val hasFuliza = fulizaMax > 0.0
     val owedFuliza = (outstandingFuliza ?: 0.0) > 0.0
-    val hasLoan = (mshwariLoan ?: 0.0) > 0.0
 
     Column(
         Modifier
@@ -375,7 +387,6 @@ fun OtherBalances(
                         }
                     }
                     mshwariBalance?.let { Pill { Svc("M-Shwari"); Strong(money(it)) } }
-                    if (hasLoan) Pill { Svc("M-Shwari loan"); Owe(money(mshwariLoan!!)) }
                     lockSavings?.let { Pill { Svc("Lock"); Strong(money(it)) } }
                     Pill(onClick = { expanded = true }) {
                         Text(
@@ -392,8 +403,6 @@ fun OtherBalances(
                     fulizaMax,
                     owedFuliza,
                     mshwariBalance,
-                    mshwariLoan,
-                    hasLoan,
                     lockSavings,
                     onCollapse = { expanded = false })
             }
@@ -404,7 +413,7 @@ fun OtherBalances(
 @Composable
 private fun OtherBalancesPanel(
     availableFuliza: Double?, outstandingFuliza: Double?, fulizaMax: Double, owedFuliza: Boolean,
-    mshwariBalance: Double?, mshwariLoan: Double?, hasLoan: Boolean, lockSavings: Double?,
+    mshwariBalance: Double?, lockSavings: Double?,
     onCollapse: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -465,7 +474,6 @@ private fun OtherBalancesPanel(
             )
         }
         mshwariBalance?.let { PanelRow { RowLine("M-Shwari balance", money(it)) } }
-        if (hasLoan) PanelRow { RowLine("M-Shwari loan", money(mshwariLoan ?: 0.0), owed = true) }
         lockSavings?.let { PanelRow { RowLine("Lock savings", money(it)) } }
         Spacer(Modifier.height(8.dp))
     }
