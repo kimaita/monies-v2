@@ -1,5 +1,6 @@
 package com.kimaita.monies.ui.export
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -21,6 +22,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,7 +42,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -48,7 +50,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,12 +81,11 @@ private val dayFmt = DateTimeFormatter.ofPattern("d MMM yyyy")
 @Composable
 fun ExportScreen(
     viewModel: ExportViewModel = hiltViewModel(),
-    onBack: () -> Unit,
 ) {
-    val sel by viewModel.sel.collectAsState()
-    val count by viewModel.count.collectAsState()
-    val options by viewModel.options.collectAsState()
-    val state by viewModel.exportState.collectAsState()
+    val sel by viewModel.sel.collectAsStateWithLifecycle()
+    val count by viewModel.count.collectAsStateWithLifecycle()
+    val options by viewModel.options.collectAsStateWithLifecycle()
+    val state by viewModel.exportState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
@@ -107,33 +107,13 @@ fun ExportScreen(
                 ) { s ->
                     when (s) {
                         is ExportState.InProgress -> ProgressPanel(s, onCancel = viewModel::cancel)
-                        is ExportState.Completed -> AlertDialog(
-                            onDismissRequest = viewModel::acknowledge,
-                            icon = { Icon(painterResource(R.drawable.check_circle), null) },
-                            title = { Text("Export complete") },
-                            text = { Text(buildString {
-                                if (s.count >= 0) append("${"%,d".format(s.count)} transactions saved · ")
-                                append(s.fileName)
-                            }) },
-                            confirmButton = {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TextButton(onClick = { shareFile(context, s.uri, s.mime); viewModel.acknowledge() }) {
-                                        Icon(painterResource(R.drawable.share), null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Share")
-                                    }
-                                    Button(onClick = { openFile(context, s.uri, s.mime); viewModel.acknowledge() }) {
-                                        Icon(painterResource(R.drawable.open_in_new), null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Open")
-                                    }
-                                }
-                            },
-                            dismissButton = { TextButton(onClick = viewModel::acknowledge) { Text("Not now") } },
-                        )
                         else -> Box(Modifier.padding(16.dp)) {
                             Button(
                                 onClick = viewModel::export,
                                 enabled = (count ?: 0) > 0,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(54.dp),
+                                    .heightIn(min = 54.dp),
                                 shape = RoundedCornerShape(14.dp),
                             ) {
                                 Text("Export${count?.let { " ${"%,d".format(it)}" } ?: ""}",
@@ -155,6 +135,7 @@ fun ExportScreen(
             Modifier
                 .fillMaxSize()
                 .padding(pad)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -183,7 +164,7 @@ fun ExportScreen(
                         f, selected = sel.format == f, onClick = { viewModel.setFormat(f) },
                         modifier = Modifier
                             .weight(1f)
-                            .widthIn(min = 140.dp)
+                            .widthIn(min = 128.dp)
                     )
                 }
             }
@@ -234,12 +215,15 @@ fun ExportScreen(
                 })
             },
             confirmButton = {
-                Button(onClick = { shareFile(context, s.uri, s.mime); viewModel.acknowledge() }) {
-                    Icon(
-                        painterResource(R.drawable.share),
-                        null,
-                        Modifier.size(18.dp)
-                    ); Spacer(Modifier.width(8.dp)); Text("Share")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { shareFile(context, s.uri, s.mime); viewModel.acknowledge() }) {
+                        Icon(painterResource(R.drawable.share), null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp)); Text("Share")
+                    }
+                    Button(onClick = { openFile(context, s.uri, s.mime); viewModel.acknowledge() }) {
+                        Icon(painterResource(R.drawable.open_in_new), null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp)); Text("Open")
+                    }
                 }
             },
             dismissButton = { TextButton(onClick = viewModel::acknowledge) { Text("Not now") } },
@@ -328,14 +312,14 @@ private fun DateBox(
                 color = if (value == null) cs.onSurfaceVariant else cs.onSurface
             )
         }
-        if (value != null) Icon(
-            painterResource(R.drawable.close_small_24dp),
-            "Clear",
-            Modifier
-                .size(18.dp)
-                .clickable(onClick = onClear),
-            tint = cs.onSurfaceVariant
-        )
+        if (value != null) IconButton(onClick = onClear, Modifier.size(48.dp)) {
+            Icon(
+                painterResource(R.drawable.close_small_24dp),
+                "Clear",
+                Modifier.size(18.dp),
+                tint = cs.onSurfaceVariant
+            )
+        }
         else Icon(
             painterResource(R.drawable.date_range),
             null,
@@ -399,10 +383,10 @@ private fun AddFiltersRow(activeCount: Int, onClick: () -> Unit) {
 @Composable
 private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val sel by vm.sel.collectAsState()
-    val options by vm.options.collectAsState()
-    val query by vm.subjectQuery.collectAsState()
-    val results by vm.subjectResults.collectAsState()
+    val sel by vm.sel.collectAsStateWithLifecycle()
+    val options by vm.options.collectAsStateWithLifecycle()
+    val query by vm.subjectQuery.collectAsStateWithLifecycle()
+    val results by vm.subjectResults.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -518,38 +502,6 @@ private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
 @Composable
 private fun DirChip(label: String, selected: Boolean, onClick: () -> Unit) =
     FilterChip(selected = selected, onClick = onClick, label = { Text(label) })
-
-/* ---------------- progress ---------------- */
-
-@Composable
-private fun ProgressPanel(s: ExportState.InProgress, onCancel: () -> Unit) {
-    val fraction = s.total?.takeIf { it > 0 }?.let { (s.processed.toFloat() / it).coerceIn(0f, 1f) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-            Text(
-                "Exporting ${s.format.label}…",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(fraction?.let { "${(it * 100).toInt()}%" } ?: "${s.processed}",
-                style = MaterialTheme.typography.labelLarge)
-        }
-        if (fraction != null) LinearProgressIndicator({ fraction }, Modifier.fillMaxWidth())
-        else LinearProgressIndicator(Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-            Text(s.total?.let { "${s.processed} of $it · runs in background" }
-                ?: "Working… you can leave this screen",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onCancel) { Text("Cancel") }
-        }
-    }
-}
 
 /* ---------------- date picker ---------------- */
 

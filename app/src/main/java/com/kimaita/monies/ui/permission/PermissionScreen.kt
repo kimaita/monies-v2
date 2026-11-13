@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +46,10 @@ fun PermissionScreen(
                 .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+          Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+          ) {
             Spacer(Modifier.height(56.dp))
             Box(
                 Modifier.size(96.dp).clip(CircleShape)
@@ -67,11 +74,12 @@ fun PermissionScreen(
             )
             Spacer(Modifier.height(32.dp))
             rationales.forEach { PermissionRow(it) }
-            Spacer(Modifier.weight(1f))
+          }
+            Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onGrantClick, modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .heightIn(min = 52.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Text("Grant permissions", fontWeight = FontWeight.SemiBold)

@@ -3,6 +3,7 @@ package com.kimaita.monies.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -101,14 +102,17 @@ fun TransactionContent(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = transaction.type.displayName.toString(),
+                text = transaction.type.displayName ?: transaction.type.name,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(8.dp))
             CurrencyText(transaction.amount) { text ->
                 Text(
-                    text, style = MaterialTheme.typography.displayMedium
+                    text,
+                    style = MaterialTheme.typography.displayMedium,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(maxFontSize = MaterialTheme.typography.displayMedium.fontSize)
                 )
             }
 

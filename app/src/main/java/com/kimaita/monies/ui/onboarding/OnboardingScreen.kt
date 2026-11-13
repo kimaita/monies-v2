@@ -106,9 +106,11 @@ fun OnboardingScreen(
             }
 
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                val offset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
                 when (page) {
-                    0 -> HeroPage(active = pagerState.currentPage == 0, parallax = offset)
+                    0 -> HeroPage(
+                        active = pagerState.currentPage == 0,
+                        parallax = { (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction }
+                    )
                     1 -> AutoPage(active = pagerState.currentPage == 1)
                     2 -> DashboardPage()
                     else -> PermissionsPage(active = pagerState.currentPage == 3)
@@ -175,29 +177,30 @@ private fun PagerIndicator(pageCount: Int, currentPage: Int) {
 /* ---------- Page 1: SMS → record ---------- */
 
 @Composable
-private fun HeroPage(active: Boolean, parallax: Float) {
+private fun HeroPage(active: Boolean, parallax: () -> Float) {
     val t = remember { Animatable(0f) }
     LaunchedEffect(active) {
         if (active) {
             t.snapTo(0f); t.animateTo(1f, tween(750, easing = FastOutSlowInEasing))
         } else t.snapTo(0f)
     }
-    val p1 = (t.value * 1.7f).coerceIn(0f, 1f)
-    val p2 = ((t.value - 0.35f) / 0.65f).coerceIn(0f, 1f)
 
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {
         Box(Modifier.graphicsLayer {
-            alpha = p1; translationX = (1f - p1) * -30f + parallax * 50f
+            val p1 = (t.value * 1.7f).coerceIn(0f, 1f)
+            alpha = p1; translationX = (1f - p1) * -30f + parallax() * 50f
         }) { SmsBubble() }
         Spacer(Modifier.height(11.dp))
-        ArrowBadge(Modifier.graphicsLayer { alpha = p1 })
+        ArrowBadge(Modifier.graphicsLayer { alpha = (t.value * 1.7f).coerceIn(0f, 1f) })
         Spacer(Modifier.height(12.dp))
         Box(Modifier.graphicsLayer {
+            val p2 = ((t.value - 0.35f) / 0.65f).coerceIn(0f, 1f)
             alpha = p2; translationY = (1f - p2) * 28f; scaleX = lerp(0.96f, 1f, p2); scaleY =
             lerp(0.96f, 1f, p2)
         }) { RecordCard() }
@@ -378,6 +381,7 @@ private fun AutoPage(active: Boolean) {
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {
@@ -493,8 +497,9 @@ private fun PulseDot() {
     )
     Box(Modifier
         .size(7.dp)
+        .graphicsLayer { alpha = a }
         .clip(CircleShape)
-        .background(OnbColors.Emerald.copy(alpha = a)))
+        .background(OnbColors.Emerald))
 }
 
 /* ---------- Page 3: analytics dashboard ---------- */
@@ -744,6 +749,7 @@ private fun PermissionsPage(active: Boolean) {
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {

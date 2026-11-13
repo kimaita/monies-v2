@@ -34,6 +34,8 @@ enum class TransactionItemStyle {
     SINGLE_LINE, TWO_LINE
 }
 
+private val shortDateFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yy")
+
 fun formatRelativeDate(dateTime: LocalDateTime?): String {
     if (dateTime == null) return ""
     val today = LocalDate.now()
@@ -41,7 +43,7 @@ fun formatRelativeDate(dateTime: LocalDateTime?): String {
     return when {
         date.isEqual(today) -> "Today"
         date.isEqual(today.minusDays(1)) -> "Yesterday"
-        else -> date.format(DateTimeFormatter.ofPattern("dd/MM/yy"))
+        else -> date.format(shortDateFmt)
     }
 }
 
@@ -54,6 +56,7 @@ fun TransactionListItem(
 ) {
     val subject = transaction.subject
     val transactionType = transaction.type
+    val typeLabel = transactionType.displayName ?: transactionType.name
     var showSheet by remember { mutableStateOf(false) }
 
     if (showSheet) {
@@ -74,18 +77,21 @@ fun TransactionListItem(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (style == TransactionItemStyle.TWO_LINE && subject != null) {
+        if (style == TransactionItemStyle.TWO_LINE) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .padding(vertical = 4.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable { onSubjectClick(subject.id) }, contentAlignment = Alignment.Center
+                    .then(
+                        if (subject != null) Modifier.clickable { onSubjectClick(subject.id) }
+                        else Modifier
+                    ), contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = subject.name?.first()?.uppercase() ?: transactionType.name.first()
-                        .uppercase(),
+                    text = subject?.name?.firstOrNull()?.uppercase()
+                        ?: typeLabel.firstOrNull()?.uppercase() ?: "?",
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold
@@ -98,17 +104,14 @@ fun TransactionListItem(
                 .padding(horizontal = 8.dp, vertical = 8.dp)
             else Modifier.weight(1f)
         ) {
-            if (style == TransactionItemStyle.TWO_LINE && subject != null) {
-                (subject.name?.uppercase() ?: subject.number
-                ?: transactionType.displayName?.uppercase())?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = Ellipsis
-                    )
-                }
+            if (style == TransactionItemStyle.TWO_LINE) {
+                Text(
+                    text = (subject?.name ?: subject?.number)?.uppercase() ?: typeLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = Ellipsis
+                )
             }
             CurrencyText(
                 amount = transaction.amount,

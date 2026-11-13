@@ -1,5 +1,6 @@
 package com.kimaita.monies.ui.account
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +27,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +57,7 @@ import com.kimaita.monies.models.TransactionType
 import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.theme.AppTheme
+import com.kimaita.monies.ui.theme.MoniesTheme
 import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDateTime
 
@@ -68,9 +69,9 @@ fun AccountScreen(
     viewModel: AccountViewModel = hiltViewModel()
 ) {
     val transactions = viewModel.subjectTransactions.collectAsLazyPagingItems()
-    val subject by viewModel.subjectDetails.collectAsState()
-    val stats by viewModel.subjectStats.collectAsState()
-    val filters by viewModel.filters.collectAsState()
+    val subject by viewModel.subjectDetails.collectAsStateWithLifecycle()
+    val stats by viewModel.subjectStats.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
 
 
     AccountScreenContent(
@@ -294,7 +295,7 @@ fun HighlightsSection(
 private fun HighlightStatItem(
     modifier: Modifier = Modifier, amount: Double, count: Int, label: String, isInc: Boolean
 ) {
-    val iconColor = if (isInc) Color(0xFF006D3B) else Color(0xFFD32F2F)
+    val iconColor = if (isInc) MoniesTheme.extra.positive else MoniesTheme.extra.negative
     val icon = if (isInc) R.drawable.arrow_circle_down_24dp else R.drawable.arrow_circle_up_24dp
 
     Row(
