@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -56,7 +57,7 @@ internal fun Path.addBar(left: Float, right: Float, base: Float, tip: Float, rad
 @Composable
 fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier, plotHeight: Dp = 180.dp) {
     val colors = chartColors()
-    val buckets = remember(data) { data.map { BarBucket(it.label, it.inflow, it.outflow) } }
+    val buckets = remember(data) { data.map { BarBucket(it.label, it.inflow, it.outflow, it.yearStart) } }
     val tooltip = remember {
         { b: BarBucket ->
             val net = b.up - b.down
@@ -75,7 +76,7 @@ fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier, plotH
 @Composable
 fun CostAnalyzerChart(data: List<CostMonth>, modifier: Modifier = Modifier) {
     val gold = MoniesTheme.extra.gold
-    val buckets = remember(data) { data.map { BarBucket(it.month, it.fee) } }
+    val buckets = remember(data) { data.map { BarBucket(it.month, it.fee, year = it.yearStart) } }
     val tooltip = remember {
         { b: BarBucket -> "${b.label} · fees ${formatCompactAmount(b.up.toDouble())}" }
     }
@@ -109,7 +110,8 @@ fun BarChart(
         grow.snapTo(0f); grow.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
     }
     val scroll = rememberScrollState()
-    val height = plotHeight + PlotTopPad + PlotBottomPad
+    val bottomPad = if (buckets.any { it.year != null }) PlotBottomPad + YearRowHeight else PlotBottomPad
+    val height = plotHeight + PlotTopPad + bottomPad
 
     BoxWithConstraints(modifier) {
         val n = buckets.size
@@ -127,7 +129,7 @@ fun BarChart(
                     .drawWithCache {
                         val style = TextStyle(fontSize = 10.sp, color = chart.axisLabel)
                         val top = PlotTopPad.toPx()
-                        val bottom = size.height - PlotBottomPad.toPx()
+                        val bottom = size.height - bottomPad.toPx()
                         val labels = Array(scale.values.size) {
                             measurer.measure(
                                 formatCompactAmount(abs(scale.values[it]).toDouble()), style
@@ -166,7 +168,7 @@ fun BarChart(
                             val labelStyle = TextStyle(fontSize = 10.sp, color = chart.axisLabel)
                             val tipStyle = TextStyle(fontSize = 11.sp, color = chart.tooltipText)
                             val top = PlotTopPad.toPx()
-                            val bottom = size.height - PlotBottomPad.toPx()
+                            val bottom = size.height - bottomPad.toPx()
                             val slot = slotW.toPx()
                             val bw = barW.toPx()
                             val minH = 2.dp.toPx()
@@ -211,6 +213,19 @@ fun BarChart(
                                 )
                             }
 
+                            // years: a divider where one begins and its label on a second row under the months
+                            val yearStyle = TextStyle(
+                                fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface
+                            )
+                            val yearAt = (0 until n).filter { buckets[it].year != null }
+                            val yearLabels = yearAt.map { measurer.measure(buckets[it].year!!, yearStyle) }
+                            val yearX = yearAt.map { it * slot + 3.dp.toPx() }
+                            val yearShown = yearAt.indices.filter { k ->   // drop one that would touch the next
+                                k == yearAt.lastIndex || yearX[k] + yearLabels[k].size.width + 4.dp.toPx() <= yearX[k + 1]
+                            }
+                            val yearY = bottom + 6.dp.toPx() + xLabels.maxOf { it.size.height }
+                            val dividerColor = chart.axisLabel.copy(alpha = 0.4f)
+
                             val tips = Array<TextLayoutResult>(n) { measurer.measure(tooltip(buckets[it]), tipStyle) }
                             val pad = 8.dp.toPx()
                             val tipRadius = CornerRadius(8.dp.toPx())
@@ -218,6 +233,10 @@ fun BarChart(
                             onDrawBehind {
                                 gridYs.forEach { y ->
                                     drawLine(chart.grid, Offset(0f, y), Offset(size.width, y), gridPx)
+                                }
+                                for (k in yearAt.indices) if (yearAt[k] > 0) {
+                                    val x = yearAt[k] * slot
+                                    drawLine(dividerColor, Offset(x, top), Offset(x, size.height), gridPx)
                                 }
                                 drawLine(cs.onSurfaceVariant, Offset(0f, y0), Offset(size.width, y0), baselinePx)
 
@@ -237,6 +256,7 @@ fun BarChart(
                                 for (i in 0 until n) {
                                     if ((n - 1 - i) % stride == 0) drawText(xLabels[i], topLeft = xPos[i])
                                 }
+                                for (k in yearShown) drawText(yearLabels[k], topLeft = Offset(yearX[k], yearY))
                                 if (sel in 0 until n) {
                                     val t = tips[sel]
                                     val w = t.size.width + pad * 2

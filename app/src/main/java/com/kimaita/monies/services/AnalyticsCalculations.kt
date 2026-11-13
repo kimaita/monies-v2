@@ -2,10 +2,19 @@ package com.kimaita.monies.services
 
 
 import com.kimaita.monies.data.dao.dtos.ActivityCell
+import com.kimaita.monies.data.dao.dtos.BalanceBucket
+import com.kimaita.monies.data.dao.dtos.CategorySpending
+import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
+import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.analytics.BalancePoint
+import com.kimaita.monies.models.export.NamedRef
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
 
 data class StreakSummary(
     val currentStreak: Int,
@@ -96,4 +105,140 @@ fun computePace(daily: List<DailyTotal>, today: LocalDate): PaceSummary {
     val at = minOf(today.dayOfMonth, lastCum.size) - 1
     val change = lastCum[at].takeIf { it > 0.0 }?.let { (thisCum[at] - it) / it * 100.0 }
     return PaceSummary(thisCum, lastCum, thisCum.last(), change)
+}
+
+/** The line Analytics is showing: its name, or "All accounts"; null when there is a single line and nothing to tell apart. */
+fun scopeLabel(selected: Int?, lines: List<Pair<Int, String>>): String? =
+    if (lines.size < 2) null else lines.firstOrNull { it.first == selected }?.second ?: "All accounts"
+
+/** A breakdown row: the label shown, its amount, and the ids tapping it narrows the entries to. */
+data class SliceValue(
+    val label: String,
+    val value: Float,
+    val categoryIds: List<Int> = emptyList(),
+    val typeIds: List<Int> = emptyList(),
+)
+
+fun categorySlices(rows: List<CategorySpending>, categories: List<NamedRef<Int>>): List<SliceValue> =
+    rows.map { r ->
+        SliceValue(r.name, r.total.toFloat(), categoryIds = categories.filter { it.name == r.name }.map { it.id })
+    }.sortedByDescending { it.value }
+
+/** Rows by type, under the type's display name. Types sharing a display name ("Airtime") become one row. */
+fun typeSlices(rows: List<CategorySpending>, types: List<TransactionType>): List<SliceValue> {
+    val byName = types.associateBy { it.name }
+    return rows.groupBy { byName[it.name]?.finalDisplayName ?: it.name }
+        .map { (label, group) ->
+            SliceValue(
+                label, group.sumOf { it.total }.toFloat(),
+                typeIds = group.mapNotNull { byName[it.name]?.id },
+            )
+        }
+        .sortedByDescending { it.value }
+}
+
+/** Tapping the selected row clears the selection. */
+fun toggleSlice(current: String?, tapped: String?): String? = if (current == tapped) null else tapped
+
+/**
+ * The (categories, types) the entries below the breakdown are narrowed to: the selected row's ids,
+ * else the filters already in force. A selection whose row has gone narrows nothing.
+ */
+fun sliceFilter(
+    slices: List<SliceValue>, selected: String?, categories: List<Int>?, types: List<Int>?,
+): Pair<List<Int>?, List<Int>?> {
+    val s = slices.firstOrNull { it.label == selected }
+    return (s?.categoryIds?.takeIf { it.isNotEmpty() } ?: categories) to
+            (s?.typeIds?.takeIf { it.isNotEmpty() } ?: types)
+}
+
+/**
+ * For bucket keys that start with the year ("2026-03", "2026-45", "2026-03-14 09"): the year at each
+ * bucket where a new one begins, null elsewhere. The first bucket is marked only when the buckets
+ * span several years, so one year of data carries no markers.
+ */
+fun yearStarts(buckets: List<String>): List<String?> {
+    val years = buckets.map { it.take(4) }
+    val several = years.distinct().size > 1
+    return years.mapIndexed { i, y -> if (if (i == 0) several else y != years[i - 1]) y else null }
+}
+
+/** At most [max] of [items], evenly picked, always keeping the first and the last. */
+fun <T> thin(items: List<T>, max: Int): List<T> {
+    if (items.size <= max || max < 2) return items
+    return List(max) { i -> items[(i * (items.size - 1).toDouble() / (max - 1)).roundToInt()] }
+}
+
+private val dateFmt = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val dateYearFmt = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private val dateShortYearFmt = DateTimeFormatter.ofPattern("d MMM yy", Locale.ENGLISH)
+
+/**
+ * Balance points with dates, from per-day ("2026-03-14") or per-hour ("2026-03-14 09") buckets.
+ * The tooltip label is the full date (with the hour for hourly buckets); the axis label is the short
+ * date, the hour when every point is on one day, and carries the year when the range spans several.
+ */
+fun balancePoints(rows: List<BalanceBucket>, maxPoints: Int = 90): List<BalancePoint> {
+    val kept = thin(rows, maxPoints)
+    if (kept.isEmpty()) return emptyList()
+    val dates = kept.map { LocalDate.parse(it.bucket.take(10)) }
+    val hourly = kept.first().bucket.length > 10
+    val sameDay = dates.first() == dates.last()
+    val several = dates.first().year != dates.last().year
+    return kept.mapIndexed { i, r ->
+        val date = dates[i]
+        val hour = if (hourly) r.bucket.substring(11, 13) + ":00" else null
+        val label = if (hour != null) "${date.format(dateFmt)} $hour" else date.format(dateYearFmt)
+        val axis = when {
+            hour != null && sameDay -> hour
+            several -> date.format(dateShortYearFmt)
+            else -> date.format(dateFmt)
+        }
+        BalancePoint(label, r.balance, axis)
+    }
+}
+
+/**
+ * Fees as a percentage of [expense] (outgoing money excluding transfers and fees), or null when
+ * nothing was spent.
+ */
+fun feeShare(fees: Double, expense: Double): Double? = if (expense > 0.0) fees / expense * 100 else null
+
+private val slotNames = listOf("mornings", "afternoons", "evenings", "nights")
+private val slotRanges = listOf("5 am–12 pm", "12–5 pm", "5–10 pm", "10 pm–5 am")
+
+/**
+ * One sentence on when the activity is, from the time-of-day cells (slot 0 morning .. 3 night,
+ * weekday 0 = Sunday): the busiest slot, and "weekday" or "weekend" when that slot's per-day rate is
+ * over 1.5 times the other's. Null when there are fewer than 5 transactions.
+ */
+fun activeSummary(cells: List<ActivityCell>): String? {
+    if (cells.sumOf { it.count } < 5) return null
+    val slot = (0..3).maxByOrNull { s -> cells.filter { it.slot == s }.sumOf { it.count } } ?: return null
+    val inSlot = cells.filter { it.slot == slot }
+    val weekdayRate = inSlot.filter { it.weekday in 1..5 }.sumOf { it.count } / 5.0
+    val weekendRate = inSlot.filter { it.weekday == 0 || it.weekday == 6 }.sumOf { it.count } / 2.0
+    val name = slotNames[slot]
+    val range = slotRanges[slot]
+    return when {
+        weekdayRate > weekendRate * 1.5 -> "Most active on weekday $name, $range"
+        weekendRate > weekdayRate * 1.5 -> "Most active on weekend $name, $range"
+        else -> "Most active in the $name, $range"
+    }
+}
+
+/**
+ * The total balance of several lines per bucket: each line's latest balance at or before the end of
+ * the bucket, carried forward through buckets where it has no transactions, and added up. A line with
+ * no balance yet adds nothing. Rows with a null bucket are the lines' balances before the range; the
+ * result has a point for every bucket in which any line has a row.
+ */
+fun sumLineBalances(rows: List<LineBalanceBucket>): List<BalanceBucket> {
+    val current = rows.filter { it.bucket == null }.associate { it.lineId to it.balance.toDouble() }.toMutableMap()
+    val inRange = rows.filter { it.bucket != null }
+    val byBucket = inRange.groupBy { it.bucket!! }
+    return byBucket.keys.sorted().map { b ->
+        byBucket.getValue(b).forEach { current[it.lineId] = it.balance.toDouble() }
+        BalanceBucket(b, current.values.sum().toFloat())
+    }
 }

@@ -185,6 +185,15 @@ internal fun LineChartCanvas(
                         bottom + 6.dp.toPx()
                     )
                 }
+                // Labels are given left to right; one that would touch the previous is dropped, but
+                // the last always stays (it takes the place of any that it would touch).
+                val labelGap = 6.dp.toPx()
+                fun touches(a: Int, b: Int) = xLabelPos[a].x + xLabelLayouts[a].size.width + labelGap > xLabelPos[b].x
+                val shown = ArrayList<Int>()
+                for (i in xLabels.indices) {
+                    if (i == xLabels.lastIndex) while (shown.isNotEmpty() && touches(shown.last(), i)) shown.removeAt(shown.lastIndex)
+                    if (shown.isEmpty() || !touches(shown.last(), i)) shown.add(i)
+                }
 
                 // lines
                 val paths = Array(series.size) { i ->
@@ -242,7 +251,7 @@ internal fun LineChartCanvas(
                         drawLine(chart.grid, Offset(left, y), Offset(right, y), gridPx)
                     }
                     yLabels.forEachIndexed { i, l -> drawText(l, topLeft = yLabelPos[i]) }
-                    xLabelLayouts.forEachIndexed { i, l -> drawText(l, topLeft = xLabelPos[i]) }
+                    for (i in shown) drawText(xLabelLayouts[i], topLeft = xLabelPos[i])
 
                     val g = grow.value
                     val clipRight = if (g >= 1f) size.width else left + (right - left) * g
@@ -293,10 +302,12 @@ fun BalanceTrendChart(
         )
     }
     val xLabels = remember(data) {
-        listOf(0, data.size / 2, data.lastIndex).distinct().map { it.toFloat() to data[it].day }
+        // Five evenly spaced dates; the chart drops any that would touch their neighbour.
+        listOf(0, data.lastIndex / 4, data.lastIndex / 2, data.lastIndex * 3 / 4, data.lastIndex)
+            .distinct().map { it.toFloat() to data[it].axisLabel }
     }
     val tooltip = remember(data) {
-        { i: Int -> "${data[i].day} · ${formatKes(data[i].balance.toDouble())}" }
+        { i: Int -> "${data[i].label} · ${formatKes(data[i].balance.toDouble())}" }
     }
     LineChartCanvas(
         series, 0f, data.lastIndex.toFloat(), xLabels, modifier, plotHeight, tooltip = tooltip

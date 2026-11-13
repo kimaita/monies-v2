@@ -31,6 +31,8 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.StreakSummary
+import com.kimaita.monies.services.activeSummary
+import com.kimaita.monies.services.feeShare
 import com.kimaita.monies.ui.charts.*
 import com.kimaita.monies.ui.components.AutoSizeText
 import com.kimaita.monies.ui.components.HighlightsFilter
@@ -54,11 +56,25 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
     var tab by rememberSaveable { mutableStateOf(AnalyticsTab.OVERVIEW) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     val listStates = AnalyticsTab.entries.associateWith { rememberLazyListState() }
+    val scope by viewModel.scopeLabel.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Analytics", fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Column {
+                        Text("Analytics", fontWeight = FontWeight.SemiBold)
+                        scope?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                },
                 actions = {
                     TextButton(onClick = { showFilters = true }) {
                         Icon(painterResource(R.drawable.filter), null, Modifier.size(18.dp))
@@ -145,23 +161,28 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val breakdownOrNull by vm.breakdown.collectAsStateWithLifecycle()
     val cashFlowOrNull by vm.cashFlow.collectAsStateWithLifecycle()
     val balanceOrNull by vm.balanceTrend.collectAsStateWithLifecycle()
-    val heatOrNull by vm.heat.collectAsStateWithLifecycle()
+    val activityOrNull by vm.activityRaw.collectAsStateWithLifecycle()
     val topOrNull by vm.topMerchant.collectAsStateWithLifecycle()
+    val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val extra = MoniesTheme.extra
 
     val stats = statsOrNull
     val breakdownRows = breakdownOrNull
     val cashFlow = cashFlowOrNull
     val balance = balanceOrNull
-    val heat = heatOrNull
+    val activity = activityOrNull
     val top = topOrNull
-    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || heat == null || top == null) {
+    val sources = sourcesOrNull
+    if (stats == null || breakdownRows == null || cashFlow == null || balance == null || activity == null ||
+        top == null || sources == null
+    ) {
         LoadingTab(listState)
         return
     }
     val whereItGoes = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
     val net = remember(stats) { stats.income - stats.expense }
     val fees = remember(stats) { stats.incomeCost + stats.expenseCost }
+    val activeText = remember(activity) { activeSummary(activity) ?: "Not enough activity yet" }
 
     TabList(listState) {
         pace?.let { p ->
@@ -186,11 +207,8 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                     minFontSize = 22.sp,
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "In ${formatCompactKes(stats.income)}  /  Out ${formatCompactKes(stats.expense)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                TopLine("Top in", sources.firstOrNull()?.let { it.name to it.amount })
+                TopLine("Top out", top.firstOrNull()?.let { it.name to it.amount })
             }
         }
 
@@ -231,40 +249,27 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             }
         }
 
-        item(key = "balance_fees") {
-            // No IntrinsicSize here: StatTile's AutoSizeText is a BoxWithConstraints (SubcomposeLayout).
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                BentoCard(
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 112.dp),
-                    onClick = { onJump(AnalyticsTab.CASHFLOW) }) {
-                    TileLabel("Balance")
-                    Spacer(Modifier.height(8.dp))
-                    if (balance.size < 2) EmptyHint()
-                    else MiniSparkline(
-                        balance,
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    )
-                }
-                StatTile(
-                    "Fees",
-                    formatCompactKes(fees),
-                    MaterialTheme.colorScheme.onSurface,
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 112.dp)
-                )
+        item(key = "balance") {
+            BentoCard(onClick = { onJump(AnalyticsTab.CASHFLOW) }) {
+                TileLabel("Balance")
+                Spacer(Modifier.height(8.dp))
+                if (balance.size < 2) EmptyHint()
+                else BalanceTrendChart(balance, Modifier.fillMaxWidth(), plotHeight = 140.dp)
             }
+        }
+
+        item(key = "fees") {
+            StatTile(
+                "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
+                sub = feeShareText(fees, stats.expense),
+            )
         }
 
         item(key = "heat") {
             BentoCard(onClick = { onJump(AnalyticsTab.ACTIVITY) }) {
                 TileLabel("When you're active")
                 Spacer(Modifier.height(8.dp))
-                if (heat.isEmpty()) EmptyHint() else TimeOfDayHeatmap(heat, showLabels = false)
+                Text(activeText, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }
@@ -355,7 +360,7 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val mode by vm.breakdownMode.collectAsStateWithLifecycle()
     val breakdownOrNull by vm.breakdown.collectAsStateWithLifecycle()
     val topOrNull by vm.topSubjects.collectAsStateWithLifecycle()
-    val selected by vm.selectedSlice.collectAsStateWithLifecycle()
+    val selectedSlice by vm.selectedSlice.collectAsStateWithLifecycle()
     val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val extra = MoniesTheme.extra
     val budgets by vm.budgets.collectAsStateWithLifecycle()
@@ -368,6 +373,8 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
         return
     }
     val slices = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
+    // A selection whose row has gone (the period changed, say) is no longer a filter.
+    val selected = selectedSlice?.takeIf { s -> slices.any { it.label == s } }
     val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
     val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
 
@@ -460,7 +467,7 @@ private fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val feesHeader = remember(stats) {
         val fees = stats.incomeCost + stats.expenseCost
         "You paid ${formatKes(fees)} in fees" +
-                if (stats.expense > 0.0) " · ${"%.1f".format(Locale.US, fees / stats.expense * 100)}% of spending" else ""
+                (feeShareText(fees, stats.expense)?.let { " · $it" } ?: "")
     }
 
     TabList(listState) {
@@ -652,6 +659,28 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         content()
+    }
+}
+
+/** "Top in  Name  KES 12K": the name takes the room left and ellipsizes; "–" when there is none. */
+@Composable
+private fun TopLine(label: String, top: Pair<String, Double>?) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            label, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            top?.first ?: "–", Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        top?.let {
+            Text(
+                formatCompactKes(it.second), style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 
@@ -873,6 +902,9 @@ private fun EmptyHint(text: String = "Nothing here yet") =
 
 private val weekdayLabels =
     arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+
+private fun feeShareText(fees: Double, expense: Double): String? =
+    feeShare(fees, expense)?.let { "${"%.1f".format(Locale.US, it)}% of spend" }
 
 private fun weekdayName(i: Int?): String = i?.let { weekdayLabels.getOrNull(it) } ?: "-"
 private fun slotName(i: Int?): String = i?.let { SLOT_LABELS.getOrNull(it) } ?: "-"

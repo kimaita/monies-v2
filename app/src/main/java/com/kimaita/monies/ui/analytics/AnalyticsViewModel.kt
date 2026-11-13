@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.kimaita.monies.data.TransactionsRepository
 import com.kimaita.monies.data.dao.dtos.CategoryBudget
 import com.kimaita.monies.data.dao.dtos.ActivityCell
-import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CashFlowBucket
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.data.dao.dtos.SourceAmount
@@ -24,10 +23,18 @@ import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.services.PaceSummary
 import com.kimaita.monies.services.RhythmStats
+import com.kimaita.monies.services.SliceValue
 import com.kimaita.monies.services.StreakSummary
 import com.kimaita.monies.services.computePace
 import com.kimaita.monies.services.computeRhythm
+import com.kimaita.monies.services.categorySlices
 import com.kimaita.monies.services.computeStreaks
+import com.kimaita.monies.services.sliceFilter
+import com.kimaita.monies.services.toggleSlice
+import com.kimaita.monies.services.typeSlices
+import com.kimaita.monies.services.scopeLabel
+import com.kimaita.monies.services.balancePoints
+import com.kimaita.monies.services.yearStarts
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -39,6 +46,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -55,7 +63,6 @@ enum class SpendDirection { OUT, IN }
 enum class Breakdown { CATEGORY, TYPE }
 
 data class WeekdayBar(val label: String, val count: Int)
-data class SliceValue(val label: String, val value: Float)
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -92,7 +99,7 @@ class AnalyticsViewModel @Inject constructor(
     }
 
     fun selectSlice(label: String?) {
-        _selectedSlice.value = if (_selectedSlice.value == label) null else label
+        _selectedSlice.value = toggleSlice(_selectedSlice.value, label)
     }
 
     fun clearFilters() {
@@ -125,33 +132,38 @@ class AnalyticsViewModel @Inject constructor(
     }.stateIn(viewModelScope, started, null)
 
     val cashFlow: StateFlow<List<CashFlowWeek>?> = combine(cashFlowRaw, _filters) { rows, f ->
-        rows?.map {
-            CashFlowWeek(
-                bucketLabel(it.bucket, f.timeFilter),
-                it.income.toFloat(),
-                it.expense.toFloat()
-            )
+        rows?.let { r ->
+            val years = yearStarts(r.map { it.bucket })
+            r.mapIndexed { i, it ->
+                CashFlowWeek(
+                    bucketLabel(it.bucket, f.timeFilter),
+                    it.income.toFloat(),
+                    it.expense.toFloat(),
+                    years[i]
+                )
+            }
         }
     }.stateIn(viewModelScope, started, null)
 
     val costs: StateFlow<List<CostMonth>?> = combine(cashFlowRaw, _filters) { rows, f ->
-        rows?.map {
-            CostMonth(
-                bucketLabel(it.bucket, f.timeFilter),
-                it.expense.toFloat(),
-                it.cost.toFloat()
-            )
+        rows?.let { r ->
+            val years = yearStarts(r.map { it.bucket })
+            r.mapIndexed { i, it ->
+                CostMonth(
+                    bucketLabel(it.bucket, f.timeFilter),
+                    it.expense.toFloat(),
+                    it.cost.toFloat(),
+                    years[i]
+                )
+            }
         }
     }.stateIn(viewModelScope, started, null)
 
     val balanceTrend: StateFlow<List<BalancePoint>?> = _filters.flatMapLatest { f ->
         val (s, e) = getDatesForFilter(f.timeFilter)
-        repository.getBalanceTrend(bucketFormatFor(f.timeFilter), s, e)
-            .map { rows -> rows.map { it.toPoint(f.timeFilter) } }
+        repository.getBalanceTrend(balanceBucketFormatFor(f.timeFilter), s, e)
+            .map { rows -> balancePoints(rows) }
     }.stateIn(viewModelScope, started, null)
-
-    private fun BalanceBucket.toPoint(tf: TimeFilter) =
-        BalancePoint(bucketLabel(bucket, tf), balance)
 
     // ---------------- headline stats (net / in / out / fees) ----------------
     val stats: StateFlow<IncExp?> = key.flatMapLatest { k ->
@@ -171,14 +183,15 @@ class AnalyticsViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, started, null)
 
-    val breakdown: StateFlow<List<SliceValue>?> =
-        combine(_breakdownMode, categorySpending, typeSpending) { mode, cat, type ->
-            if (cat == null || type == null) return@combine null
-            val chosen = if (mode == Breakdown.CATEGORY) cat else type
-            (chosen.ifEmpty { type })
-                .sortedByDescending { it.total }
-                .map { SliceValue(it.name, it.total.toFloat()) }
-        }.stateIn(viewModelScope, started, null)
+    val breakdown: StateFlow<List<SliceValue>?> = combine(
+        _breakdownMode, categorySpending, typeSpending,
+        repository.getCategories(), repository.getTransactionTypes(),
+    ) { mode, cat, type, categories, types ->
+        if (cat == null || type == null) return@combine null
+        val byType = typeSlices(type, types)
+        if (mode == Breakdown.TYPE) byType
+        else categorySlices(cat, categories.map { NamedRef(it.id, it.name) }).ifEmpty { byType }
+    }.stateIn(viewModelScope, started, null)
 
     /** Budgeted categories with this calendar month's spending (not affected by the filters). */
     val budgets: StateFlow<List<CategoryBudget>> =
@@ -187,31 +200,14 @@ class AnalyticsViewModel @Inject constructor(
     val filterOptions: StateFlow<FilterOptions?> =
         flow { emit(repository.getFilterOptions()) }.stateIn(viewModelScope, onceStarted, null)
 
-    private data class SpendKey(
-        val key: FilterKey,
-        val mode: Breakdown,
-        val slice: String?,
-        val opts: FilterOptions?
-    )
-
+    /** Top merchants, narrowed to the breakdown row that is selected, in Category and Type mode alike. */
     val topSubjects: StateFlow<List<MerchantSpend>?> =
-        combine(
-            key,
-            _breakdownMode,
-            _selectedSlice,
-            filterOptions
-        ) { fk, mode, slice, opts -> SpendKey(fk, mode, slice, opts) }
-            .flatMapLatest { k ->
-                val catId =
-                    if (k.mode == Breakdown.CATEGORY) k.opts?.categories?.firstOrNull { it.name == k.slice }?.id else null
-                val typeId =
-                    if (k.mode == Breakdown.TYPE) k.opts?.types?.firstOrNull { it.name == k.slice }?.id else null
+        combine(key, breakdown, _selectedSlice) { fk, rows, slice -> Triple(fk, rows, slice) }
+            .flatMapLatest { (k, rows, slice) ->
+                if (rows == null) return@flatMapLatest emptyFlow()
+                val (categories, types) = sliceFilter(rows, slice, k.categories, k.types)
                 repository.getTopSubjectsByAmount(
-                    k.key.start,
-                    k.key.end,
-                    k.key.subjects,
-                    catId?.let { listOf(it) } ?: k.key.categories,
-                    typeId?.let { listOf(it) } ?: k.key.types,
+                    k.start, k.end, k.subjects, categories, types,
                     natureFilter = false,
                     limit = 8,
                 ).map { list -> list.map { MerchantSpend(it.name, it.amount) } }
@@ -229,7 +225,7 @@ class AnalyticsViewModel @Inject constructor(
     }.stateIn(viewModelScope, started, null)
 
     // ---------------- Activity tab ----------------
-    private val activityRaw: StateFlow<List<ActivityCell>?> =
+    val activityRaw: StateFlow<List<ActivityCell>?> =
         key.flatMapLatest { k ->
             repository.getActivityByTimeOfDay(
                 k.start, k.end, k.subjects, k.categories, k.types, k.nature
@@ -284,12 +280,16 @@ class AnalyticsViewModel @Inject constructor(
 
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =
-        flow {
+        repository.selectedAccount.mapLatest {
             val first = repository.getEarliestTransactionDate()
-            emit(first?.let {
-                (ChronoUnit.DAYS.between(it.toLocalDate(), LocalDate.now()) + 1).toInt()
-            })
+            first?.let { (ChronoUnit.DAYS.between(it.toLocalDate(), LocalDate.now()) + 1).toInt() }
         }.stateIn(viewModelScope, onceStarted, null)
+
+    /** Which line these numbers are for: its name, or "All accounts"; null when there is only one line. */
+    val scopeLabel: StateFlow<String?> =
+        combine(repository.selectedAccount, repository.getAccountBalances()) { selected, lines ->
+            scopeLabel(selected, lines.map { it.accountId to it.name })
+        }.stateIn(viewModelScope, started, null)
 
     val rhythm: StateFlow<RhythmStats?> =
         combine(
@@ -340,7 +340,7 @@ class AnalyticsViewModel @Inject constructor(
 
     val subjectResults: StateFlow<List<NamedRef<Long>>> = _subjectQuery
         .debounce(250.milliseconds).distinctUntilChanged()
-        .mapLatest { q -> if (q.isBlank()) repository.topSubjects() else repository.searchSubjects(q.trim()) }
+        .mapLatest { q -> if (q.isBlank()) emptyList() else repository.searchSubjects(q.trim()) }
         .stateIn(viewModelScope, started, emptyList())
 
     // ---------------- helpers ----------------
@@ -350,6 +350,12 @@ class AnalyticsViewModel @Inject constructor(
         TimeFilter.MONTH, TimeFilter.QUARTER -> "%Y-%W"
         TimeFilter.SIX_MONTHS, TimeFilter.YTD, TimeFilter.ALL -> "%Y-%m"
         is TimeFilter.CustomRange -> "%Y-%m-%d"
+    }
+
+    /** Balance points are daily, or hourly for the short ranges. */
+    private fun balanceBucketFormatFor(tf: TimeFilter): String = when (tf) {
+        TimeFilter.DAY, TimeFilter.WEEK -> "%Y-%m-%d %H"
+        else -> "%Y-%m-%d"
     }
 
     private val monthAbbrev =

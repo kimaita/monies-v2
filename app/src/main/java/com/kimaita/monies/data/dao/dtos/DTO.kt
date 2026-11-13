@@ -60,6 +60,9 @@ data class ActivityCell(val weekday: Int, val slot: Int, val count: Int)
 /** Latest balance per bucket — the balance-trend line. */
 data class BalanceBucket(val bucket: String, val balance: Float)
 
+/** A line's latest balance in a bucket; [bucket] is null for its balance just before the range starts. */
+data class LineBalanceBucket(val lineId: Int, val bucket: String?, val balance: Float)
+
 /** Subject ranked by spend (top subjects, cross-filterable). */
 data class SubjectAmount(val subjectId: Long, val name: String, val amount: Double)
 
