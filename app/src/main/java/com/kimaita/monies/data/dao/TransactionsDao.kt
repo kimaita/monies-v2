@@ -10,6 +10,7 @@ import com.kimaita.monies.data.dao.dtos.CashFlowBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.FulizaRow
 import com.kimaita.monies.data.dao.dtos.LineBalance
+import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.data.dao.dtos.SubjectOccurrence
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
@@ -316,6 +317,47 @@ interface TransactionsDao : BaseDao<Transaction> {
         natureFilter: Boolean?,
         account: Int? = null
     ): Flow<List<DailyTotal>>
+
+    /**
+     * Per line (merged accounts count as one), its latest balance in each bucket, plus one row with a
+     * null bucket for its latest balance before [startDate]. Only the lines that [getAccountBalances]
+     * counts (not dormant). Summed per bucket by [com.kimaita.monies.services.sumLineBalances].
+     */
+    @Query(
+        """
+    WITH lines AS (
+        SELECT a.id AS id FROM accounts a
+        WHERE a.mergedInto IS NULL
+          AND (SELECT MAX(t.transactionTime) FROM transactions t
+               WHERE t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = a.id))
+              >= (SELECT strftime('%Y-%m-%dT%H:%M:%S', MAX(transactionTime), '-90 days') FROM transactions)
+    ), ledger AS (
+        SELECT COALESCE(a.mergedInto, a.id) AS line, t.id AS id, t.transactionTime AS time, t.balance AS balance
+        FROM transactions t JOIN accounts a ON a.id = t.accountId
+        WHERE t.balance IS NOT NULL AND COALESCE(a.mergedInto, a.id) IN (SELECT id FROM lines)
+    )
+    SELECT line AS lineId, bucket, balance FROM (
+        SELECT line, strftime(:bucketFormat, time) AS bucket, balance,
+            ROW_NUMBER() OVER (
+                PARTITION BY line, strftime(:bucketFormat, time) ORDER BY time DESC, id DESC
+            ) AS rn
+        FROM ledger
+        WHERE (:startDate IS NULL OR time >= :startDate) AND (:endDate IS NULL OR time <= :endDate)
+    ) WHERE rn = 1
+    UNION ALL
+    SELECT line AS lineId, NULL AS bucket, balance FROM (
+        SELECT line, balance,
+            ROW_NUMBER() OVER (PARTITION BY line ORDER BY time DESC, id DESC) AS rn
+        FROM ledger
+        WHERE :startDate IS NOT NULL AND time < :startDate
+    ) WHERE rn = 1
+"""
+    )
+    fun getLineBalanceBuckets(
+        bucketFormat: String,
+        startDate: String?,
+        endDate: String?
+    ): Flow<List<LineBalanceBucket>>
 
     @Query(
         """

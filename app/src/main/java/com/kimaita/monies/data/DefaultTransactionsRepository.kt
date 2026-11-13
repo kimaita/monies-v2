@@ -41,6 +41,7 @@ import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
+import com.kimaita.monies.services.sumLineBalances
 import com.kimaita.monies.services.FulizaEvent
 import com.kimaita.monies.services.RecurringDetector
 import com.kimaita.monies.services.computeFuliza
@@ -429,8 +430,13 @@ class DefaultTransactionsRepository @Inject constructor(
         )
     }
 
+    /** One line: its balance per bucket. All: the sum of the lines' balances (what Home's total shows). */
     override fun getBalanceTrend(bucketFormat: String, startDate: String?, endDate: String?) =
-        forAccount { transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate, it) }
+        forAccount {
+            if (it != null) transactionsDao.getBalanceByBucket(bucketFormat, startDate, endDate, it)
+            else transactionsDao.getLineBalanceBuckets(bucketFormat, startDate, endDate)
+                .map(::sumLineBalances)
+        }
 
     override fun getWeekdayCounts(
         startDate: String?,

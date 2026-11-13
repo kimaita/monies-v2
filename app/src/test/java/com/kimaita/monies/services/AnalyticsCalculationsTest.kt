@@ -3,6 +3,7 @@ package com.kimaita.monies.services
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CategorySpending
+import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.export.NamedRef
@@ -234,5 +235,31 @@ class AnalyticsCalculationsTest {
             "Most active in the mornings, 5 am–12 pm",
             activeSummary(listOf(cell(1, 0, 3), cell(4, 0, 2), cell(6, 0, 1), cell(0, 0, 1))),
         )
+    }
+
+    private fun lb(line: Int, bucket: String?, balance: Float) = LineBalanceBucket(line, bucket, balance)
+
+    @Test
+    fun sumLineBalances_carriesEachLineForwardAndAddsThemUp() {
+        val rows = listOf(
+            lb(1, "2026-11-01", 100f), lb(2, "2026-11-02", 50f), lb(1, "2026-11-03", 80f),
+        )
+        val sum = sumLineBalances(rows)
+        assertEquals(listOf("2026-11-01", "2026-11-02", "2026-11-03"), sum.map { it.bucket })
+        // Line 2 starts on the 2nd (adds nothing before); line 1 carries 100 into the 2nd.
+        assertEquals(listOf(100f, 150f, 130f), sum.map { it.balance })
+    }
+
+    @Test
+    fun sumLineBalances_usesBalancesBeforeTheRangeAsTheStart() {
+        val rows = listOf(lb(1, null, 40f), lb(2, null, 10f), lb(2, "2026-11-05", 25f))
+        assertEquals(listOf(BalanceBucket("2026-11-05", 65f)), sumLineBalances(rows))
+    }
+
+    @Test
+    fun sumLineBalances_oneLineIsUnchangedAndEmptyIsEmpty() {
+        val rows = listOf(lb(7, "2026-11-01", 5f), lb(7, "2026-11-04", 9f))
+        assertEquals(listOf(BalanceBucket("2026-11-01", 5f), BalanceBucket("2026-11-04", 9f)), sumLineBalances(rows))
+        assertEquals(emptyList<BalanceBucket>(), sumLineBalances(emptyList()))
     }
 }

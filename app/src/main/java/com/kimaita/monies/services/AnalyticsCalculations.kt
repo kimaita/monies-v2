@@ -4,6 +4,7 @@ package com.kimaita.monies.services
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.BalanceBucket
 import com.kimaita.monies.data.dao.dtos.CategorySpending
+import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.TransactionType
@@ -223,5 +224,21 @@ fun activeSummary(cells: List<ActivityCell>): String? {
         weekdayRate > weekendRate * 1.5 -> "Most active on weekday $name, $range"
         weekendRate > weekdayRate * 1.5 -> "Most active on weekend $name, $range"
         else -> "Most active in the $name, $range"
+    }
+}
+
+/**
+ * The total balance of several lines per bucket: each line's latest balance at or before the end of
+ * the bucket, carried forward through buckets where it has no transactions, and added up. A line with
+ * no balance yet adds nothing. Rows with a null bucket are the lines' balances before the range; the
+ * result has a point for every bucket in which any line has a row.
+ */
+fun sumLineBalances(rows: List<LineBalanceBucket>): List<BalanceBucket> {
+    val current = rows.filter { it.bucket == null }.associate { it.lineId to it.balance.toDouble() }.toMutableMap()
+    val inRange = rows.filter { it.bucket != null }
+    val byBucket = inRange.groupBy { it.bucket!! }
+    return byBucket.keys.sorted().map { b ->
+        byBucket.getValue(b).forEach { current[it.lineId] = it.balance.toDouble() }
+        BalanceBucket(b, current.values.sum().toFloat())
     }
 }
