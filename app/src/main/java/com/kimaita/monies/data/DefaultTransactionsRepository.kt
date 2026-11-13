@@ -68,7 +68,13 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import javax.inject.Singleton
 
+/**
+ * Singleton: the selected account is state held here, so every screen's view model must share one
+ * instance or a choice made on Home would never reach Analytics.
+ */
+@Singleton
 class DefaultTransactionsRepository @Inject constructor(
     private val transactionsDao: TransactionsDao,
     private val categoryDao: CategoryDao,
@@ -487,7 +493,7 @@ class DefaultTransactionsRepository @Inject constructor(
         recurringDetector.detect(account = selectedAccount.value)
 
     override suspend fun getEarliestTransactionDate(): LocalDateTime? =
-        transactionsDao.getEarliestTransactionTime()?.let {
+        transactionsDao.getEarliestTransactionTime(selectedAccount.value)?.let {
             runCatching { LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }.getOrNull()
         }
 

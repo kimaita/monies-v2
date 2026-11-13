@@ -54,11 +54,25 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
     var tab by rememberSaveable { mutableStateOf(AnalyticsTab.OVERVIEW) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     val listStates = AnalyticsTab.entries.associateWith { rememberLazyListState() }
+    val scope by viewModel.scopeLabel.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Analytics", fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Column {
+                        Text("Analytics", fontWeight = FontWeight.SemiBold)
+                        scope?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                },
                 actions = {
                     TextButton(onClick = { showFilters = true }) {
                         Icon(painterResource(R.drawable.filter), null, Modifier.size(18.dp))

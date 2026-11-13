@@ -58,4 +58,18 @@ class AnalyticsCalculationsTest {
         assertEquals(listOf(0.0, 25.0, 25.0), pace.thisMonth)
         assertEquals(25.0, pace.spent, 0.0)
     }
+
+    @Test
+    fun scopeLabel_namesTheSelectedLineOrAll() {
+        val lines = listOf(1 to "M-PESA", 3 to "Airtel Money")
+        assertEquals("Airtel Money", scopeLabel(3, lines))
+        assertEquals("All accounts", scopeLabel(null, lines))
+        assertEquals("All accounts", scopeLabel(9, lines))
+    }
+
+    @Test
+    fun scopeLabel_singleLineNeedsNoLabel() {
+        assertNull(scopeLabel(null, listOf(1 to "M-PESA")))
+        assertNull(scopeLabel(null, emptyList()))
+    }
 }

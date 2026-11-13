@@ -405,7 +405,12 @@ interface TransactionsDao : BaseDao<Transaction> {
         resetCursor(cursorKey)
     }
 
-    @Query("SELECT MIN(transactionTime) FROM transactions")
-    suspend fun getEarliestTransactionTime(): String?
+    @Query(
+        """
+        SELECT MIN(transactionTime) FROM transactions
+        WHERE (:account IS NULL OR accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+    """
+    )
+    suspend fun getEarliestTransactionTime(account: Int? = null): String?
 }
 

@@ -28,6 +28,7 @@ import com.kimaita.monies.services.StreakSummary
 import com.kimaita.monies.services.computePace
 import com.kimaita.monies.services.computeRhythm
 import com.kimaita.monies.services.computeStreaks
+import com.kimaita.monies.services.scopeLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -284,12 +285,16 @@ class AnalyticsViewModel @Inject constructor(
 
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =
-        flow {
+        repository.selectedAccount.mapLatest {
             val first = repository.getEarliestTransactionDate()
-            emit(first?.let {
-                (ChronoUnit.DAYS.between(it.toLocalDate(), LocalDate.now()) + 1).toInt()
-            })
+            first?.let { (ChronoUnit.DAYS.between(it.toLocalDate(), LocalDate.now()) + 1).toInt() }
         }.stateIn(viewModelScope, onceStarted, null)
+
+    /** Which line these numbers are for: its name, or "All accounts"; null when there is only one line. */
+    val scopeLabel: StateFlow<String?> =
+        combine(repository.selectedAccount, repository.getAccountBalances()) { selected, lines ->
+            scopeLabel(selected, lines.map { it.accountId to it.name })
+        }.stateIn(viewModelScope, started, null)
 
     val rhythm: StateFlow<RhythmStats?> =
         combine(

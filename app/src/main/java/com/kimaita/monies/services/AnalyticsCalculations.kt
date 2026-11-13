@@ -97,3 +97,7 @@ fun computePace(daily: List<DailyTotal>, today: LocalDate): PaceSummary {
     val change = lastCum[at].takeIf { it > 0.0 }?.let { (thisCum[at] - it) / it * 100.0 }
     return PaceSummary(thisCum, lastCum, thisCum.last(), change)
 }
+
+/** The line Analytics is showing: its name, or "All accounts"; null when there is a single line and nothing to tell apart. */
+fun scopeLabel(selected: Int?, lines: List<Pair<Int, String>>): String? =
+    if (lines.size < 2) null else lines.firstOrNull { it.first == selected }?.second ?: "All accounts"
