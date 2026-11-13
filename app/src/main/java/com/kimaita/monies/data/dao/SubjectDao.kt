@@ -122,6 +122,8 @@ interface SubjectDao : BaseDao<Subject> {
     )
     suspend fun topSubjects(limit: Int = 15): List<SubjectRef>
 
+    // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
+    // element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
     @Query(
         """
     SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount
@@ -130,9 +132,9 @@ interface SubjectDao : BaseDao<Subject> {
     JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
       AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
@@ -158,9 +160,9 @@ interface SubjectDao : BaseDao<Subject> {
     JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
       AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
@@ -187,9 +189,9 @@ interface SubjectDao : BaseDao<Subject> {
     WHERE tt.isInc = 1 AND tt.isTransfer = 0
       AND (:startDate IS NULL OR t.transactionTime >= :startDate)
       AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (:subjectId IS NULL OR t.subject IN (:subjectId))
-      AND (:categoryId IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (:transactionType IS NULL OR t.transactionType IN (:transactionType))
+      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
+      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
       AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """

@@ -203,7 +203,7 @@ class DefaultTransactionsRepository @Inject constructor(
                 limit = EXPORT_PAGE_SIZE,
                 startDate = filters.startDate,
                 endDate = filters.endDate,
-                subjectId = filters.subjectId,
+                subjectId = filters.subjectId?.takeIf { it.isNotEmpty() },
                 categoryId = filters.categoryId?.takeIf { it.isNotEmpty() },
                 transactionType = filters.transactionType?.takeIf { it.isNotEmpty() },
                 account = filters.account,
