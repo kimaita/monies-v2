@@ -67,7 +67,7 @@ data class WeekdayCount(val weekday: Int, val count: Int, val total: Double)
 
 /** Raw rows for recurring detection (grouped + analysed in Kotlin). */
 data class SubjectOccurrence(
-    val subjectId: Long, val name: String, val typeName: String,
+    val subjectId: Long, val name: String,
     val transactionTime: String, val amount: Double,
 )
 

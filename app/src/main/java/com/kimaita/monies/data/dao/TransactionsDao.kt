@@ -15,7 +15,6 @@ import com.kimaita.monies.data.dao.dtos.SubjectOccurrence
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionWithDetails
-import com.kimaita.monies.models.SortOrder
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -27,6 +26,30 @@ private const val SEARCH_FILTER = """
             OR :fts IS NOT NULL AND t.id IN (SELECT rowid FROM transactions_fts WHERE transactions_fts MATCH :fts)
             OR :amountQuery IS NOT NULL AND CAST(t.amount AS TEXT) LIKE :amountQuery || '%'
             OR :subjectLike IS NOT NULL AND t.subject IN (SELECT id FROM subjects WHERE name LIKE :subjectLike))
+"""
+
+/**
+ * The rows the recurring detector may see, on alias `t`. Used both for the rows returned and for
+ * counting rows per subject, so a subject qualifies only on rows the detector would receive.
+ */
+private const val RECURRING_ROWS = """
+        t.subject IS NOT NULL AND t.transactionTime >= :since
+        AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
+        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+"""
+
+private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
+
+// List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
+// element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
+private const val TRANSACTIONS_FILTER = """
+        WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
+        AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+        AND (:subjectId IS NULL OR t.subject = :subjectId)
+        AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
+        AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
 """
 
 @Dao
@@ -45,39 +68,66 @@ interface TransactionsDao : BaseDao<Transaction> {
     )
     suspend fun deletePairedAirtelReceipts()
 
-    // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
-    // element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
+    // The four list queries differ only in ORDER BY. Each sorts by a plain indexed column with id as the
+    // tie-break, so SQLite reads the index in order instead of sorting every matching row for each page.
     @androidx.room.Transaction
-    @Query(
-        """
-        SELECT t.* FROM transactions t
-        WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-        AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-        AND (:subjectId IS NULL OR t.subject = :subjectId)
-        AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-        AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
-        AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
-        """ + SEARCH_FILTER + """
-        ORDER BY 
-            CASE WHEN :sortOrder = 'DATE_DESC' THEN t.transactionTime END DESC,
-            CASE WHEN :sortOrder = 'DATE_ASC' THEN t.transactionTime END ASC,
-            CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amount END DESC,
-            CASE WHEN :sortOrder = 'AMOUNT_ASC' THEN t.amount END ASC
-        """
-    )
-    fun getTransactions(
-        startDate: String? = null,
-        endDate: String? = null,
-        subjectId: Long? = null,
-        categoryId: List<Int>? = null,
-        transactionType: List<Int>? = null,
-        account: Int? = null,
+    @Query(TRANSACTIONS_SELECT + TRANSACTIONS_FILTER + SEARCH_FILTER + "ORDER BY t.transactionTime DESC, t.id DESC")
+    fun getTransactionsNewest(
+        startDate: String?,
+        endDate: String?,
+        subjectId: Long?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        account: Int?,
         natureFilter: Boolean?,
-        sortOrder: SortOrder?,
-        fts: String? = null,
-        amountQuery: String? = null,
-        subjectLike: String? = null
+        fts: String?,
+        amountQuery: String?,
+        subjectLike: String?
+    ): PagingSource<Int, TransactionWithDetails>
+
+    @androidx.room.Transaction
+    @Query(TRANSACTIONS_SELECT + TRANSACTIONS_FILTER + SEARCH_FILTER + "ORDER BY t.transactionTime ASC, t.id ASC")
+    fun getTransactionsOldest(
+        startDate: String?,
+        endDate: String?,
+        subjectId: Long?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        account: Int?,
+        natureFilter: Boolean?,
+        fts: String?,
+        amountQuery: String?,
+        subjectLike: String?
+    ): PagingSource<Int, TransactionWithDetails>
+
+    @androidx.room.Transaction
+    @Query(TRANSACTIONS_SELECT + TRANSACTIONS_FILTER + SEARCH_FILTER + "ORDER BY t.amount DESC, t.id DESC")
+    fun getTransactionsLargest(
+        startDate: String?,
+        endDate: String?,
+        subjectId: Long?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        account: Int?,
+        natureFilter: Boolean?,
+        fts: String?,
+        amountQuery: String?,
+        subjectLike: String?
+    ): PagingSource<Int, TransactionWithDetails>
+
+    @androidx.room.Transaction
+    @Query(TRANSACTIONS_SELECT + TRANSACTIONS_FILTER + SEARCH_FILTER + "ORDER BY t.amount ASC, t.id ASC")
+    fun getTransactionsSmallest(
+        startDate: String?,
+        endDate: String?,
+        subjectId: Long?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        account: Int?,
+        natureFilter: Boolean?,
+        fts: String?,
+        amountQuery: String?,
+        subjectLike: String?
     ): PagingSource<Int, TransactionWithDetails>
 
 
@@ -368,18 +418,22 @@ interface TransactionsDao : BaseDao<Transaction> {
 
     @Query(
         """
-    SELECT t.subject AS subjectId, s.name AS name, tt.name AS typeName,
+    SELECT t.subject AS subjectId, s.name AS name,
            t.transactionTime AS transactionTime, t.amount AS amount
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
-    JOIN transaction_types tt ON t.transactionType = tt.id
-    WHERE t.subject IS NOT NULL AND t.transactionTime >= :since
-      AND tt.isTransfer = 0
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+    WHERE $RECURRING_ROWS
+      AND t.subject IN (
+          SELECT t.subject FROM transactions t WHERE $RECURRING_ROWS
+          GROUP BY t.subject HAVING COUNT(*) >= :minOccurrences)
     ORDER BY t.subject ASC, t.transactionTime ASC
 """
     )
-    suspend fun getSubjectOccurrences(since: String, account: Int? = null): List<SubjectOccurrence>
+    suspend fun getSubjectOccurrences(
+        since: String,
+        minOccurrences: Int,
+        account: Int? = null
+    ): List<SubjectOccurrence>
 
     /**
      * One row per line (root account with transactions), in order of first activity, with the

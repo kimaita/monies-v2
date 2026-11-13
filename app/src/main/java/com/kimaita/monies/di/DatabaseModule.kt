@@ -26,10 +26,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import javax.inject.Provider
 import javax.inject.Singleton
 
 /** Adds `accounts.mergedInto` and clears the carrier-derived labels the old sync wrote. */
@@ -48,16 +44,13 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(
         @ApplicationContext context: Context,
-        categoryDaoProvider: Provider<CategoryDao>,
     ): AppDatabase {
         return Room.databaseBuilder(
             context, AppDatabase::class.java, "monies-db",
         )
             .addMigrations(MIGRATION_2_3)
             .fallbackToDestructiveMigrationFrom(true, 1)
-            .addCallback(
-                DatabaseInitializer(categoryDaoProvider)
-            )
+            .addCallback(DatabaseInitializer())
             .build()
     }
 
@@ -99,14 +92,18 @@ object DatabaseModule {
 }
 
 
-class DatabaseInitializer(
-    private val categoryDaoProvider: Provider<CategoryDao>,
-) : RoomDatabase.Callback() {
+class DatabaseInitializer : RoomDatabase.Callback() {
 
+    /** Inserts the default categories before any DAO sees the database, so a first sync never misses one. */
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)
-        CoroutineScope(Dispatchers.IO).launch {
-            populateDatabase()
+        for (category in getDefaultCategories()) {
+            val values = ContentValues().apply {
+                put("name", category.name)
+                put("description", category.description)
+                put("monthlyBudget", category.monthlyBudget)
+            }
+            db.insert("categories", SQLiteDatabase.CONFLICT_IGNORE, values)
         }
     }
 
@@ -226,10 +223,5 @@ class DatabaseInitializer(
 
     private companion object {
         const val CATEGORY_RULES_KEY = "category_rules_version"
-    }
-
-    private suspend fun populateDatabase() {
-        // Transaction types are inserted by onOpen, which Room calls straight after onCreate.
-        categoryDaoProvider.get().insertAll(getDefaultCategories())
     }
 }

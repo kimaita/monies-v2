@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -47,8 +48,10 @@ class ExportStorage @Inject constructor(
             resolver.update(uri, values, null, null)
             uri                                          // branch result
         } else {
-            @Suppress("DEPRECATION")
-            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            // API 26-28: public Downloads needs WRITE_EXTERNAL_STORAGE, so write to the app's own
+            // external folder and hand out a content:// URI (a file:// URI crashes the share intent).
+            val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: throw IOException("External storage is not available")
             val file = File(dir, fileName)
             try {
                 FileOutputStream(file).use { out -> body(out) }
@@ -56,7 +59,7 @@ class ExportStorage @Inject constructor(
                 file.delete()
                 throw t
             }
-            Uri.fromFile(file)                           // branch result
+            FileProvider.getUriForFile(context, "${context.packageName}.files", file)                         // branch result
         }
     }
 

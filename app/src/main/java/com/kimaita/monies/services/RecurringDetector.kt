@@ -25,7 +25,7 @@ class RecurringDetector @Inject constructor(
         account: Int? = null,
     ): List<RecurringPayment> = withContext(Dispatchers.IO) {
         val since = now.minusMonths(lookbackMonths).format(fmt)
-        transactionsDao.getSubjectOccurrences(since, account)
+        transactionsDao.getSubjectOccurrences(since, minOccurrences, account)
             .groupBy { it.subjectId }
             .values
             .mapNotNull { analyze(it, now, minOccurrences) }
@@ -63,10 +63,7 @@ class RecurringDetector @Inject constructor(
         val irregular = cv(gaps) > 0.40 || cv(amounts) > 0.30
 
         return RecurringPayment(
-            subjectId = group.first().subjectId,
             name = group.first().name,
-            typeName = group.first().typeName,
-            cadenceDays = cadence,
             cadenceLabel = label(cadence, irregular),
             typicalAmount = typical,
             lastDate = last,
