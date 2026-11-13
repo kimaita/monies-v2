@@ -2,30 +2,34 @@ package com.kimaita.monies.ui.charts
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -33,7 +37,243 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kimaita.monies.models.analytics.BalancePoint
-import kotlin.math.roundToInt
+import com.kimaita.monies.ui.util.formatCompactAmount
+import com.kimaita.monies.ui.util.formatKes
+import kotlin.math.abs
+
+/** One line of a [LineChartCanvas]. [xs] are in the chart's x domain and must be increasing. */
+internal class LineSeries(
+    val xs: FloatArray,
+    val ys: FloatArray,
+    val color: Color,
+    val width: Dp,
+    val dashed: Boolean = false,
+    val fill: Boolean = false,
+)
+
+/**
+ * Adds a monotone cubic (Fritsch-Carlson) curve through the points: the curve never overshoots
+ * between two points. Control points sit at one third of each interval.
+ */
+internal fun Path.monotoneCurve(xs: FloatArray, ys: FloatArray) {
+    val n = xs.size
+    if (n == 0) return
+    moveTo(xs[0], ys[0])
+    if (n == 1) return
+    val d = FloatArray(n - 1) { (ys[it + 1] - ys[it]) / (xs[it + 1] - xs[it]) }
+    val m = FloatArray(n)
+    m[0] = d[0]
+    m[n - 1] = d[n - 2]
+    for (k in 1 until n - 1) m[k] = if (d[k - 1] * d[k] <= 0f) 0f else (d[k - 1] + d[k]) / 2f
+    for (k in 0 until n - 1) {
+        if (d[k] == 0f) {
+            m[k] = 0f; m[k + 1] = 0f
+        } else {
+            val a = m[k] / d[k]
+            val b = m[k + 1] / d[k]
+            val s = a * a + b * b
+            if (s > 9f) {
+                val t = 3f / kotlin.math.sqrt(s)
+                m[k] = t * a * d[k]; m[k + 1] = t * b * d[k]
+            }
+        }
+    }
+    for (k in 0 until n - 1) {
+        val h = xs[k + 1] - xs[k]
+        cubicTo(
+            xs[k] + h / 3f, ys[k] + m[k] * h / 3f,
+            xs[k + 1] - h / 3f, ys[k + 1] - m[k + 1] * h / 3f,
+            xs[k + 1], ys[k + 1],
+        )
+    }
+}
+
+/**
+ * Gridlines, y labels, x labels, grow-in animation and (when [tooltip] is set) scrubbing for one or
+ * more lines. Callers must remember [series] and [tooltip] against their data: a new instance
+ * rebuilds the cached geometry and restarts the animation.
+ */
+@Composable
+internal fun LineChartCanvas(
+    series: List<LineSeries>,
+    xMin: Float,
+    xMax: Float,
+    xLabels: List<Pair<Float, String>>,
+    modifier: Modifier = Modifier,
+    plotHeight: Dp = 180.dp,
+    zeroBased: Boolean = false,
+    tooltip: ((Int) -> String)? = null,
+) {
+    val measurer = rememberTextMeasurer()
+    val haptic = LocalHapticFeedback.current
+    val cs = MaterialTheme.colorScheme
+    val chart = chartColors()
+    val labelColor = cs.onSurfaceVariant
+    val pointColor = cs.surfaceContainerHighest
+
+    var scrub by remember(series) { mutableIntStateOf(-1) }
+    val grow = remember(series) { Animatable(0f) }
+    LaunchedEffect(series) { grow.snapTo(0f); grow.animateTo(1f, tween(800)) }
+
+    Spacer(
+        modifier
+            .fillMaxWidth()
+            .height(plotHeight + PlotTopPad + PlotBottomPad)
+            .pointerInput(series, tooltip) {
+                if (tooltip == null) return@pointerInput
+                val left = YAxisWidth.toPx()
+                val right = size.width - 6.dp.toPx()
+                fun nearest(px: Float): Int {
+                    val f = ((px - left) / (right - left)).coerceIn(0f, 1f)
+                    val x = xMin + f * (xMax - xMin)
+                    val xs = series[0].xs
+                    var best = 0
+                    for (i in xs.indices) if (abs(xs[i] - x) < abs(xs[best] - x)) best = i
+                    return best
+                }
+
+                fun move(px: Float) {
+                    val i = nearest(px)
+                    if (i != scrub) {
+                        scrub = i
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                }
+                detectHorizontalDragGestures(
+                    onDragStart = { move(it.x) },
+                    onHorizontalDrag = { change, _ -> move(change.position.x); change.consume() },
+                    onDragEnd = { scrub = -1 },
+                    onDragCancel = { scrub = -1 },
+                )
+            }
+            .drawWithCache {
+                val axisStyle = TextStyle(fontSize = 10.sp, color = labelColor)
+                val tipStyle = TextStyle(fontSize = 11.sp, color = cs.onSurface)
+                var mn = Float.MAX_VALUE
+                var mx = -Float.MAX_VALUE
+                for (s in series) for (y in s.ys) {
+                    if (y < mn) mn = y; if (y > mx) mx = y
+                }
+                if (mn > mx) { mn = 0f; mx = 0f }
+                val scale = lineScale(mn, mx, zeroBased)
+
+                val left = YAxisWidth.toPx()
+                val right = size.width - 6.dp.toPx()
+                val top = PlotTopPad.toPx()
+                val bottom = size.height - PlotBottomPad.toPx()
+                val span = (xMax - xMin).coerceAtLeast(1e-6f)
+                fun px(x: Float) = left + (x - xMin) / span * (right - left)
+
+                // gridlines and y labels
+                val gridPx = 1.dp.toPx()
+                val gridYs = FloatArray(scale.values.size) { scale.y(scale.values[it], top, bottom) }
+                val yLabels = Array(scale.values.size) {
+                    measurer.measure(formatCompactAmount(scale.values[it].toDouble()), axisStyle)
+                }
+                val yLabelPos = Array(yLabels.size) {
+                    Offset(
+                        left - 6.dp.toPx() - yLabels[it].size.width,
+                        (gridYs[it] - yLabels[it].size.height / 2f)
+                            .coerceIn(0f, size.height - yLabels[it].size.height)
+                    )
+                }
+                val xLabelLayouts = Array(xLabels.size) { measurer.measure(xLabels[it].second, axisStyle) }
+                val xLabelPos = Array(xLabels.size) {
+                    Offset(
+                        (px(xLabels[it].first) - xLabelLayouts[it].size.width / 2f)
+                            .coerceIn(0f, size.width - xLabelLayouts[it].size.width),
+                        bottom + 6.dp.toPx()
+                    )
+                }
+
+                // lines
+                val paths = Array(series.size) { i ->
+                    val s = series[i]
+                    Path().apply {
+                        monotoneCurve(
+                            FloatArray(s.xs.size) { px(s.xs[it]) },
+                            FloatArray(s.ys.size) { scale.y(s.ys[it], top, bottom) },
+                        )
+                    }
+                }
+                val areas = Array(series.size) { i ->
+                    val s = series[i]
+                    if (!s.fill || s.xs.size < 2) null else Path().apply {
+                        addPath(paths[i])
+                        lineTo(px(s.xs.last()), bottom)
+                        lineTo(px(s.xs.first()), bottom)
+                        close()
+                    }
+                }
+                val strokes = Array(series.size) { i ->
+                    Stroke(
+                        width = series[i].width.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round,
+                        pathEffect = if (series[i].dashed)
+                            PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())) else null,
+                    )
+                }
+                val brushes = Array(series.size) { i ->
+                    Brush.verticalGradient(
+                        listOf(series[i].color.copy(alpha = 0.25f), series[i].color.copy(alpha = 0f)),
+                        startY = top, endY = bottom,
+                    )
+                }
+                val lonePoints = Array(series.size) { i ->
+                    val s = series[i]
+                    if (s.xs.size == 1) Offset(px(s.xs[0]), scale.y(s.ys[0], top, bottom)) else null
+                }
+
+                // scrub marker and tooltip, precomputed for every index
+                val first = series.firstOrNull()
+                val pointX = FloatArray(first?.xs?.size ?: 0) { px(first!!.xs[it]) }
+                val pointY = FloatArray(pointX.size) { scale.y(first!!.ys[it], top, bottom) }
+                val tips = if (tooltip == null) arrayOf<TextLayoutResult>()
+                else Array(pointX.size) { measurer.measure(tooltip(it), tipStyle) }
+                val pad = 8.dp.toPx()
+                val tipRadius = CornerRadius(8.dp.toPx())
+                val markerStroke = 1.dp.toPx()
+                val outerR = 5.dp.toPx()
+                val innerR = 2.5.dp.toPx()
+
+                onDrawBehind {
+                    gridYs.forEach { y ->
+                        drawLine(chart.grid, Offset(left, y), Offset(right, y), gridPx)
+                    }
+                    yLabels.forEachIndexed { i, l -> drawText(l, topLeft = yLabelPos[i]) }
+                    xLabelLayouts.forEachIndexed { i, l -> drawText(l, topLeft = xLabelPos[i]) }
+
+                    val g = grow.value
+                    val clipRight = if (g >= 1f) size.width else left + (right - left) * g
+                    clipRect(0f, 0f, clipRight, size.height) {
+                        for (i in paths.indices) {
+                            areas[i]?.let { drawPath(it, brushes[i]) }
+                            drawPath(paths[i], series[i].color, style = strokes[i])
+                            lonePoints[i]?.let { drawCircle(series[i].color, series[i].width.toPx(), it) }
+                        }
+                    }
+
+                    val i = scrub
+                    if (i in tips.indices) {
+                        val x = pointX[i]
+                        val y = pointY[i]
+                        drawLine(
+                            labelColor.copy(alpha = 0.4f), Offset(x, top), Offset(x, bottom), markerStroke
+                        )
+                        drawCircle(first!!.color, outerR, Offset(x, y))
+                        drawCircle(pointColor, innerR, Offset(x, y))
+                        val t = tips[i]
+                        val w = t.size.width + pad * 2
+                        val h = t.size.height + pad
+                        val cx = (x - w / 2).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
+                        drawRoundRect(chart.tooltipBg, Offset(cx, 0f), Size(w, h), tipRadius)
+                        drawText(t, topLeft = Offset(cx + pad, pad / 2))
+                    }
+                }
+            }
+    )
+}
 
 @Composable
 fun BalanceTrendChart(
@@ -42,105 +282,23 @@ fun BalanceTrendChart(
     plotHeight: Dp = 180.dp
 ) {
     if (data.size < 2) return
-    val maxV = remember(data) { data.maxOf { it.balance } }
-    val (axisMax, step) = remember(maxV) { niceAxis(maxV) }
-    val labels = remember(axisMax, step) { axisLabels(axisMax, step) }
-    val measurer = rememberTextMeasurer()
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val line = MaterialTheme.colorScheme.primary
-    val surface = MaterialTheme.colorScheme.surfaceContainerHighest
-    val gridColor = onSurfaceVariant.copy(alpha = 0.15f)
-
-    var scrub by remember(data) { mutableStateOf<Int?>(null) }
-    val grow = remember(data) { Animatable(0f) }
-    LaunchedEffect(data) { grow.snapTo(0f); grow.animateTo(1f, tween(800)) }
-
-    Row(modifier) {
-        Column(
-            Modifier.height(plotHeight),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.End
-        ) {
-            labels.forEach {
-                Text(
-                    kesCompact(it),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onSurfaceVariant
-                )
-            }
-        }
-        Spacer(Modifier.width(8.dp))
-        Canvas(
-            Modifier
-                .weight(1f)
-                .height(plotHeight + 22.dp)
-                .pointerInput(data) {
-                    val dx = size.width / (data.size - 1)
-                    fun idx(x: Float) = (x / dx).roundToInt().coerceIn(0, data.lastIndex)
-                    detectDragGestures(
-                        onDragStart = { scrub = idx(it.x) },
-                        onDrag = { change, _ -> scrub = idx(change.position.x); change.consume() },
-                        onDragEnd = { scrub = null },
-                        onDragCancel = { scrub = null },
-                    )
-                }
-        ) {
-            val plotH = plotHeight.toPx()
-            val dx = size.width / (data.size - 1)
-            fun py(v: Float) = plotH * (1f - v / axisMax)
-
-            labels.forEach { v ->
-                val y = py(v); drawLine(
-                gridColor,
-                Offset(0f, y),
-                Offset(size.width, y),
-                1f
+    val color = MaterialTheme.colorScheme.primary
+    val series = remember(data, color) {
+        listOf(
+            LineSeries(
+                FloatArray(data.size) { it.toFloat() },
+                FloatArray(data.size) { data[it].balance },
+                color, 3.dp, fill = true,
             )
-            }
-
-            val linePath = Path().apply {
-                data.forEachIndexed { i, p ->
-                    val x = i * dx;
-                    val y = py(p.balance); if (i == 0) moveTo(x, y) else lineTo(x, y)
-                }
-            }
-            val areaPath = Path().apply {
-                addPath(linePath); lineTo((data.size - 1) * dx, plotH); lineTo(0f, plotH); close()
-            }
-            clipRect(right = size.width * grow.value) {
-                drawPath(
-                    areaPath,
-                    Brush.verticalGradient(listOf(line.copy(alpha = 0.25f), line.copy(alpha = 0f)))
-                )
-                drawPath(linePath, line, style = Stroke(width = 2.5.dp.toPx()))
-            }
-
-            scrub?.let { i ->
-                val x = i * dx;
-                val y = py(data[i].balance)
-                drawLine(
-                    onSurfaceVariant.copy(alpha = 0.4f),
-                    Offset(x, 0f),
-                    Offset(x, plotH),
-                    1.dp.toPx()
-                )
-                drawCircle(line, 5.dp.toPx(), Offset(x, y))
-                drawCircle(surface, 2.5.dp.toPx(), Offset(x, y))
-                val text = measurer.measure(
-                    "${data[i].balance}: ${kesCompact(data[i].balance)}",
-                    TextStyle(fontSize = 11.sp, color = onSurface)
-                )
-                val pad = 8.dp.toPx();
-                val w = text.size.width + pad * 2;
-                val h = text.size.height + pad
-                val cx = (x - w / 2).coerceIn(0f, size.width - w)
-                drawRoundRect(
-                    surface, Offset(cx, 0f), androidx.compose.ui.geometry.Size(w, h),
-                    androidx.compose.ui.geometry.CornerRadius(8.dp.toPx(), 8.dp.toPx())
-                )
-                drawText(text, topLeft = Offset(cx + pad, pad / 2))
-            }
-        }
+        )
     }
+    val xLabels = remember(data) {
+        listOf(0, data.size / 2, data.lastIndex).distinct().map { it.toFloat() to data[it].day }
+    }
+    val tooltip = remember(data) {
+        { i: Int -> "${data[i].day} · ${formatKes(data[i].balance.toDouble())}" }
+    }
+    LineChartCanvas(
+        series, 0f, data.lastIndex.toFloat(), xLabels, modifier, plotHeight, tooltip = tooltip
+    )
 }

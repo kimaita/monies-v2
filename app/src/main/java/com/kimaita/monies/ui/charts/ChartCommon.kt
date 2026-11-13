@@ -1,29 +1,25 @@
 package com.kimaita.monies.ui.charts
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.kimaita.monies.ui.theme.MoniesTheme
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.remember
-import com.kimaita.monies.models.analytics.CategorySlice
-import com.kimaita.monies.ui.analytics.SliceValue
-import com.kimaita.monies.ui.theme.AppTheme
-import com.kimaita.monies.ui.theme.MoniesTheme
 
-data class BarSegment(val value: Float, val color: Color)
-data class BarGroup(val label: String, val segments: List<BarSegment>)
+/** One bar slot: [up] rises from the baseline, [down] hangs below it. */
+data class BarBucket(val label: String, val up: Float, val down: Float = 0f)
 
-fun kesCompact(v: Float): String = when {
-    v >= 1_000_000f -> "%.1fM".format(v / 1_000_000f)
-    v >= 1_000f -> "%.1fk".format(v / 1_000f)
-    else -> v.roundToInt().toString()
-}
+// Plot geometry shared by the line and bar charts.
+internal val YAxisWidth = 40.dp
+internal val PlotTopPad = 8.dp
+internal val PlotBottomPad = 22.dp   // room for the x-axis labels
 
 /** Returns (axisMax, step) giving ~[lines] evenly-spaced, round gridlines. */
 fun niceAxis(max: Float, lines: Int = 4): Pair<Float, Float> {
@@ -38,12 +34,33 @@ fun niceAxis(max: Float, lines: Int = 4): Pair<Float, Float> {
     return (ceil(max / step) * step) to step
 }
 
-fun axisLabels(axisMax: Float, step: Float): List<Float> =
-    buildList {
-        var v = axisMax; while (v >= -0.001f) {
-        add(v); v -= step
-    }
-    }
+/** Vertical value range [lo, hi] with gridlines every [step]. */
+internal class YScale(val lo: Float, val hi: Float, val step: Float) {
+    val values = FloatArray(((hi - lo) / step).roundToInt() + 1) { lo + it * step }
+    fun y(v: Float, top: Float, bottom: Float) = bottom - (v - lo) / (hi - lo) * (bottom - top)
+}
+
+/**
+ * Starts at 0, unless [zeroBased] is false and the minimum is above half the maximum: then it starts
+ * at the nice floor of the minimum so small changes stay visible.
+ */
+internal fun lineScale(min: Float, max: Float, zeroBased: Boolean = false): YScale {
+    val lo0 = if (!zeroBased && min > 0f && min > max / 2f) min else minOf(min, 0f)
+    val step = niceAxis(max - lo0).second
+    val lo = floor(lo0 / step) * step
+    var hi = ceil(max / step - 1e-4f) * step
+    if (hi <= lo) hi = lo + step
+    return YScale(lo, hi, step)
+}
+
+/** Runs from the nice ceiling of [maxDown] (below the baseline) to the nice ceiling of [maxUp]. */
+internal fun barScale(maxUp: Float, maxDown: Float): YScale {
+    val step = niceAxis(maxOf(maxUp, maxDown)).second
+    var hi = ceil(maxUp / step - 1e-4f) * step
+    val lo = -ceil(maxDown / step - 1e-4f) * step
+    if (hi - lo <= 0f) hi = step
+    return YScale(lo, hi, step)
+}
 
 @Immutable
 data class ChartColors(
@@ -63,18 +80,9 @@ fun chartColors(): ChartColors {
     return ChartColors(
         inflow = extra.inflow,
         outflow = extra.outflow,
-        grid = cs.outlineVariant,
+        grid = cs.outlineVariant.copy(alpha = 0.5f),
         axisLabel = cs.onSurfaceVariant,
-        tooltipBg = cs.inverseSurface,
-        tooltipText = cs.inverseOnSurface,
+        tooltipBg = cs.surfaceContainerHighest,
+        tooltipText = cs.onSurface,
     )
 }
-
-/** Assigns theme palette colours to slices, cycling if there are more slices than colours. */
-@Composable
-fun rememberSlices(values: List<SliceValue>): List<CategorySlice> {
-        val palette = MoniesTheme.extra.chartPalette
-        return remember(values, palette) {
-                values.mapIndexed { i, v -> CategorySlice(v.label, v.value, palette[i % palette.size]) }
-            }
-    }

@@ -539,64 +539,46 @@ private fun DashboardPage() {
 
 @Composable
 private fun BreakdownCard() {
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .onbCard(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        MiniDonut(Modifier.size(100.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            LegendItem(OnbColors.Emerald, "Groceries", "42%")
-            LegendItem(OnbColors.Coral, "Transport", "28%")
-            LegendItem(OnbColors.EmeraldDeep, "Bills", "18%")
-            LegendItem(OnbColors.Gold, "Other", "12%")
-        }
+        RankedPreviewRow("Groceries", 42, OnbColors.Emerald)
+        RankedPreviewRow("Transport", 28, OnbColors.Coral)
+        RankedPreviewRow("Bills", 18, OnbColors.EmeraldDeep)
     }
 }
 
 @Composable
-private fun LegendItem(color: Color, label: String, pct: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier
-            .size(11.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(color))
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnbColors.Ink)
-        Spacer(Modifier.weight(1f))
-        Text(pct, fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 12.sp, color = OnbColors.Muted)
-    }
-}
-
-@Composable
-private fun MiniDonut(modifier: Modifier = Modifier) {
-    val slices = listOf(
-        42f to OnbColors.Emerald,
-        28f to OnbColors.Coral,
-        18f to OnbColors.EmeraldDeep,
-        12f to OnbColors.Gold
-    )
-    Canvas(modifier) {
-        val stroke = size.minDimension * 0.17f
-        val arcSize = Size(size.width - stroke, size.height - stroke)
-        val topLeft = Offset(stroke / 2, stroke / 2)
-        drawArc(OnbColors.Rule, 0f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
-        var start = -90f;
-        val gap = 5f
-        slices.forEach { (pct, color) ->
-            val sweep = pct / 100f * 360f
-            drawArc(
-                color,
-                start + gap / 2,
-                sweep - gap,
-                false,
-                topLeft,
-                arcSize,
-                style = Stroke(stroke, cap = StrokeCap.Round)
+private fun RankedPreviewRow(label: String, pct: Int, color: Color) {
+    Column {
+        Row {
+            Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnbColors.Ink)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "$pct%",
+                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
+                fontSize = 12.sp,
+                color = OnbColors.Muted
             )
-            start += sweep
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(OnbColors.Rule)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(pct / 42f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(color)
+            )
         }
     }
 }

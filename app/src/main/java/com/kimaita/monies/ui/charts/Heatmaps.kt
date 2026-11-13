@@ -1,37 +1,32 @@
 package com.kimaita.monies.ui.charts
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import com.kimaita.monies.models.analytics.HabitWeek
+import androidx.compose.ui.unit.sp
 import com.kimaita.monies.models.analytics.HeatRow
 
 val SLOT_LABELS = arrayOf("Morning", "Midday", "Evening", "Night")
 
+/** Day-by-time-slot grid drawn in one Canvas. */
 @Composable
 fun TimeOfDayHeatmap(
     rows: List<HeatRow>,
@@ -42,75 +37,52 @@ fun TimeOfDayHeatmap(
     val emptyColor = MaterialTheme.colorScheme.surfaceContainerHighest
     val fullColor = MaterialTheme.colorScheme.primary
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val cellShape = remember { RoundedCornerShape(6.dp) }
+    val measurer = rememberTextMeasurer()
 
-    var visible by remember { mutableStateOf(false) }
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(600), label = "heat")
-    LaunchedEffect(Unit) { visible = true }
+    val fade = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { fade.animateTo(1f, tween(600)) }
 
-    Column(modifier
-        .fillMaxWidth()
-        .alpha(alpha), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (showLabels) Row(Modifier.fillMaxWidth()) {
-            Spacer(Modifier.width(40.dp))
-            SLOT_LABELS.forEach {
-                Text(
-                    it, Modifier.weight(1f), textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelSmall, color = labelColor,
-                )
-            }
-        }
-        rows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                if (showLabels) Text(
-                    row.day, Modifier.width(40.dp),
-                    style = MaterialTheme.typography.labelSmall, color = labelColor,
-                )
-                row.values.forEach { v ->
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .aspectRatio(if (showLabels) 1.6f else 2.4f)
-                            .padding(3.dp)
-                            .background(
-                                lerp(emptyColor, fullColor, v.toFloat() / maxVal),
-                                cellShape
-                            ),
-                    )
+    val rowHeight = if (showLabels) 36.dp else 22.dp
+    val headerHeight = if (showLabels) 18.dp else 0.dp
+    Spacer(
+        modifier
+            .fillMaxWidth()
+            .height(headerHeight + rowHeight * rows.size)
+            .graphicsLayer { alpha = fade.value }
+            .drawWithCache {
+                val style = TextStyle(fontSize = 11.sp, color = labelColor)
+                val gutter = if (showLabels) 40.dp.toPx() else 0f
+                val header = headerHeight.toPx()
+                val rowH = rowHeight.toPx()
+                val cols = rows.maxOfOrNull { it.values.size } ?: 0
+                val colW = if (cols > 0) (size.width - gutter) / cols else 0f
+                val inset = 3.dp.toPx()
+                val radius = CornerRadius(6.dp.toPx())
+                val cellSize = Size((colW - inset * 2).coerceAtLeast(0f), (rowH - inset * 2).coerceAtLeast(0f))
+
+                val slotLabels = if (showLabels) Array(minOf(cols, SLOT_LABELS.size)) {
+                    measurer.measure(SLOT_LABELS[it], style)
+                } else arrayOf<TextLayoutResult>()
+                val slotPos = Array(slotLabels.size) {
+                    Offset(gutter + colW * it + (colW - slotLabels[it].size.width) / 2f, 0f)
                 }
-            }
-        }
-    }
-}
-
-/** GitHub-style 12-week habit graph. Currently unused; kept for the subject-profile page. */
-@Composable
-fun HabitGraph(weeks: List<HabitWeek>, modifier: Modifier = Modifier) {
-    val colors = chartColors()
-    val emptyColor = MaterialTheme.colorScheme.surfaceContainerHighest
-    val shape = remember { RoundedCornerShape(3.dp) }
-    var visible by remember { mutableStateOf(false) }
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(700), label = "habit")
-    LaunchedEffect(Unit) { visible = true }
-
-    Row(modifier
-        .fillMaxWidth()
-        .alpha(alpha), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        weeks.forEach { week ->
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                week.days.forEach { count ->
-                    val c = when {
-                        count <= 0 -> emptyColor
-                        count == 1 -> colors.inflow.copy(alpha = 0.35f)
-                        count == 2 -> colors.inflow.copy(alpha = 0.6f)
-                        else -> colors.inflow
+                val dayLabels = if (showLabels) Array(rows.size) { measurer.measure(rows[it].day, style) } else arrayOf<TextLayoutResult>()
+                val dayPos = Array(dayLabels.size) {
+                    Offset(0f, header + rowH * it + (rowH - dayLabels[it].size.height) / 2f)
+                }
+                val cellPos = ArrayList<Offset>()
+                val cellColor = ArrayList<androidx.compose.ui.graphics.Color>()
+                rows.forEachIndexed { r, row ->
+                    row.values.forEachIndexed { c, v ->
+                        cellPos.add(Offset(gutter + colW * c + inset, header + rowH * r + inset))
+                        cellColor.add(lerp(emptyColor, fullColor, v.toFloat() / maxVal))
                     }
-                    Box(Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .background(c, shape))
+                }
+                onDrawBehind {
+                    slotLabels.forEachIndexed { i, l -> drawText(l, topLeft = slotPos[i]) }
+                    dayLabels.forEachIndexed { i, l -> drawText(l, topLeft = dayPos[i]) }
+                    for (i in cellPos.indices) drawRoundRect(cellColor[i], cellPos[i], cellSize, radius)
                 }
             }
-        }
-    }
+    )
 }

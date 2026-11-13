@@ -36,6 +36,7 @@ import com.kimaita.monies.ui.util.formatSignedKes
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.util.Locale
 
 enum class AnalyticsTab(val title: String) {
     OVERVIEW("Overview"), ACTIVITY("Activity"), SPENDING("Spending"), CASHFLOW("Cash flow")
@@ -133,7 +134,7 @@ private fun SegmentedTabs(selected: AnalyticsTab, onSelect: (AnalyticsTab) -> Un
 private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) {
     val stats by vm.stats.collectAsStateWithLifecycle()
     val donutValues by vm.donut.collectAsStateWithLifecycle()
-    val donut = rememberSlices(donutValues)
+    val whereItGoes = remember(donutValues) { donutValues.map { RankedRow(it.label, it.value.toDouble()) } }
     val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
     val balance by vm.balanceTrend.collectAsStateWithLifecycle()
     val heat by vm.heat.collectAsStateWithLifecycle()
@@ -168,20 +169,14 @@ private fun OverviewTab(vm: AnalyticsViewModel, onJump: (AnalyticsTab) -> Unit) 
         item(key = "donut_stats") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BentoCard(
-                    Modifier
-                        .weight(1f)
-                        .height(168.dp),
+                    Modifier.weight(1f),
                     onClick = { onJump(AnalyticsTab.SPENDING) }) {
                     TileLabel("Where it goes")
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (donut.isEmpty()) EmptyHint()
-                        else DonutChart(
-                            donut,
-                            Modifier.fillMaxSize(),
-                            thickness = 14.dp,
-                            minSize = 0.dp
-                        )
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (whereItGoes.isEmpty()) EmptyHint()
+                    else RankedBars(
+                        whereItGoes, MoniesTheme.extra.outflow, limit = 3, showPercent = false
+                    )
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile("Spent", formatCompactKes(stats.expense), extra.negative)
@@ -319,10 +314,13 @@ private fun SpendingTab(vm: AnalyticsViewModel) {
     val direction by vm.direction.collectAsStateWithLifecycle()
     val breakdown by vm.breakdown.collectAsStateWithLifecycle()
     val donutValues by vm.donut.collectAsStateWithLifecycle()
-    val donut = rememberSlices(donutValues)
+    val slices = remember(donutValues) { donutValues.map { RankedRow(it.label, it.value.toDouble()) } }
     val top by vm.topSubjects.collectAsStateWithLifecycle()
+    val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
     val selected by vm.selectedSlice.collectAsStateWithLifecycle()
     val sources by vm.incomeSources.collectAsStateWithLifecycle()
+    val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
+    val extra = MoniesTheme.extra
 
     TabList {
         item(key = "direction") {
@@ -350,13 +348,10 @@ private fun SpendingTab(vm: AnalyticsViewModel) {
                         selected = breakdown, onSelect = vm::setBreakdown,
                     )
                     Spacer(Modifier.height(12.dp))
-                    if (donut.isEmpty()) EmptyHint()
-                    else DonutChart(
-                        donut,
-                        Modifier
-                            .fillMaxWidth()
-                            .height(240.dp),
-                        selectedLabel = selected, onSliceClick = vm::selectSlice,
+                    if (slices.isEmpty()) EmptyHint()
+                    else RankedBars(
+                        slices, extra.outflow,
+                        selected = selected, onRowClick = vm::selectSlice,
                     )
                 }
             }
@@ -376,13 +371,13 @@ private fun SpendingTab(vm: AnalyticsViewModel) {
                         )
                         Spacer(Modifier.height(8.dp))
                     }
-                    if (top.isEmpty()) EmptyHint() else TopMerchantsChart(top)
+                    if (merchants.isEmpty()) EmptyHint() else RankedBars(merchants, extra.outflow)
                 }
             }
         } else {
             item(key = "sources") {
                 SectionCard("Income sources") {
-                    if (sources.isEmpty()) EmptyHint() else IncomeSources(sources)
+                    if (sourceRows.isEmpty()) EmptyHint() else RankedBars(sourceRows, extra.inflow)
                 }
             }
         }
@@ -397,7 +392,11 @@ private fun CashFlowTab(vm: AnalyticsViewModel) {
     val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
     val costs by vm.costs.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
-    val fees = remember(stats) { stats.incomeCost + stats.expenseCost }
+    val feesHeader = remember(stats) {
+        val fees = stats.incomeCost + stats.expenseCost
+        "You paid ${formatKes(fees)} in fees" +
+                if (stats.expense > 0.0) " · ${"%.1f".format(Locale.US, fees / stats.expense * 100)}% of spending" else ""
+    }
 
     TabList {
         item(key = "trend") {
@@ -415,9 +414,9 @@ private fun CashFlowTab(vm: AnalyticsViewModel) {
             }
         }
         item(key = "fees") {
-            SectionCard("Amounts vs fees") {
+            SectionCard("Fees") {
                 Text(
-                    "You paid ${formatKes(fees)} in fees",
+                    feesHeader,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -710,43 +709,6 @@ private fun DayOfWeekBars(bars: List<WeekdayBar>) {
                     b.label, style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun IncomeSources(sources: List<SourceAmount>) {
-    val total = remember(sources) { sources.sumOf { it.amount }.coerceAtLeast(1.0) }
-    val barColor = MoniesTheme.extra.inflow
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    val shape = remember { RoundedCornerShape(5.dp) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        sources.forEach { s ->
-            Column {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        s.name,
-                        Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(formatKes(s.amount), style = MaterialTheme.typography.labelLarge)
-                }
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .background(trackColor, shape)
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth((s.amount / total).toFloat())
-                            .fillMaxHeight()
-                            .background(barColor, shape),
-                    )
-                }
             }
         }
     }

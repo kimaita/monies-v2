@@ -1,6 +1,7 @@
 package com.kimaita.monies.ui.charts
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -10,7 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -20,56 +25,61 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.ceil
 
-/** Non-interactive in/out bars for the Overview bento */
+/** Non-interactive diverging in/out bars for the Overview bento. */
 @Composable
 fun MiniInOutBars(data: List<CashFlowWeek>, modifier: Modifier = Modifier, buckets: Int = 8) {
     val colors = chartColors()
     val slice = remember(data, buckets) { data.takeLast(buckets) }
-    val max = remember(slice) {
-        slice.maxOfOrNull { maxOf(it.inflow, it.outflow) }?.coerceAtLeast(1f) ?: 1f
-    }
-    Canvas(modifier) {
-        if (slice.isEmpty()) return@Canvas
-        val groupW = size.width / slice.size
-        val barW = (groupW * 0.34f).coerceAtMost(10f)
-        val r = CornerRadius(barW / 3f)
+    Spacer(modifier.drawWithCache {
+        if (slice.isEmpty()) return@drawWithCache onDrawBehind { }
+        val maxUp = slice.maxOf { it.inflow }
+        val maxDown = slice.maxOf { it.outflow }
+        val total = (maxUp + maxDown).coerceAtLeast(1f)
+        val y0 = size.height * maxUp / total
+        val slot = size.width / slice.size
+        val bw = (slot * 0.6f).coerceIn(4.dp.toPx(), 12.dp.toPx())
+        val minH = 2.dp.toPx()
+        val radius = bw * 0.35f
+        val upPath = Path()
+        val downPath = Path()
         slice.forEachIndexed { i, w ->
-            val cx = i * groupW + groupW / 2f
-            val hIn = size.height * (w.inflow / max)
-            val hOut = size.height * (w.outflow / max)
-            drawRoundRect(
-                colors.inflow,
-                Offset(cx - barW - 1f, size.height - hIn),
-                Size(barW, hIn),
-                r
-            )
-            drawRoundRect(colors.outflow, Offset(cx + 1f, size.height - hOut), Size(barW, hOut), r)
+            val l = i * slot + (slot - bw) / 2f
+            if (w.inflow > 0f) {
+                val tip = minOf(y0 - size.height * w.inflow / total, y0 - minH)
+                upPath.addBar(l, l + bw, y0, tip, minOf(radius, y0 - tip))
+            }
+            if (w.outflow > 0f) {
+                val tip = maxOf(y0 + size.height * w.outflow / total, y0 + minH)
+                downPath.addBar(l, l + bw, y0, tip, minOf(radius, tip - y0))
+            }
         }
-    }
+        onDrawBehind {
+            drawPath(upPath, colors.inflow)
+            drawPath(downPath, colors.outflow)
+        }
+    })
 }
 
 /** Non-interactive balance sparkline for the Overview bento. */
 @Composable
 fun MiniSparkline(points: List<BalancePoint>, modifier: Modifier = Modifier) {
-    val colors = chartColors()
-    Canvas(modifier) {
-        if (points.size < 2) return@Canvas
-        val min = points.minOf { it.balance }
-        val max = points.maxOf { it.balance }
-        val span = (max - min).takeIf { it > 0f } ?: 1f
+    val color = chartColors().inflow
+    Spacer(modifier.drawWithCache {
+        if (points.size < 2) return@drawWithCache onDrawBehind { }
+        val strokeW = 2.dp.toPx()
+        val scale = lineScale(points.minOf { it.balance }, points.maxOf { it.balance })
+        val top = strokeW
+        val bottom = size.height - strokeW
         val stepX = size.width / (points.size - 1)
-        val path = Path()
-        points.forEachIndexed { i, p ->
-            val x = i * stepX
-            val y = size.height - (p.balance - min) / span * size.height
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        val path = Path().apply {
+            monotoneCurve(
+                FloatArray(points.size) { it * stepX },
+                FloatArray(points.size) { scale.y(points[it].balance, top, bottom) },
+            )
         }
-        drawPath(
-            path,
-            colors.inflow,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f)
-        )
-    }
+        val stroke = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        onDrawBehind { drawPath(path, color, style = stroke) }
+    })
 }
 
 /** Trailing-window contribution grid. One Canvas instead of ~91 Boxes. */
