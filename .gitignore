@@ -21,4 +21,4 @@ keystore.properties
 build/
 .claude/worktrees/
 .claude/settings.local.json
-transactions.txt
+transactions.txt*
