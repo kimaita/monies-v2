@@ -22,8 +22,10 @@ import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
+import com.kimaita.monies.services.PaceSummary
 import com.kimaita.monies.services.RhythmStats
 import com.kimaita.monies.services.StreakSummary
+import com.kimaita.monies.services.computePace
 import com.kimaita.monies.services.computeRhythm
 import com.kimaita.monies.services.computeStreaks
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -70,8 +72,8 @@ class AnalyticsViewModel @Inject constructor(
     private val _direction = MutableStateFlow(SpendDirection.OUT)
     val direction: StateFlow<SpendDirection> = _direction.asStateFlow()
 
-    private val _breakdown = MutableStateFlow(Breakdown.CATEGORY)
-    val breakdown: StateFlow<Breakdown> = _breakdown.asStateFlow()
+    private val _breakdownMode = MutableStateFlow(Breakdown.CATEGORY)
+    val breakdownMode: StateFlow<Breakdown> = _breakdownMode.asStateFlow()
 
     private val _selectedSlice = MutableStateFlow<String?>(null)
     val selectedSlice: StateFlow<String?> = _selectedSlice.asStateFlow()
@@ -85,8 +87,8 @@ class AnalyticsViewModel @Inject constructor(
         _direction.value = d
     }
 
-    fun setBreakdown(b: Breakdown) {
-        _breakdown.value = b; _selectedSlice.value = null
+    fun setBreakdownMode(b: Breakdown) {
+        _breakdownMode.value = b; _selectedSlice.value = null
     }
 
     fun selectSlice(label: String?) {
@@ -154,7 +156,7 @@ class AnalyticsViewModel @Inject constructor(
         repository.getIncomeVsExpense(k.start, k.end, k.subjects, k.categories, k.types)
     }.stateIn(viewModelScope, started, IncExp())
 
-    // ---------------- Spending tab: donut, subjects (cross-filtered), income tree ----------------
+    // ---------------- Spending tab: breakdown, subjects (cross-filtered), income tree ----------------
     private val categorySpending =
         key.flatMapLatest { k ->
             repository.getCategorySpending(
@@ -167,8 +169,8 @@ class AnalyticsViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, started, emptyList())
 
-    val donut: StateFlow<List<SliceValue>> =
-        combine(_breakdown, categorySpending, typeSpending) { mode, cat, type ->
+    val breakdown: StateFlow<List<SliceValue>> =
+        combine(_breakdownMode, categorySpending, typeSpending) { mode, cat, type ->
             val chosen = if (mode == Breakdown.CATEGORY) cat else type
             (chosen.ifEmpty { type })
                 .sortedByDescending { it.total }
@@ -192,7 +194,7 @@ class AnalyticsViewModel @Inject constructor(
     val topSubjects: StateFlow<List<MerchantSpend>> =
         combine(
             key,
-            _breakdown,
+            _breakdownMode,
             _selectedSlice,
             filterOptions
         ) { fk, mode, slice, opts -> SpendKey(fk, mode, slice, opts) }
@@ -258,6 +260,17 @@ class AnalyticsViewModel @Inject constructor(
     val streak: StateFlow<StreakSummary> = streakDaily
         .map { computeStreaks(it, streakStart, streakEnd) }
         .stateIn(viewModelScope, started, StreakSummary(0, 0, 0, emptyMap()))
+
+    // Spending pace: last month's first day to tomorrow; ignores the time chip and filters.
+    val pace: StateFlow<PaceSummary?> = repository
+        .getDailyTotals(
+            LocalDate.now().minusMonths(1).withDayOfMonth(1).atStartOfDay()
+                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            LocalDate.now().plusDays(1).atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            natureFilter = false
+        )
+        .map<_, PaceSummary?> { computePace(it, LocalDate.now()) }
+        .stateIn(viewModelScope, started, null)
 
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =

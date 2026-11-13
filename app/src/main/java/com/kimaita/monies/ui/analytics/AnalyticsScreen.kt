@@ -141,8 +141,9 @@ private fun SegmentedTabs(selected: AnalyticsTab, onSelect: (AnalyticsTab) -> Un
 @Composable
 private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump: (AnalyticsTab) -> Unit) {
     val stats by vm.stats.collectAsStateWithLifecycle()
-    val donutValues by vm.donut.collectAsStateWithLifecycle()
-    val whereItGoes = remember(donutValues) { donutValues.map { RankedRow(it.label, it.value.toDouble()) } }
+    val pace by vm.pace.collectAsStateWithLifecycle()
+    val breakdownRows by vm.breakdown.collectAsStateWithLifecycle()
+    val whereItGoes = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
     val cashFlow by vm.cashFlow.collectAsStateWithLifecycle()
     val balance by vm.balanceTrend.collectAsStateWithLifecycle()
     val heat by vm.heat.collectAsStateWithLifecycle()
@@ -153,6 +154,15 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
     val extra = MoniesTheme.extra
 
     TabList(listState) {
+        pace?.let { p ->
+            item(key = "pace") {
+                BentoCard {
+                    TileLabel("Spending pace")
+                    Spacer(Modifier.height(6.dp))
+                    PaceChart(p, Modifier.fillMaxWidth())
+                }
+            }
+        }
         item(key = "net") {
             BentoCard {
                 TileLabel("Net this period")
@@ -174,7 +184,7 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             }
         }
 
-        item(key = "donut_stats") {
+        item(key = "breakdown_stats") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BentoCard(
                     Modifier.weight(1f),
@@ -321,9 +331,9 @@ private fun StreakSection(streak: StreakSummary, window: ClosedRange<LocalDate>)
 @Composable
 private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val direction by vm.direction.collectAsStateWithLifecycle()
-    val breakdown by vm.breakdown.collectAsStateWithLifecycle()
-    val donutValues by vm.donut.collectAsStateWithLifecycle()
-    val slices = remember(donutValues) { donutValues.map { RankedRow(it.label, it.value.toDouble()) } }
+    val mode by vm.breakdownMode.collectAsStateWithLifecycle()
+    val breakdownRows by vm.breakdown.collectAsStateWithLifecycle()
+    val slices = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
     val top by vm.topSubjects.collectAsStateWithLifecycle()
     val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
     val selected by vm.selectedSlice.collectAsStateWithLifecycle()
@@ -363,7 +373,7 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
                                 "Type" to Breakdown.TYPE
                             )
                         },
-                        selected = breakdown, onSelect = vm::setBreakdown,
+                        selected = mode, onSelect = vm::setBreakdownMode,
                     )
                     Spacer(Modifier.height(12.dp))
                     if (slices.isEmpty()) EmptyHint()
