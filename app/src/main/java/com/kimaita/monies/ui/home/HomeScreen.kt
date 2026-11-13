@@ -229,13 +229,14 @@ fun HomeScreenContent(
             ChangePill(change = uiState.changeInTotal, filter = filter, onClick = onViewAnalytics)
 
             if (((uiState.availableFuliza ?: 0.0) + (uiState.outstandingFuliza ?: 0.0)) > 0.0 ||
-                uiState.mshwariBalance != null || uiState.lockSavings != null
+                uiState.mshwariBalance != null || uiState.lockSavings != null || uiState.mshwariLoan != null
             ) {
                 Spacer(Modifier.height(20.dp))
                 OtherBalances(
                     availableFuliza = uiState.availableFuliza,
                     outstandingFuliza = uiState.outstandingFuliza,
                     mshwariBalance = uiState.mshwariBalance,
+                    mshwariLoan = uiState.mshwariLoan,
                     lockSavings = uiState.lockSavings,
                     hide = hide,
                 )
@@ -426,6 +427,7 @@ fun OtherBalances(
     availableFuliza: Double?,
     outstandingFuliza: Double?,
     mshwariBalance: Double?,
+    mshwariLoan: Double? = null,
     lockSavings: Double?,
     hide: Boolean = false,
 ) {
@@ -461,6 +463,7 @@ fun OtherBalances(
                         }
                     }
                     mshwariBalance?.let { Pill { Svc("M-Shwari"); Strong(bal(it)) } }
+                    mshwariLoan?.let { Pill { Svc("M-Shwari loan"); Owe(bal(it)) } }
                     lockSavings?.let { Pill { Svc("Lock"); Strong(bal(it)) } }
                     Pill(onClick = { expanded = true }) {
                         Text(
@@ -477,6 +480,7 @@ fun OtherBalances(
                     fulizaMax,
                     owedFuliza,
                     mshwariBalance,
+                    mshwariLoan,
                     lockSavings,
                     hide,
                     onCollapse = { expanded = false })
@@ -488,7 +492,7 @@ fun OtherBalances(
 @Composable
 private fun OtherBalancesPanel(
     availableFuliza: Double?, outstandingFuliza: Double?, fulizaMax: Double, owedFuliza: Boolean,
-    mshwariBalance: Double?, lockSavings: Double?, hide: Boolean,
+    mshwariBalance: Double?, mshwariLoan: Double?, lockSavings: Double?, hide: Boolean,
     onCollapse: () -> Unit,
 ) {
     fun bal(v: Double) = if (hide) HIDDEN else money(v)
@@ -550,6 +554,7 @@ private fun OtherBalancesPanel(
             )
         }
         mshwariBalance?.let { PanelRow { RowLine("M-Shwari balance", bal(it)) } }
+        mshwariLoan?.let { PanelRow { RowLine("M-Shwari loan", bal(it), owed = true) } }
         lockSavings?.let { PanelRow { RowLine("Lock savings", bal(it)) } }
         Spacer(Modifier.height(8.dp))
     }

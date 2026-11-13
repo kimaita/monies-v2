@@ -5,6 +5,7 @@ data class OtherBalances(
     val lockSavings: Double? = null,
     val availableFuliza: Double? = null,
     val outstandingFuliza: Double? = null,
+    val mshwariLoan: Double? = null,
 )
 
 /** Maps a balance to the named regex group that carries it. Add a row to support a new balance. */

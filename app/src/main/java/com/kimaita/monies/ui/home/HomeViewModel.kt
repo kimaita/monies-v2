@@ -50,6 +50,7 @@ data class HomeUiState(
     val outstandingFuliza: Double? = null,
     val lockSavings: Double? = null,
     val mshwariBalance: Double? = null,
+    val mshwariLoan: Double? = null,
     val changeInTotal: Double? = null,
 )
 
@@ -138,6 +139,7 @@ class HomeViewModel @Inject constructor(
             availableFuliza = other.availableFuliza.takeIf { mpesaView },
             outstandingFuliza = other.outstandingFuliza.takeIf { mpesaView },
             mshwariBalance = other.mshwariBalance.takeIf { mpesaView },
+            mshwariLoan = other.mshwariLoan.takeIf { mpesaView && it != null && it > 0.0 },
             lockSavings = other.lockSavings.takeIf { mpesaView },
         )
     }.stateIn(

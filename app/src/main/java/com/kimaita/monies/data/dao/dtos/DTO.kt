@@ -96,7 +96,7 @@ data class AccountBalance(
     val provider: String,
 )
 
-/** A Fuliza transaction: type name, time (ISO text), amount, and the stored message. */
+/** A Fuliza or M-Shwari loan transaction: type name, time (ISO text), amount, and the stored message. */
 data class FulizaRow(
     val typeName: String,
     val transactionTime: String,
