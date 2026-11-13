@@ -52,28 +52,37 @@ class SmsSyncerTest {
             return saved.id
         }
 
-        override suspend fun accountActivity(): List<AccountActivity> =
-            accounts.mapNotNull { a ->
+        /** How many times merges were recomputed (each one scans every transaction in the real store). */
+        var activityReads = 0
+
+        override suspend fun accountActivity(): List<AccountActivity> {
+            activityReads++
+            return accounts.mapNotNull { a ->
                 val times = transactions.filter { it.accountId == a.id }.map { it.transactionTime.toString() }
                 if (times.isEmpty()) null else AccountActivity(a.id, a.provider, times.min(), times.max(), a.mergedInto)
             }
+        }
 
         override suspend fun setMergedInto(accountId: Int, root: Int?) {
             val i = accounts.indexOfFirst { it.id == accountId }
             accounts[i] = accounts[i].copy(mergedInto = root)
         }
 
-        // Like Room's insert, only a new subject takes the categoryId it is given.
-        override suspend fun subjectId(subject: Subject): Long {
-            val key = subject.rawName to subject.number
-            val id = subjects[key] ?: (subjects.size + 1L).also {
-                subjects[key] = it
+        var mergesStale = true // like the real store before the flag is first written
+        override suspend fun mergesStale() = mergesStale
+        override suspend fun setMergesStale(stale: Boolean) { mergesStale = stale }
+
+        override suspend fun savedSubjects(rawNames: Collection<String>) =
+            subjects.filterKeys { it.first in rawNames }.map { (key, id) ->
+                val root = mergedInto[id] ?: id
+                SavedSubject(key.first, key.second, root, subjectCategories[root])
+            }
+
+        override suspend fun insertSubject(subject: Subject): Long =
+            (subjects.size + 1L).also {
+                subjects[subject.rawName to subject.number] = it
                 subjectCategories[it] = subject.categoryId
             }
-            return mergedInto[id] ?: id
-        }
-
-        override suspend fun subjectCategory(subjectId: Long) = subjectCategories[subjectId]
         override suspend fun categoryIds() = categories
         override suspend fun insertTransactions(transactions: List<Transaction>) {
             transactions.forEach { t -> if (this.transactions.none { it.message == t.message }) this.transactions += t }
@@ -254,8 +263,10 @@ class SmsSyncerTest {
         // Same sample date on both: they overlap, so no merge.
         assertEquals(listOf(null, null), store.accounts.map { it.mergedInto })
 
+        // Stands in for new activity on the account, which a sync that saves transactions flags.
         fun retime(account: Int, time: String) {
             store.transactions.replaceAll { if (it.accountId == account) it.copy(transactionTime = java.time.LocalDateTime.parse(time)) else it }
+            store.mergesStale = true
         }
         retime(1, "2021-01-01T10:00:00")
         retime(2, "2024-01-01T10:00:00")
@@ -276,5 +287,43 @@ class SmsSyncerTest {
         store.mergedInto[source] = target // what SubjectDao.merge records
         run(FakeInbox(listOf(msg(1), msg(2))), store)
         assertEquals(target, store.transactions.last().subject)
+    }
+
+    @Test
+    fun aSyncThatSavesNothingNewLeavesMergesAlone() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val inbox = FakeInbox(listOf(msg(1)))
+        run(inbox, store)
+        assertEquals(1, store.activityReads)
+
+        run(inbox, store) // app opened again, nothing new
+        inbox.messages += msg(2, body = promo)
+        run(inbox, store) // only a promo arrived
+        assertEquals(1, store.activityReads)
+    }
+
+    @Test
+    fun anInboxThatEndsOnAFullBatchStillRecomputesOnce() {
+        val store = FakeStore(getDefaultTransactionTypes()).apply { mergesStale = false }
+        val s = syncer(FakeInbox(listOf(msg(1), msg(2))), store)
+        runBlocking {
+            s.syncBatch(2) // full: may not be the last, so merges wait
+            assertEquals(0, store.activityReads)
+            s.syncBatch(2) // empty: the inbox is drained
+            s.syncBatch(2)
+        }
+        assertEquals(1, store.activityReads)
+    }
+
+    @Test
+    fun aCategoryChangedBetweenBatchesAppliesToTheNextOne() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        val s = syncer(FakeInbox(listOf(msg(1), msg(2))), store)
+        runBlocking {
+            s.syncBatch(1)
+            store.subjectCategories[store.transactions.single().subject!!] = store.categories.getValue("rent")
+            s.syncBatch(1)
+        }
+        assertEquals(store.categories["rent"], store.transactions.last().transactionCategory)
     }
 }

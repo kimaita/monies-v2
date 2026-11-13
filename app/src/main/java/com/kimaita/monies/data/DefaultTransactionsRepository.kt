@@ -49,7 +49,7 @@ import com.kimaita.monies.services.RecurringDetector
 import com.kimaita.monies.services.computeFuliza
 import com.kimaita.monies.services.typeGroups
 import com.kimaita.monies.services.computeMshwariLoan
-import com.kimaita.monies.utils.getSafeValue
+import com.kimaita.monies.utils.groupValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -425,9 +425,11 @@ class DefaultTransactionsRepository @Inject constructor(
             "fuliza.final_pay" -> FulizaEvent.Kind.FULL
             else -> return null
         }
-        val groups = regexByName[row.typeName]?.find(row.message)?.groups as? MatchNamedGroupCollection
+        val regex = regexByName[row.typeName]
+        val match = regex?.find(row.message)
         val time = runCatching { LocalDateTime.parse(row.transactionTime) }.getOrNull() ?: return null
-        fun group(name: String) = groups?.getSafeValue(name)?.replace(",", "")?.toDoubleOrNull()
+        fun group(name: String) =
+            regex?.let { match?.groupValue(it, name) }?.replace(",", "")?.toDoubleOrNull()
         return FulizaEvent(kind, time, row.amount, group("TotalLoan"), group("AvailableFuliza"))
     }
 
@@ -435,8 +437,8 @@ class DefaultTransactionsRepository @Inject constructor(
     private fun mshwariLoanEvent(row: FulizaRow, repaymentRegex: Regex?): MshwariLoanEvent? {
         val time = runCatching { LocalDateTime.parse(row.transactionTime) }.getOrNull() ?: return null
         if (row.typeName != "mshwari.loan_repayment") return MshwariLoanEvent(MshwariLoanEvent.Kind.UNKNOWN, time)
-        val groups = repaymentRegex?.find(row.message)?.groups as? MatchNamedGroupCollection
-        val stated = groups?.getSafeValue("LoanBal")?.replace(",", "")?.toDoubleOrNull()
+        val stated = repaymentRegex?.let { it.find(row.message)?.groupValue(it, "LoanBal") }
+            ?.replace(",", "")?.toDoubleOrNull()
         return when {
             stated != null -> MshwariLoanEvent(MshwariLoanEvent.Kind.STATED, time, stated)
             row.message.contains("repaid in full", ignoreCase = true) -> MshwariLoanEvent(MshwariLoanEvent.Kind.CLEARED, time)
@@ -452,10 +454,9 @@ class DefaultTransactionsRepository @Inject constructor(
         val best = HashMap<BalanceField, Pair<Double, LocalDateTime>>()
         rows.forEach { row ->
             val regex = regexByType[row.transactionType] ?: return@forEach
-            val groups =
-                regex.find(row.message)?.groups as? MatchNamedGroupCollection ?: return@forEach
+            val match = regex.find(row.message) ?: return@forEach
             BalanceField.entries.forEach { field ->
-                val value = groups.getSafeValue(field.group)?.replace(",", "")?.toDoubleOrNull()
+                val value = match.groupValue(regex, field.group)?.replace(",", "")?.toDoubleOrNull()
                     ?: return@forEach
                 val current = best[field]
                 if (current == null || row.transactionTime.isAfter(current.second)) {
