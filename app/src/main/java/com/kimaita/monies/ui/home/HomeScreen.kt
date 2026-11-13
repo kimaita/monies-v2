@@ -210,7 +210,7 @@ fun HomeScreenContent(
                     ),
                 )
             }
-            if (uiState.accountBalances.size > 1) {
+            if (uiState.selectedAccount == null && uiState.accountBalances.size > 1) {
                 Spacer(Modifier.height(8.dp))
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
