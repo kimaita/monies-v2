@@ -212,27 +212,25 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
             }
         }
 
-        item(key = "breakdown_stats") {
+        item(key = "breakdown") {
+            BentoCard(onClick = { onJump(AnalyticsTab.SPENDING) }) {
+                TileLabel("Where it goes")
+                Spacer(Modifier.height(8.dp))
+                if (whereItGoes.isEmpty()) EmptyHint()
+                else RankedBars(
+                    whereItGoes, MoniesTheme.extra.outflow, limit = 3, showPercent = false
+                )
+            }
+        }
+
+        item(key = "spent_fees") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                BentoCard(
-                    Modifier.weight(1f),
-                    onClick = { onJump(AnalyticsTab.SPENDING) }) {
-                    TileLabel("Where it goes")
-                    Spacer(Modifier.height(8.dp))
-                    if (whereItGoes.isEmpty()) EmptyHint()
-                    else RankedBars(
-                        whereItGoes, MoniesTheme.extra.outflow, limit = 3, showPercent = false
-                    )
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatTile("Spent", formatCompactKes(stats.expense), extra.negative)
-                    StatTile(
-                        "Top", top.firstOrNull()?.name ?: "-",
-                        MaterialTheme.colorScheme.onSurface,
-                        sub = top.firstOrNull()?.let { formatCompactKes(it.amount) },
-                        valueMaxLines = 2,
-                    )
-                }
+                StatTile("Spent", formatCompactKes(stats.expense), extra.negative, Modifier.weight(1f).heightIn(min = 104.dp))
+                StatTile(
+                    "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
+                    Modifier.weight(1f).heightIn(min = 104.dp),
+                    sub = feeShareText(fees, stats.expense),
+                )
             }
         }
 
@@ -256,13 +254,6 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                 if (balance.size < 2) EmptyHint()
                 else BalanceTrendChart(balance, Modifier.fillMaxWidth(), plotHeight = 140.dp)
             }
-        }
-
-        item(key = "fees") {
-            StatTile(
-                "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
-                sub = feeShareText(fees, stats.expense),
-            )
         }
 
         item(key = "heat") {

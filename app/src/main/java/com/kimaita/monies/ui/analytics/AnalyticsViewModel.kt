@@ -213,7 +213,7 @@ class AnalyticsViewModel @Inject constructor(
                 ).map { list -> list.map { MerchantSpend(it.name, it.amount) } }
             }.stateIn(viewModelScope, started, null)
 
-    /** The Overview "Top" tile: the biggest merchant for the filters, not affected by the selected slice. */
+    /** The Overview "Top out" line: the biggest merchant for the filters, not affected by the selected slice. */
     val topMerchant: StateFlow<List<MerchantSpend>?> = key.flatMapLatest { k ->
         repository.getTopSubjectsByAmount(
             k.start, k.end, k.subjects, k.categories, k.types, natureFilter = false, limit = 1,
