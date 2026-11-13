@@ -195,4 +195,11 @@ class AnalyticsCalculationsTest {
         assertEquals(10, balancePoints(rows, maxPoints = 10).size)
         assertEquals(emptyList<Any>(), balancePoints(emptyList()))
     }
+
+    @Test
+    fun feeShare_isPercentOfSpendAndNullWithoutSpend() {
+        assertEquals(2.5, feeShare(25.0, 1000.0)!!, 1e-9)
+        assertNull(feeShare(25.0, 0.0))
+        assertNull(feeShare(0.0, -5.0))
+    }
 }

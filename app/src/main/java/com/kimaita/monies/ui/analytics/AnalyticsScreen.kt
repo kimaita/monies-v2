@@ -31,6 +31,7 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.StreakSummary
+import com.kimaita.monies.services.feeShare
 import com.kimaita.monies.ui.charts.*
 import com.kimaita.monies.ui.components.AutoSizeText
 import com.kimaita.monies.ui.components.HighlightsFilter
@@ -256,7 +257,10 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
         }
 
         item(key = "fees") {
-            StatTile("Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface)
+            StatTile(
+                "Fees", formatCompactKes(fees), MaterialTheme.colorScheme.onSurface,
+                sub = feeShareText(fees, stats.expense),
+            )
         }
 
         item(key = "heat") {
@@ -461,7 +465,7 @@ private fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val feesHeader = remember(stats) {
         val fees = stats.incomeCost + stats.expenseCost
         "You paid ${formatKes(fees)} in fees" +
-                if (stats.expense > 0.0) " · ${"%.1f".format(Locale.US, fees / stats.expense * 100)}% of spending" else ""
+                (feeShareText(fees, stats.expense)?.let { " · $it" } ?: "")
     }
 
     TabList(listState) {
@@ -896,6 +900,9 @@ private fun EmptyHint(text: String = "Nothing here yet") =
 
 private val weekdayLabels =
     arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+
+private fun feeShareText(fees: Double, expense: Double): String? =
+    feeShare(fees, expense)?.let { "${"%.1f".format(Locale.US, it)}% of spend" }
 
 private fun weekdayName(i: Int?): String = i?.let { weekdayLabels.getOrNull(it) } ?: "-"
 private fun slotName(i: Int?): String = i?.let { SLOT_LABELS.getOrNull(it) } ?: "-"

@@ -196,3 +196,9 @@ fun balancePoints(rows: List<BalanceBucket>, maxPoints: Int = 90): List<BalanceP
         BalancePoint(label, r.balance, axis)
     }
 }
+
+/**
+ * Fees as a percentage of [expense] (outgoing money excluding transfers and fees), or null when
+ * nothing was spent.
+ */
+fun feeShare(fees: Double, expense: Double): Double? = if (expense > 0.0) fees / expense * 100 else null
