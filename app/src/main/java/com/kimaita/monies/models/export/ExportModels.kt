@@ -2,6 +2,7 @@ package com.kimaita.monies.models.export
 
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.getDatesForFilter
+import com.kimaita.monies.services.TypeGroup
 
 
 data class ExportFilters(
@@ -23,7 +24,7 @@ data class FilterOptions(
     val subjects: List<NamedRef<Long>> = emptyList(),
     val categories: List<NamedRef<Int>> = emptyList(),
     val accounts: List<NamedRef<Int>> = emptyList(),
-    val types: List<NamedRef<Int>> = emptyList(),
+    val types: List<TypeGroup> = emptyList(),
 )
 
 data class ExportUiState(

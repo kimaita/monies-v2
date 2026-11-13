@@ -76,6 +76,10 @@ import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
+import com.kimaita.monies.services.TypeGroup
+import com.kimaita.monies.services.isSelected
+import com.kimaita.monies.services.toggleGroup
+import com.kimaita.monies.services.typeGroups
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.navigateToTab
 import com.kimaita.monies.ui.components.TransactionListItem
@@ -247,12 +251,12 @@ fun TransactionsScreenContent(
 
             if (hasActiveFilters) {
                 val categoryMap = remember(categories) { categories.associateBy { it.id } }
-                val typeMap = remember(transactionTypes) { transactionTypes.associateBy { it.id } }
+                val groups = remember(transactionTypes) { typeGroups(transactionTypes) }
 
                 ActiveFiltersGroup(
                     filters = filters,
                     categoryMap = categoryMap,
-                    typeMap = typeMap,
+                    typeGroups = groups,
                     onRemoveFilter = onUpdateFilters
                 )
             }
@@ -416,7 +420,7 @@ private fun RetryRow(message: String, onRetry: () -> Unit) {
 fun ActiveFiltersGroup(
     filters: TransactionFilters,
     categoryMap: Map<Int, Category>,
-    typeMap: Map<Int, TransactionType>,
+    typeGroups: List<TypeGroup>,
     onRemoveFilter: (TransactionFilters) -> Unit
 ) {
     FlowRow(
@@ -434,12 +438,11 @@ fun ActiveFiltersGroup(
                     )
                 })
         }
-        filters.typeFilters.forEach { typeId ->
-            val typeName = typeMap[typeId]?.finalDisplayName ?: "Type"
+        typeGroups.filter { g -> g.ids.any { it in filters.typeFilters } }.forEach { group ->
             InputChip(
                 selected = true,
-                onClick = { onRemoveFilter(filters.copy(typeFilters = filters.typeFilters - typeId)) },
-                label = { Text(typeName) },
+                onClick = { onRemoveFilter(filters.copy(typeFilters = filters.typeFilters - group.ids.toSet())) },
+                label = { Text(group.label) },
                 trailingIcon = {
                     Icon(
                         painterResource(R.drawable.close_small_24dp), null, Modifier.size(18.dp)
@@ -508,14 +511,11 @@ fun FilterBottomSheetContent(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                typesFor(filters.natureFilter, transactionTypes).forEach { type ->
-                    val isSelected = filters.typeFilters.contains(type.id)
-                    FilterChip(selected = isSelected, onClick = {
-                        val newTypes =
-                            if (isSelected) filters.typeFilters - type.id else filters.typeFilters + type.id
-                        onFilterChange(filters.copy(typeFilters = newTypes))
-
-                    }, label = { Text(type.finalDisplayName) })
+                val picked = filters.typeFilters.toSet()
+                typeGroups(typesFor(filters.natureFilter, transactionTypes)).forEach { group ->
+                    FilterChip(selected = group.isSelected(picked), onClick = {
+                        onFilterChange(filters.copy(typeFilters = picked.toggleGroup(group).toList()))
+                    }, label = { Text(group.label) })
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

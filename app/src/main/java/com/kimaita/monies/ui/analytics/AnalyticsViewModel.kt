@@ -48,7 +48,6 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -198,7 +197,7 @@ class AnalyticsViewModel @Inject constructor(
         repository.getBudgets().stateIn(viewModelScope, started, emptyList())
 
     val filterOptions: StateFlow<FilterOptions?> =
-        flow { emit(repository.getFilterOptions()) }.stateIn(viewModelScope, onceStarted, null)
+        repository.getFilterOptions().stateIn(viewModelScope, started, null)
 
     /** Top merchants, narrowed to the breakdown row that is selected, in Category and Type mode alike. */
     val topSubjects: StateFlow<List<MerchantSpend>?> =

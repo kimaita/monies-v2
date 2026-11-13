@@ -33,6 +33,8 @@ import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.services.StreakSummary
 import com.kimaita.monies.services.activeSummary
 import com.kimaita.monies.services.feeShare
+import com.kimaita.monies.services.isSelected
+import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.ui.charts.*
 import com.kimaita.monies.ui.components.AutoSizeText
 import com.kimaita.monies.ui.components.HighlightsFilter
@@ -535,10 +537,15 @@ private fun FiltersSheet(vm: AnalyticsViewModel, onDismiss: () -> Unit) {
 
             opts?.types?.takeIf { it.isNotEmpty() }?.let { types ->
                 Text("Type", style = MaterialTheme.typography.labelLarge)
-                MultiSelectChips(
-                    types,
-                    filters.typeFilters
-                ) { vm.setTypeFilters(filters.typeFilters.toggle(it)) }
+                val picked = filters.typeFilters.toSet()
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    types.forEach { group ->
+                        FilterChip(
+                            selected = group.isSelected(picked),
+                            onClick = { vm.setTypeFilters(picked.toggleGroup(group).toList()) },
+                            label = { Text(group.label) })
+                    }
+                }
             }
             opts?.categories?.takeIf { it.isNotEmpty() }?.let { cats ->
                 Text("Category", style = MaterialTheme.typography.labelLarge)

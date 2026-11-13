@@ -134,7 +134,7 @@ interface TransactionsRepository {
     /** Moves [source]'s transactions to [target] and merges it into it; false if refused. */
     suspend fun mergeSubject(source: Long, target: Long): Boolean
     suspend fun getSubjects(ids: List<Long>): List<NamedRef<Long>>
-    suspend fun getFilterOptions(): FilterOptions
+    fun getFilterOptions(): Flow<FilterOptions>
     fun getOtherBalances(): Flow<OtherBalances>
     suspend fun isOnboardingComplete(): Boolean
     suspend fun setOnboardingComplete()

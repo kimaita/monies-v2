@@ -8,6 +8,7 @@ import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.export.NamedRef
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -98,6 +99,40 @@ class AnalyticsCalculationsTest {
         assertEquals(listOf(2, 3), slices[0].typeIds)
         assertEquals(listOf(1), slices[1].typeIds)
         assertTrue(slices.all { it.categoryIds.isEmpty() })
+    }
+
+    @Test
+    fun typeGroups_oneChoicePerDisplayName() {
+        val groups = typeGroups(types)
+        assertEquals(listOf("Send Money", "Airtime"), groups.map { it.label })
+        assertEquals(listOf(2, 3), groups[1].ids)
+        // A type without a display name falls back to its readable key.
+        assertEquals("Mshwari deposit", typeGroups(listOf(TransactionType(id = 9, name = "mshwari.deposit", isInc = true)))[0].label)
+    }
+
+    @Test
+    fun typeGroups_selectingAGroupSelectsAllItsIdsAndTogglesBack() {
+        val airtime = typeGroups(types)[1]
+        var picked = setOf(1)
+        picked = picked.toggleGroup(airtime)
+        assertEquals(setOf(1, 2, 3), picked)
+        assertTrue(airtime.isSelected(picked))
+        // Only some of its ids in: not shown as selected, and a tap completes it.
+        assertFalse(airtime.isSelected(setOf(2)))
+        assertEquals(setOf(2, 3), setOf(2).toggleGroup(airtime))
+        picked = picked.toggleGroup(airtime)
+        assertEquals(setOf(1), picked)
+    }
+
+    @Test
+    fun typeGroups_countOnceHoweverManyIdsAreIn() {
+        val groups = typeGroups(types)
+        assertEquals(0, countTypeChoices(emptySet(), groups))
+        assertEquals(1, countTypeChoices(setOf(2, 3), groups))
+        assertEquals(1, countTypeChoices(setOf(2), groups))
+        assertEquals(2, countTypeChoices(setOf(1, 2, 3), groups))
+        // Ids no group knows count one each.
+        assertEquals(2, countTypeChoices(setOf(8, 9), groups))
     }
 
     @Test
