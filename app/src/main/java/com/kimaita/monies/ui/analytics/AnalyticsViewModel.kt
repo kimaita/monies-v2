@@ -24,10 +24,15 @@ import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.services.PaceSummary
 import com.kimaita.monies.services.RhythmStats
+import com.kimaita.monies.services.SliceValue
 import com.kimaita.monies.services.StreakSummary
 import com.kimaita.monies.services.computePace
 import com.kimaita.monies.services.computeRhythm
+import com.kimaita.monies.services.categorySlices
 import com.kimaita.monies.services.computeStreaks
+import com.kimaita.monies.services.sliceFilter
+import com.kimaita.monies.services.toggleSlice
+import com.kimaita.monies.services.typeSlices
 import com.kimaita.monies.services.scopeLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +45,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -56,7 +62,6 @@ enum class SpendDirection { OUT, IN }
 enum class Breakdown { CATEGORY, TYPE }
 
 data class WeekdayBar(val label: String, val count: Int)
-data class SliceValue(val label: String, val value: Float)
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -93,7 +98,7 @@ class AnalyticsViewModel @Inject constructor(
     }
 
     fun selectSlice(label: String?) {
-        _selectedSlice.value = if (_selectedSlice.value == label) null else label
+        _selectedSlice.value = toggleSlice(_selectedSlice.value, label)
     }
 
     fun clearFilters() {
@@ -172,14 +177,15 @@ class AnalyticsViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, started, null)
 
-    val breakdown: StateFlow<List<SliceValue>?> =
-        combine(_breakdownMode, categorySpending, typeSpending) { mode, cat, type ->
-            if (cat == null || type == null) return@combine null
-            val chosen = if (mode == Breakdown.CATEGORY) cat else type
-            (chosen.ifEmpty { type })
-                .sortedByDescending { it.total }
-                .map { SliceValue(it.name, it.total.toFloat()) }
-        }.stateIn(viewModelScope, started, null)
+    val breakdown: StateFlow<List<SliceValue>?> = combine(
+        _breakdownMode, categorySpending, typeSpending,
+        repository.getCategories(), repository.getTransactionTypes(),
+    ) { mode, cat, type, categories, types ->
+        if (cat == null || type == null) return@combine null
+        val byType = typeSlices(type, types)
+        if (mode == Breakdown.TYPE) byType
+        else categorySlices(cat, categories.map { NamedRef(it.id, it.name) }).ifEmpty { byType }
+    }.stateIn(viewModelScope, started, null)
 
     /** Budgeted categories with this calendar month's spending (not affected by the filters). */
     val budgets: StateFlow<List<CategoryBudget>> =
@@ -188,31 +194,14 @@ class AnalyticsViewModel @Inject constructor(
     val filterOptions: StateFlow<FilterOptions?> =
         flow { emit(repository.getFilterOptions()) }.stateIn(viewModelScope, onceStarted, null)
 
-    private data class SpendKey(
-        val key: FilterKey,
-        val mode: Breakdown,
-        val slice: String?,
-        val opts: FilterOptions?
-    )
-
+    /** Top merchants, narrowed to the breakdown row that is selected, in Category and Type mode alike. */
     val topSubjects: StateFlow<List<MerchantSpend>?> =
-        combine(
-            key,
-            _breakdownMode,
-            _selectedSlice,
-            filterOptions
-        ) { fk, mode, slice, opts -> SpendKey(fk, mode, slice, opts) }
-            .flatMapLatest { k ->
-                val catId =
-                    if (k.mode == Breakdown.CATEGORY) k.opts?.categories?.firstOrNull { it.name == k.slice }?.id else null
-                val typeId =
-                    if (k.mode == Breakdown.TYPE) k.opts?.types?.firstOrNull { it.name == k.slice }?.id else null
+        combine(key, breakdown, _selectedSlice) { fk, rows, slice -> Triple(fk, rows, slice) }
+            .flatMapLatest { (k, rows, slice) ->
+                if (rows == null) return@flatMapLatest emptyFlow()
+                val (categories, types) = sliceFilter(rows, slice, k.categories, k.types)
                 repository.getTopSubjectsByAmount(
-                    k.key.start,
-                    k.key.end,
-                    k.key.subjects,
-                    catId?.let { listOf(it) } ?: k.key.categories,
-                    typeId?.let { listOf(it) } ?: k.key.types,
+                    k.start, k.end, k.subjects, categories, types,
                     natureFilter = false,
                     limit = 8,
                 ).map { list -> list.map { MerchantSpend(it.name, it.amount) } }

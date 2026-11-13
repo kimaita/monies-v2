@@ -1,6 +1,9 @@
 package com.kimaita.monies.services
 
+import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
+import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.export.NamedRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -71,5 +74,59 @@ class AnalyticsCalculationsTest {
     fun scopeLabel_singleLineNeedsNoLabel() {
         assertNull(scopeLabel(null, listOf(1 to "M-PESA")))
         assertNull(scopeLabel(null, emptyList()))
+    }
+
+    private val types = listOf(
+        TransactionType(id = 1, name = "send_money", isInc = false, displayName = "Send Money"),
+        TransactionType(id = 2, name = "airtime.own", isInc = false, displayName = "Airtime"),
+        TransactionType(id = 3, name = "airtime.other", isInc = false, displayName = "Airtime"),
+    )
+
+    @Test
+    fun typeSlices_useDisplayNamesAndMergeSharedOnes() {
+        val rows = listOf(
+            CategorySpending("send_money", 300.0, 0.0),
+            CategorySpending("airtime.own", 100.0, 0.0),
+            CategorySpending("airtime.other", 250.0, 0.0),
+        )
+        val slices = typeSlices(rows, types)
+        assertEquals(listOf("Airtime", "Send Money"), slices.map { it.label })
+        assertEquals(350f, slices[0].value, 0f)
+        assertEquals(listOf(2, 3), slices[0].typeIds)
+        assertEquals(listOf(1), slices[1].typeIds)
+        assertTrue(slices.all { it.categoryIds.isEmpty() })
+    }
+
+    @Test
+    fun categorySlices_carryTheCategoryId() {
+        val slices = categorySlices(
+            listOf(CategorySpending("Food", 50.0, 0.0), CategorySpending("Rent", 900.0, 0.0)),
+            listOf(NamedRef(7, "Food"), NamedRef(8, "Rent")),
+        )
+        assertEquals(listOf("Rent", "Food"), slices.map { it.label })
+        assertEquals(listOf(8), slices[0].categoryIds)
+        assertEquals(listOf(7), slices[1].categoryIds)
+    }
+
+    @Test
+    fun sliceFilter_narrowsInEitherModeAndClearsOnSecondTap() {
+        val byCategory = categorySlices(
+            listOf(CategorySpending("Food", 50.0, 0.0)), listOf(NamedRef(7, "Food")),
+        )
+        val byType = typeSlices(listOf(CategorySpending("send_money", 300.0, 0.0)), types)
+        val filters: List<Int>? = listOf(9)
+
+        // Tap a category row: categories narrow to it, types stay as they were.
+        var selected = toggleSlice(null, "Food")
+        assertEquals(listOf(7) to filters, sliceFilter(byCategory, selected, filters, filters))
+        // Tap a type row: the same, the other way round.
+        selected = toggleSlice(null, "Send Money")
+        assertEquals(filters to listOf(1), sliceFilter(byType, selected, filters, filters))
+        // Tap the same row again: back to the filters in force.
+        selected = toggleSlice(selected, "Send Money")
+        assertNull(selected)
+        assertEquals(filters to filters, sliceFilter(byType, selected, filters, filters))
+        // A selection whose row has gone narrows nothing.
+        assertEquals(null to null, sliceFilter(byType, "Food", null, null))
     }
 }

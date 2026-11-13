@@ -369,7 +369,7 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val mode by vm.breakdownMode.collectAsStateWithLifecycle()
     val breakdownOrNull by vm.breakdown.collectAsStateWithLifecycle()
     val topOrNull by vm.topSubjects.collectAsStateWithLifecycle()
-    val selected by vm.selectedSlice.collectAsStateWithLifecycle()
+    val selectedSlice by vm.selectedSlice.collectAsStateWithLifecycle()
     val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val extra = MoniesTheme.extra
     val budgets by vm.budgets.collectAsStateWithLifecycle()
@@ -382,6 +382,8 @@ private fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
         return
     }
     val slices = remember(breakdownRows) { breakdownRows.map { RankedRow(it.label, it.value.toDouble()) } }
+    // A selection whose row has gone (the period changed, say) is no longer a filter.
+    val selected = selectedSlice?.takeIf { s -> slices.any { it.label == s } }
     val merchants = remember(top) { top.map { RankedRow(it.name, it.amount) } }
     val sourceRows = remember(sources) { sources.map { RankedRow(it.name, it.amount) } }
 

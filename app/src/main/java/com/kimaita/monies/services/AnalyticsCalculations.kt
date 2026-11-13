@@ -2,8 +2,11 @@ package com.kimaita.monies.services
 
 
 import com.kimaita.monies.data.dao.dtos.ActivityCell
+import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
+import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.export.NamedRef
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -101,3 +104,44 @@ fun computePace(daily: List<DailyTotal>, today: LocalDate): PaceSummary {
 /** The line Analytics is showing: its name, or "All accounts"; null when there is a single line and nothing to tell apart. */
 fun scopeLabel(selected: Int?, lines: List<Pair<Int, String>>): String? =
     if (lines.size < 2) null else lines.firstOrNull { it.first == selected }?.second ?: "All accounts"
+
+/** A breakdown row: the label shown, its amount, and the ids tapping it narrows the entries to. */
+data class SliceValue(
+    val label: String,
+    val value: Float,
+    val categoryIds: List<Int> = emptyList(),
+    val typeIds: List<Int> = emptyList(),
+)
+
+fun categorySlices(rows: List<CategorySpending>, categories: List<NamedRef<Int>>): List<SliceValue> =
+    rows.map { r ->
+        SliceValue(r.name, r.total.toFloat(), categoryIds = categories.filter { it.name == r.name }.map { it.id })
+    }.sortedByDescending { it.value }
+
+/** Rows by type, under the type's display name. Types sharing a display name ("Airtime") become one row. */
+fun typeSlices(rows: List<CategorySpending>, types: List<TransactionType>): List<SliceValue> {
+    val byName = types.associateBy { it.name }
+    return rows.groupBy { byName[it.name]?.finalDisplayName ?: it.name }
+        .map { (label, group) ->
+            SliceValue(
+                label, group.sumOf { it.total }.toFloat(),
+                typeIds = group.mapNotNull { byName[it.name]?.id },
+            )
+        }
+        .sortedByDescending { it.value }
+}
+
+/** Tapping the selected row clears the selection. */
+fun toggleSlice(current: String?, tapped: String?): String? = if (current == tapped) null else tapped
+
+/**
+ * The (categories, types) the entries below the breakdown are narrowed to: the selected row's ids,
+ * else the filters already in force. A selection whose row has gone narrows nothing.
+ */
+fun sliceFilter(
+    slices: List<SliceValue>, selected: String?, categories: List<Int>?, types: List<Int>?,
+): Pair<List<Int>?, List<Int>?> {
+    val s = slices.firstOrNull { it.label == selected }
+    return (s?.categoryIds?.takeIf { it.isNotEmpty() } ?: categories) to
+            (s?.typeIds?.takeIf { it.isNotEmpty() } ?: types)
+}
