@@ -35,7 +35,7 @@ private const val SEARCH_FILTER = """
 private const val RECURRING_ROWS = """
         t.subject IS NOT NULL AND t.transactionTime >= :since
         AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
-        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        AND $ACCOUNT_FILTER
 """
 
 private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
@@ -43,12 +43,11 @@ private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
 // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
 // element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
 private const val TRANSACTIONS_FILTER = """
-        WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-        AND (:endDate IS NULL OR t.transactionTime <= :endDate)
+        WHERE $DATE_RANGE
         AND (:subjectId IS NULL OR t.subject = :subjectId)
-        AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-        AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        AND $CATEGORIES_IN
+        AND $TYPES_IN
+        AND $ACCOUNT_FILTER
         AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
 """
 
@@ -134,9 +133,9 @@ interface TransactionsDao : BaseDao<Transaction> {
     @androidx.room.Transaction
     @Query(
         """
-        SELECT * FROM transactions
-        WHERE (:account IS NULL OR accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
-        ORDER BY transactionTime DESC
+        SELECT * FROM transactions t
+        WHERE $ACCOUNT_FILTER
+        ORDER BY t.transactionTime DESC
         LIMIT :limit
     """
     )
@@ -154,12 +153,11 @@ interface TransactionsDao : BaseDao<Transaction> {
             SUM(CASE WHEN tt.isInc = 0 AND tt.isTransfer = 0 THEN 1 ELSE 0 END) AS expenseCount
         FROM transactions AS t
         JOIN transaction_types AS tt ON t.transactionType = tt.id
-        WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-        AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-        AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-        AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-        AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-        AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        WHERE $DATE_RANGE
+        AND $SUBJECTS_IN
+        AND $CATEGORIES_IN
+        AND $TYPES_IN
+        AND $ACCOUNT_FILTER
         """
     )
     fun getIncomeVsExpense(
@@ -191,12 +189,11 @@ interface TransactionsDao : BaseDao<Transaction> {
     @Query(
         """
     SELECT t.* FROM transactions t
-    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+    WHERE $DATE_RANGE
+      AND $SUBJECTS_IN
+      AND $CATEGORIES_IN
+      AND $TYPES_IN
+      AND $ACCOUNT_FILTER
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
       AND (:afterId IS NULL OR t.id > :afterId)
     """ + SEARCH_FILTER + """
@@ -222,12 +219,11 @@ interface TransactionsDao : BaseDao<Transaction> {
     @Query(
         """
     SELECT COUNT(*) FROM transactions t
-    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+    WHERE $DATE_RANGE
+      AND $SUBJECTS_IN
+      AND $CATEGORIES_IN
+      AND $TYPES_IN
+      AND $ACCOUNT_FILTER
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
     """ + SEARCH_FILTER
     )
@@ -252,12 +248,11 @@ interface TransactionsDao : BaseDao<Transaction> {
                SUM(t.cost) AS cost
         FROM transactions AS t
         JOIN transaction_types AS tt ON t.transactionType = tt.id
-        WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-          AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-          AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-          AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-          AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        WHERE $DATE_RANGE
+          AND $SUBJECTS_IN
+          AND $CATEGORIES_IN
+          AND $TYPES_IN
+          AND $ACCOUNT_FILTER
         GROUP BY bucket ORDER BY bucket ASC
     """
     )
@@ -284,14 +279,13 @@ interface TransactionsDao : BaseDao<Transaction> {
                COUNT(*) AS count
         FROM transactions AS t
         JOIN transaction_types AS tt ON t.transactionType = tt.id
-        WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-          AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-          AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-          AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-          AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+        WHERE $DATE_RANGE
+          AND $SUBJECTS_IN
+          AND $CATEGORIES_IN
+          AND $TYPES_IN
           AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
           AND tt.isTransfer = 0
-          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+          AND $ACCOUNT_FILTER
         GROUP BY weekday, slot
     """
     )
@@ -312,11 +306,10 @@ interface TransactionsDao : BaseDao<Transaction> {
         """
     WITH cells AS (
         SELECT strftime(:bucketFormat, transactionTime) AS bucket, transactionTime AS time, id, balance
-        FROM transactions
+        FROM transactions t
         WHERE balance IS NOT NULL
-          AND (:startDate IS NULL OR transactionTime >= :startDate)
-          AND (:endDate IS NULL OR transactionTime <= :endDate)
-          AND (:account IS NULL OR accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+          AND $DATE_RANGE
+          AND $ACCOUNT_FILTER
     )
     SELECT bucket, balance FROM (
         SELECT bucket, balance, MAX(time) AS time FROM (
@@ -340,12 +333,12 @@ interface TransactionsDao : BaseDao<Transaction> {
     FROM transactions t
     WHERE (:startDate IS NULL OR transactionTime >= :startDate)
       AND (:endDate IS NULL OR transactionTime <= :endDate)
-      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+      AND $SUBJECTS_IN
+      AND $CATEGORIES_IN
+      AND $TYPES_IN
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
       AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+      AND $ACCOUNT_FILTER
     GROUP BY weekday ORDER BY weekday
 """
     )
@@ -363,7 +356,7 @@ interface TransactionsDao : BaseDao<Transaction> {
       AND (:endDate IS NULL OR transactionTime <= :endDate)
       AND (:natureFilter IS NULL OR (SELECT isInc FROM transaction_types WHERE id = t.transactionType) = :natureFilter)
       AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+      AND $ACCOUNT_FILTER
     GROUP BY day ORDER BY day ASC
 """
     )
@@ -468,7 +461,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         FROM transactions t
         JOIN transaction_types tt ON tt.id = t.transactionType
         WHERE tt.name LIKE 'fuliza.%'
-          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+          AND $ACCOUNT_FILTER
         ORDER BY t.transactionTime DESC, t.id DESC
         LIMIT 200
     """
@@ -483,7 +476,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         FROM transactions t
         JOIN transaction_types tt ON tt.id = t.transactionType
         WHERE tt.name IN ('mshwari.loan', 'mshwari.loan_repayment')
-          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+          AND $ACCOUNT_FILTER
         ORDER BY t.transactionTime DESC, t.id DESC
         LIMIT 50
     """
@@ -525,8 +518,8 @@ interface TransactionsDao : BaseDao<Transaction> {
 
     @Query(
         """
-        SELECT MIN(transactionTime) FROM transactions
-        WHERE (:account IS NULL OR accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+        SELECT MIN(t.transactionTime) FROM transactions t
+        WHERE $ACCOUNT_FILTER
     """
     )
     suspend fun getEarliestTransactionTime(account: Int? = null): String?

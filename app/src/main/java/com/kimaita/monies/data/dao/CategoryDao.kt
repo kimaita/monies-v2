@@ -27,14 +27,13 @@ interface CategoryDao : BaseDao<Category> {
             FROM transactions AS t
             JOIN categories AS c ON t.transactionCategory = c.id
             JOIN transaction_types AS tt ON t.transactionType = tt.id
-            WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-              AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-              AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-              AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-              AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+            WHERE $DATE_RANGE
+              AND $SUBJECTS_IN
+              AND $CATEGORIES_IN
+              AND $TYPES_IN
               AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
               AND tt.isTransfer = 0
-              AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+              AND $ACCOUNT_FILTER
             GROUP BY c.name ORDER BY total DESC
         """
     )
@@ -67,7 +66,7 @@ interface CategoryDao : BaseDao<Category> {
         LEFT JOIN transactions t ON t.transactionCategory = c.id
             AND t.transactionTime >= :start AND t.transactionTime <= :end
             AND t.transactionType IN (SELECT id FROM transaction_types WHERE isInc = 0 AND isTransfer = 0)
-            AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+            AND $ACCOUNT_FILTER
         WHERE c.monthlyBudget IS NOT NULL
         GROUP BY c.id
         ORDER BY c.name
