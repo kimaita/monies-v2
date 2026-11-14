@@ -85,7 +85,7 @@ class SettingsViewModel @Inject constructor(
     fun reimport() {
         viewModelScope.launch {
             smsSyncer.exclusive { repository.clearForReimport() }
-            SmsSyncWorker.enqueueImport(context)
+            SmsSyncWorker.enqueueImport(context, firstRun = false)
         }
     }
 }

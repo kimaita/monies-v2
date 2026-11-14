@@ -42,16 +42,26 @@ class SmsSyncWorker @AssistedInject constructor(
         const val KEY_TOTAL = "total"
         const val KEY_YEAR = "year"
         const val KEY_FOREGROUND = "foreground"
+
+        /** Marks the import the first-run screen follows; incoming-SMS and re-import work does not carry it. */
+        const val TAG_FIRST_RUN = "first_run"
         private const val CHANNEL_ID = "sms_sync"
         private const val NOTIFICATION_ID = 4242
 
-        /** Starts the foreground import of the whole inbox (first run, or a re-import). */
-        fun enqueueImport(context: Context) {
+        /**
+         * Starts the foreground import of the whole inbox. [firstRun] tags it for the first-run screen and
+         * replaces whatever holds [WORK_NAME] (an incoming-SMS sync would otherwise keep it from starting);
+         * the import resumes from the sync cursor. A re-import keeps any work already running.
+         */
+        fun enqueueImport(context: Context, firstRun: Boolean) {
             val request = OneTimeWorkRequestBuilder<SmsSyncWorker>()
                 .setInputData(workDataOf(KEY_FOREGROUND to true))
+                .apply { if (firstRun) addTag(TAG_FIRST_RUN) }
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
-                WORK_NAME, ExistingWorkPolicy.KEEP, request
+                WORK_NAME,
+                if (firstRun) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                request,
             )
         }
     }
