@@ -81,6 +81,14 @@ class AnalyticsViewModel @Inject constructor(
     private val started = SharingStarted.WhileSubscribed(5_000)
     private val onceStarted = SharingStarted.Lazily
 
+    /** The calendar day every date range is built from; the screen refreshes it on each start. */
+    private val today = MutableStateFlow(LocalDate.now())
+
+    /** Called when the screen starts: a process kept alive past midnight moves to the new day. */
+    fun refreshToday() {
+        today.value = LocalDate.now()
+    }
+
     private val _filters = MutableStateFlow(TransactionFilters(timeFilter = TimeFilter.MONTH))
     val filters: StateFlow<TransactionFilters> = _filters.asStateFlow()
 
@@ -137,8 +145,8 @@ class AnalyticsViewModel @Inject constructor(
         val subjects: List<Long>?, val categories: List<Int>?, val types: List<Int>?,
     )
 
-    private fun keyOf(f: TransactionFilters): FilterKey {
-        val (s, e) = getDatesForFilter(f.timeFilter)
+    private fun keyOf(f: TransactionFilters, day: LocalDate): FilterKey {
+        val (s, e) = getDatesForFilter(f.timeFilter, day)
         return FilterKey(
             s, e, f.timeFilter,
             f.subjectFilters.ifEmpty { null },
@@ -147,14 +155,14 @@ class AnalyticsViewModel @Inject constructor(
         )
     }
 
-    private val key: Flow<FilterKey> = _filters.map(::keyOf).distinctUntilChanged()
+    private val key: Flow<FilterKey> = combine(_filters, today, ::keyOf).distinctUntilChanged()
 
     /**
      * [key] with the direction filter, for the three queries that use it. Built from the same
      * emission, so a change to both (Clear) restarts them once, not twice.
      */
     private val natureKey: Flow<Pair<FilterKey, Boolean?>> =
-        _filters.map { keyOf(it) to it.natureFilter }.distinctUntilChanged()
+        combine(_filters, today) { f, day -> keyOf(f, day) to f.natureFilter }.distinctUntilChanged()
 
     // ---------------- Cash flow tab: balance, flow, costs ----------------
     /** The two bar series of one query, labelled for the time filter the rows were queried for. */
@@ -184,8 +192,10 @@ class AnalyticsViewModel @Inject constructor(
 
     // The balance reads only the time range, so it restarts on that alone.
     val balanceTrend: StateFlow<List<BalancePoint>?> =
-        _filters.map { it.timeFilter }.distinctUntilChanged().flatMapLatest { tf ->
-            val (s, e) = getDatesForFilter(tf)
+        combine(_filters.map { it.timeFilter }.distinctUntilChanged(), today) { tf, day ->
+            val (s, e) = getDatesForFilter(tf, day)
+            Triple(tf, s, e)
+        }.distinctUntilChanged().flatMapLatest { (tf, s, e) ->
             repository.getBalanceTrend(balanceBucketFormatFor(tf), s, e)
                 .map { rows -> balancePoints(rows) }
         }.stateIn(viewModelScope, started, null)
@@ -297,20 +307,23 @@ class AnalyticsViewModel @Inject constructor(
 
     private class DailyRows(val window: DailyWindow, val days: List<DailyTotal>)
 
-    private val firstWindow = DailyWindow(LocalDate.now())
-    val streakWindow: ClosedRange<LocalDate> = firstWindow.streakStart..firstWindow.today
-
-    // A flow of windows, so the day can re-key it.
-    private val dailyWindow: Flow<DailyWindow> = flowOf(firstWindow)
+    private val dailyWindow: Flow<DailyWindow> = today.map { DailyWindow(it) }
 
     private val dailyTotals: StateFlow<DailyRows?> = dailyWindow.flatMapLatest { w ->
         repository.getDailyTotals(w.from, w.to, natureFilter = false).map { DailyRows(w, it) }
     }.stateIn(viewModelScope, started, null)
 
-    val streak: StateFlow<StreakSummary?> = dailyTotals
+    /** The streak and the days it covers, from one emission so the grid never mixes two days. */
+    class StreakState(val summary: StreakSummary, val window: ClosedRange<LocalDate>)
+
+    val streak: StateFlow<StreakState?> = dailyTotals
         .map { r ->
             r?.let {
-                computeStreaks(daysFrom(it.days, it.window.streakStart), it.window.streakStart, it.window.today)
+                val w = it.window
+                StreakState(
+                    computeStreaks(daysFrom(it.days, w.streakStart), w.streakStart, w.today),
+                    w.streakStart..w.today,
+                )
             }
         }
         .stateIn(viewModelScope, started, null)
@@ -321,9 +334,9 @@ class AnalyticsViewModel @Inject constructor(
 
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =
-        repository.selectedAccount.mapLatest {
+        combine(repository.selectedAccount, today) { _, day -> day }.mapLatest { day ->
             val first = repository.getEarliestTransactionDate()
-            first?.let { (ChronoUnit.DAYS.between(it.toLocalDate(), LocalDate.now()) + 1).toInt() }
+            first?.let { (ChronoUnit.DAYS.between(it.toLocalDate(), day) + 1).toInt() }
         }.stateIn(viewModelScope, onceStarted, null)
 
     /** Which line these numbers are for: its name, or "All accounts"; null when there is only one line. */
@@ -333,14 +346,14 @@ class AnalyticsViewModel @Inject constructor(
         }.stateIn(viewModelScope, started, null)
 
     val rhythm: StateFlow<RhythmStats?> =
-        combine(weekdayRaw, activityRaw, streak, dataSpanDays) { wk, act, st, spanDays ->
+        combine(weekdayRaw, activityRaw, streak, dataSpanDays, today) { wk, act, st, spanDays, day ->
             if (wk == null || act == null || st == null) return@combine null
             computeRhythm(
                 wk.counts,
                 act,
                 totalCount = wk.counts.sumOf { it.count },
-                rangeDays = daysForFilter(wk.time, spanDays),
-                longestNoSpend = st.longestNoSpend
+                rangeDays = daysForFilter(wk.time, spanDays, day),
+                longestNoSpend = st.summary.longestNoSpend
             )
         }.stateIn(viewModelScope, started, null)
 

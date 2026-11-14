@@ -58,6 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kimaita.monies.R
@@ -81,6 +83,7 @@ fun HomeScreen(
     val filters by viewModel.filters.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.refreshToday() }
     LaunchedEffect(viewModel) {
         viewModel.errorEvents.collect { snackbarHostState.showSnackbar(it) }
     }
@@ -196,11 +199,12 @@ fun HomeScreenContent(
                     )
                 }
             }
-            if (hide) Text(
-                HIDDEN,
+            val balance = uiState.mpesaBalance
+            if (hide || balance == null) Text(
+                if (hide) HIDDEN else DASH,
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.ExtraBold
-            ) else CurrencyText(uiState.mpesaBalance) {
+            ) else CurrencyText(balance) {
                 Text(
                     it,
                     style = MaterialTheme.typography.displayMedium,
@@ -246,8 +250,8 @@ fun HomeScreenContent(
             Spacer(Modifier.height(20.dp))
             InOutCard(
                 filter = filter,
-                income = uiState.incomeVsExpense.income,
-                expense = uiState.incomeVsExpense.expense,
+                income = uiState.incomeVsExpense?.income,
+                expense = uiState.incomeVsExpense?.expense,
                 onPeriod = onTimeFilterChange,
                 onAnalytics = onViewAnalytics,
             )
@@ -295,12 +299,14 @@ private fun ChangePill(change: Double?, filter: TimeFilter, onClick: () -> Unit)
 
 @Composable
 private fun InOutCard(
-    filter: TimeFilter, income: Double, expense: Double,
+    filter: TimeFilter, income: Double?, expense: Double?,
     onPeriod: (TimeFilter) -> Unit, onAnalytics: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
-    val net = income - expense
-    val inFraction = (income / (income + expense).coerceAtLeast(1.0)).toFloat()
+    val net = if (income != null && expense != null) income - expense else null
+    val inFraction = if (income != null && expense != null) {
+        (income / (income + expense).coerceAtLeast(1.0)).toFloat()
+    } else null
 
     Card(
         Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
@@ -321,7 +327,8 @@ private fun InOutCard(
                 IoColumn("OUT", expense, cs.onSurface, Modifier.weight(1f))
             }
             Spacer(Modifier.height(14.dp))
-            Box(
+            if (inFraction == null) Spacer(Modifier.fillMaxWidth().height(7.dp))
+            else Box(
                 Modifier
                     .fillMaxWidth()
                     .height(7.dp)
@@ -340,14 +347,13 @@ private fun InOutCard(
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text(
                     buildString {
-                        append("Net "); append(if (net >= 0) "+" else "−"); append(
-                        money(
-                            abs(net)
-                        )
-                    )
+                        append("Net ")
+                        if (net == null) append(DASH) else {
+                            append(if (net >= 0) "+" else "−"); append(money(abs(net)))
+                        }
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (net >= 0) cs.primary else cs.error,
+                    color = if (net == null) cs.onSurfaceVariant else if (net >= 0) cs.primary else cs.error,
                     fontWeight = FontWeight.SemiBold,
                 )
                 TextButton(
@@ -360,7 +366,7 @@ private fun InOutCard(
 }
 
 @Composable
-private fun IoColumn(label: String, value: Double, color: Color, modifier: Modifier = Modifier) =
+private fun IoColumn(label: String, value: Double?, color: Color, modifier: Modifier = Modifier) =
     Column(modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -380,7 +386,7 @@ private fun IoColumn(label: String, value: Double, color: Color, modifier: Modif
         }
         Spacer(Modifier.height(5.dp))
         Text(
-            money(value),
+            if (value == null) DASH else money(value),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = color,
@@ -596,7 +602,7 @@ private fun Pill(onClick: (() -> Unit)? = null, content: @Composable RowScope.()
 
 @Composable
 fun Transactions(
-    transactions: List<Transaction>, onViewAllClick: () -> Unit, onSubjectClick: (Long) -> Unit,
+    transactions: List<Transaction>?, onViewAllClick: () -> Unit, onSubjectClick: (Long) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -626,9 +632,9 @@ fun Transactions(
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(16.dp)
     ) {
-        if (transactions.isEmpty()) {
+        if (transactions == null || transactions.isEmpty()) {
             Text(
-                "No transactions yet",
+                if (transactions == null) DASH else "No transactions yet",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -676,6 +682,9 @@ private fun Muted(t: String) = Text(
 
 
 private const val HIDDEN = "••••"
+
+/** Shown where a stream failed and there is no earlier value; never a 0. */
+private const val DASH = "—"
 
 private fun money(v: Double): String = formatAmount(v)
 private fun periodWord(f: TimeFilter): String = when (f) {

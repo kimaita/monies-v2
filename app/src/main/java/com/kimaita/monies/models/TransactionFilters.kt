@@ -31,8 +31,7 @@ data class TransactionFilters(
 
     )
 
-fun getDatesForFilter(filter: TimeFilter): Pair<String?, String?> {
-    val today = LocalDate.now()
+fun getDatesForFilter(filter: TimeFilter, today: LocalDate = LocalDate.now()): Pair<String?, String?> {
     val formatter = DateTimeFormatter.ISO_LOCAL_DATE
     return when (filter) {
         TimeFilter.DAY -> today.format(formatter) to today.plusDays(1).format(formatter)
