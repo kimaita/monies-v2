@@ -6,6 +6,7 @@ import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.export.NamedRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,6 +14,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 class AnalyticsCalculationsTest {
 
@@ -296,5 +298,81 @@ class AnalyticsCalculationsTest {
         val rows = listOf(lb(7, "2026-11-01", 5f), lb(7, "2026-11-04", 9f))
         assertEquals(listOf(BalanceBucket("2026-11-01", 5f), BalanceBucket("2026-11-04", 9f)), sumLineBalances(rows))
         assertEquals(emptyList<BalanceBucket>(), sumLineBalances(emptyList()))
+    }
+
+    // ---- bucket labels and range lengths ----
+
+    @Test
+    fun bucketLabel_hourlyDayShowsTheHour() {
+        assertEquals("09h", bucketLabel("2026-03-14 09", TimeFilter.DAY))
+        // No space in the bucket: the whole key is kept.
+        assertEquals("2026-03-14h", bucketLabel("2026-03-14", TimeFilter.DAY))
+    }
+
+    @Test
+    fun bucketLabel_weekAndCustomShowTheDayOfMonth() {
+        assertEquals("14", bucketLabel("2026-03-14", TimeFilter.WEEK))
+        val custom = TimeFilter.CustomRange(LocalDateTime.of(2026, 3, 1, 0, 0), LocalDateTime.of(2026, 3, 20, 0, 0))
+        assertEquals("05", bucketLabel("2026-03-05", custom))
+    }
+
+    @Test
+    fun bucketLabel_monthShowsTheWeekNumber() {
+        assertEquals("Wk 11", bucketLabel("2026-11", TimeFilter.MONTH))
+    }
+
+    @Test
+    fun bucketLabel_longerRangesShowTheMonthName() {
+        assertEquals("Jan", bucketLabel("2026-01", TimeFilter.SIX_MONTHS))
+        assertEquals("Dec", bucketLabel("2025-12", TimeFilter.YTD))
+        assertEquals("Mar", bucketLabel("2026-03", TimeFilter.ALL))
+        // A month outside 1..12, or no number at all, leaves the bucket as it is.
+        assertEquals("2026-13", bucketLabel("2026-13", TimeFilter.ALL))
+        assertEquals("junk", bucketLabel("junk", TimeFilter.ALL))
+    }
+
+    @Test
+    fun daysForFilter_fixedRanges() {
+        assertEquals(1, daysForFilter(TimeFilter.DAY, null))
+        assertEquals(7, daysForFilter(TimeFilter.WEEK, null))
+        assertEquals(30, daysForFilter(TimeFilter.MONTH, null))
+        assertEquals(182, daysForFilter(TimeFilter.SIX_MONTHS, null))
+    }
+
+    @Test
+    fun daysForFilter_yearToDateIsTheDayOfTheYear() {
+        assertEquals(1, daysForFilter(TimeFilter.YTD, null, LocalDate.of(2026, 1, 1)))
+        assertEquals(74, daysForFilter(TimeFilter.YTD, null, LocalDate.of(2026, 3, 15)))
+        assertEquals(366, daysForFilter(TimeFilter.YTD, null, LocalDate.of(2024, 12, 31)))
+    }
+
+    @Test
+    fun daysForFilter_allUsesTheRecordedSpanOrOne() {
+        assertEquals(400, daysForFilter(TimeFilter.ALL, 400))
+        assertEquals(1, daysForFilter(TimeFilter.ALL, null))
+    }
+
+    @Test
+    fun daysForFilter_customRangeCountsBothEndsAndIsAtLeastOne() {
+        fun custom(from: LocalDateTime, to: LocalDateTime) = TimeFilter.CustomRange(from, to)
+        assertEquals(
+            10,
+            daysForFilter(custom(LocalDateTime.of(2026, 3, 1, 8, 0), LocalDateTime.of(2026, 3, 10, 23, 59)), null),
+        )
+        assertEquals(
+            1,
+            daysForFilter(custom(LocalDateTime.of(2026, 3, 1, 0, 0), LocalDateTime.of(2026, 3, 1, 23, 59)), null),
+        )
+        assertEquals(
+            1,
+            daysForFilter(custom(LocalDateTime.of(2026, 3, 5, 0, 0), LocalDateTime.of(2026, 3, 1, 0, 0)), null),
+        )
+    }
+
+    @Test
+    fun daysFrom_keepsTheDaysOnOrAfterTheStart() {
+        val days = listOf(day("2026-03-09", 1.0), day("2026-03-10", 2.0), day("2026-03-11", 3.0))
+        assertEquals(listOf("2026-03-10", "2026-03-11"), daysFrom(days, LocalDate.of(2026, 3, 10)).map { it.day })
+        assertEquals(days, daysFrom(days, LocalDate.of(2026, 3, 1)))
     }
 }

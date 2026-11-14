@@ -78,9 +78,8 @@ interface SubjectDao : BaseDao<Subject> {
     FROM transactions t
     JOIN transaction_types ON t.transactionType = transaction_types.id
     WHERE subject = :subjectId
-    AND (:startDate IS NULL OR t.transactionTime >= :startDate)
-    AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-    AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+    AND $DATE_RANGE
+    AND $ACCOUNT_FILTER
     """
     )
     fun getSubjectStats(
@@ -100,7 +99,7 @@ interface SubjectDao : BaseDao<Subject> {
         FROM subjects s
         JOIN transactions t ON t.subject = s.id
         WHERE s.mergedInto IS NULL AND s.name LIKE :like
-          AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+          AND $ACCOUNT_FILTER
         GROUP BY s.id ORDER BY count DESC, s.name LIMIT :limit
     """
     )
@@ -127,14 +126,13 @@ interface SubjectDao : BaseDao<Subject> {
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id
-    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+    WHERE $DATE_RANGE
+      AND $SUBJECTS_IN
+      AND $CATEGORIES_IN
+      AND $TYPES_IN
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+      AND $ACCOUNT_FILTER
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
     )
@@ -155,14 +153,13 @@ interface SubjectDao : BaseDao<Subject> {
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id
-    WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+    WHERE $DATE_RANGE
+      AND $SUBJECTS_IN
+      AND $CATEGORIES_IN
+      AND $TYPES_IN
       AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
       AND tt.isTransfer = 0
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+      AND $ACCOUNT_FILTER
     GROUP BY s.id ORDER BY count DESC LIMIT :limit
 """
     )
@@ -184,12 +181,11 @@ interface SubjectDao : BaseDao<Subject> {
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id
     WHERE tt.isInc = 1 AND tt.isTransfer = 0
-      AND (:startDate IS NULL OR t.transactionTime >= :startDate)
-      AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-      AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-      AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-      AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
-      AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+      AND $DATE_RANGE
+      AND $SUBJECTS_IN
+      AND $CATEGORIES_IN
+      AND $TYPES_IN
+      AND $ACCOUNT_FILTER
     GROUP BY s.id ORDER BY amount DESC LIMIT :limit
 """
     )

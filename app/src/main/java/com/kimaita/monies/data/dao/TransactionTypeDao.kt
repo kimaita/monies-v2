@@ -21,14 +21,13 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
             SELECT tt.name, SUM(t.amount) AS total, SUM(t.cost) AS totalCost
             FROM transactions AS t
             JOIN transaction_types AS tt ON t.transactionType = tt.id
-            WHERE (:startDate IS NULL OR t.transactionTime >= :startDate)
-              AND (:endDate IS NULL OR t.transactionTime <= :endDate)
-              AND (COALESCE(:subjectId, NULL) IS NULL OR t.subject IN (:subjectId))
-              AND (COALESCE(:categoryId, NULL) IS NULL OR t.transactionCategory IN (:categoryId))
-              AND (COALESCE(:transactionType, NULL) IS NULL OR t.transactionType IN (:transactionType))
+            WHERE $DATE_RANGE
+              AND $SUBJECTS_IN
+              AND $CATEGORIES_IN
+              AND $TYPES_IN
               AND (:natureFilter IS NULL OR tt.isInc = :natureFilter)
               AND tt.isTransfer = 0
-              AND (:account IS NULL OR t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = :account))
+              AND $ACCOUNT_FILTER
             GROUP BY tt.id
             ORDER BY total DESC
         """

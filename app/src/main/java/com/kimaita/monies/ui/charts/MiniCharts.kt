@@ -15,20 +15,19 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.kimaita.monies.models.analytics.CashFlowWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.ceil
 
 /** Non-interactive diverging in/out bars for the Overview bento. */
 @Composable
-fun MiniInOutBars(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
+fun MiniInOutBars(data: List<BarBucket>, modifier: Modifier = Modifier) {
     val colors = chartColors()
     val slice = remember(data) { data.takeLast(8) }
     Spacer(modifier.drawWithCache {
         if (slice.isEmpty()) return@drawWithCache onDrawBehind { }
-        val maxUp = slice.maxOf { it.inflow }
-        val maxDown = slice.maxOf { it.outflow }
+        val maxUp = slice.maxOf { it.up }
+        val maxDown = slice.maxOf { it.down }
         val total = (maxUp + maxDown).coerceAtLeast(1f)
         val y0 = size.height * maxUp / total
         val slot = size.width / slice.size
@@ -39,12 +38,12 @@ fun MiniInOutBars(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
         val downPath = Path()
         slice.forEachIndexed { i, w ->
             val l = i * slot + (slot - bw) / 2f
-            if (w.inflow > 0f) {
-                val tip = minOf(y0 - size.height * w.inflow / total, y0 - minH)
+            if (w.up > 0f) {
+                val tip = minOf(y0 - size.height * w.up / total, y0 - minH)
                 upPath.addBar(l, l + bw, y0, tip, minOf(radius, y0 - tip))
             }
-            if (w.outflow > 0f) {
-                val tip = maxOf(y0 + size.height * w.outflow / total, y0 + minH)
+            if (w.down > 0f) {
+                val tip = maxOf(y0 + size.height * w.down / total, y0 + minH)
                 downPath.addBar(l, l + bw, y0, tip, minOf(radius, tip - y0))
             }
         }

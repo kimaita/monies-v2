@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.scale
@@ -37,8 +36,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kimaita.monies.models.analytics.CashFlowWeek
-import com.kimaita.monies.models.analytics.CostMonth
 import com.kimaita.monies.ui.theme.MoniesTheme
 import com.kimaita.monies.ui.util.formatCompactAmount
 import kotlin.math.abs
@@ -55,9 +52,8 @@ internal fun Path.addBar(left: Float, right: Float, base: Float, tip: Float, rad
 
 /** Money in above the baseline, money out below it, and a dot at net. */
 @Composable
-fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
+fun CashFlowChart(buckets: List<BarBucket>, modifier: Modifier = Modifier) {
     val colors = chartColors()
-    val buckets = remember(data) { data.map { BarBucket(it.label, it.inflow, it.outflow, it.yearStart) } }
     val tooltip = remember {
         { b: BarBucket ->
             val net = b.up - b.down
@@ -74,9 +70,8 @@ fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun CostAnalyzerChart(data: List<CostMonth>, modifier: Modifier = Modifier) {
+fun CostAnalyzerChart(buckets: List<BarBucket>, modifier: Modifier = Modifier) {
     val gold = MoniesTheme.extra.gold
-    val buckets = remember(data) { data.map { BarBucket(it.month, it.fee, year = it.yearStart) } }
     val tooltip = remember {
         { b: BarBucket -> "${b.label} · fees ${formatCompactAmount(b.up.toDouble())}" }
     }
@@ -226,7 +221,7 @@ fun BarChart(
                             val yearY = bottom + 6.dp.toPx() + xLabels.maxOf { it.size.height }
                             val dividerColor = chart.axisLabel.copy(alpha = 0.4f)
 
-                            val tips = Array<TextLayoutResult>(n) { measurer.measure(tooltip(buckets[it]), tipStyle) }
+                            val tips = TooltipCache(measurer, tipStyle)
                             val pad = 8.dp.toPx()
                             val tipRadius = CornerRadius(8.dp.toPx())
 
@@ -258,12 +253,10 @@ fun BarChart(
                                 }
                                 for (k in yearShown) drawText(yearLabels[k], topLeft = Offset(yearX[k], yearY))
                                 if (sel in 0 until n) {
-                                    val t = tips[sel]
-                                    val w = t.size.width + pad * 2
-                                    val h = t.size.height + pad
-                                    val cx = (dotX[sel] - w / 2).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
-                                    drawRoundRect(chart.tooltipBg, Offset(cx, 0f), Size(w, h), tipRadius)
-                                    drawText(t, topLeft = Offset(cx + pad, pad / 2))
+                                    drawTooltip(
+                                        tips.layoutFor(sel) { tooltip(buckets[sel]) },
+                                        dotX[sel], chart.tooltipBg, pad, tipRadius,
+                                    )
                                 }
                             }
                         }

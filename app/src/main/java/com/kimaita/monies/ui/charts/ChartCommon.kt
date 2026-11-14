@@ -4,7 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
 import com.kimaita.monies.ui.theme.MoniesTheme
 import kotlin.math.ceil
@@ -86,4 +94,29 @@ fun chartColors(): ChartColors {
         tooltipBg = cs.surfaceContainerHighest,
         tooltipText = cs.onSurface,
     )
+}
+
+/**
+ * Lays out the tooltip of the scrubbed point only, and keeps that one layout until another point is
+ * scrubbed. Made in a chart's cache block, used in its draw block.
+ */
+internal class TooltipCache(private val measurer: TextMeasurer, private val style: TextStyle) {
+    private var index = -1
+    private var layout: TextLayoutResult? = null
+
+    fun layoutFor(i: Int, text: () -> String): TextLayoutResult {
+        layout?.let { if (index == i) return it }
+        return measurer.measure(text(), style).also { layout = it; index = i }
+    }
+}
+
+/** A rounded box across the top of the plot with [layout] in it, centred on [anchorX] and kept inside the plot. */
+internal fun DrawScope.drawTooltip(
+    layout: TextLayoutResult, anchorX: Float, background: Color, pad: Float, radius: CornerRadius,
+) {
+    val w = layout.size.width + pad * 2
+    val h = layout.size.height + pad
+    val x = (anchorX - w / 2).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
+    drawRoundRect(background, Offset(x, 0f), Size(w, h), radius)
+    drawText(layout, topLeft = Offset(x + pad, pad / 2))
 }

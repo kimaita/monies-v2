@@ -30,27 +30,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.SelectableDates
-import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,21 +53,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.R
 import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
 import com.kimaita.monies.services.TypeGroup
-import com.kimaita.monies.services.isSelected
-import com.kimaita.monies.ui.export.components.ProgressPanel
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.LinearProgressIndicator
 
 private val FORMAT_ORDER =
     listOf(ExportFormat.XLSX, ExportFormat.CSV, ExportFormat.PDF, ExportFormat.JSON)
@@ -306,238 +290,6 @@ private fun FormatCell(
     }
 }
 
-/* ---------------- filters ---------------- */
-
-@Composable
-private fun AddFiltersRow(activeCount: Int, onClick: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, cs.outlineVariant, RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(cs.primaryContainer),
-                Alignment.Center
-            ) {
-                Icon(
-                    painterResource(R.drawable.add_24),
-                    null,
-                    Modifier.size(18.dp),
-                    tint = cs.onPrimaryContainer
-                )
-            }
-            Column {
-                Text(
-                    if (activeCount > 0) "Filters · $activeCount" else "Add filters",
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    "Subject, type, category, direction",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = cs.onSurfaceVariant
-                )
-            }
-        }
-        Icon(painterResource(R.drawable.keyboard_arrow_right), null, tint = cs.onSurfaceVariant)
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FilterPanel(vm: ExportViewModel, onCollapse: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    val sel by vm.sel.collectAsStateWithLifecycle()
-    val options by vm.options.collectAsStateWithLifecycle()
-    val query by vm.subjectQuery.collectAsStateWithLifecycle()
-    val results by vm.subjectResults.collectAsStateWithLifecycle()
-
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, cs.outlineVariant, RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-            Text(
-                "Filters",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = vm::clearFilters) { Text("Clear all") }
-                IconButton(onClick = onCollapse) {
-                    Icon(
-                        painterResource(R.drawable.collapse),
-                        "Collapse"
-                    )
-                }
-            }
-        }
-
-        FilterLabel("Direction")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DirChip("All", sel.nature == null) { vm.setNature(null) }
-            DirChip("Money in", sel.nature == true) { vm.setNature(true) }
-            DirChip("Money out", sel.nature == false) { vm.setNature(false) }
-        }
-
-        if (sel.search.isNotBlank()) {
-            FilterLabel("Search")
-            InputChip(
-                selected = true,
-                onClick = { vm.setSearch("") },
-                label = { Text(sel.search, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                trailingIcon = {
-                    Icon(painterResource(R.drawable.close_small_24dp), null, Modifier.size(16.dp))
-                })
-        }
-
-        FilterLabel("Subject")
-        OutlinedTextField(
-            value = query, onValueChange = vm::setSubjectQuery, singleLine = true,
-            placeholder = { Text("Search subjects…") },
-            leadingIcon = { Icon(painterResource(R.drawable.search), null) },
-            modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions.Default,
-        )
-        if (sel.subjects.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            sel.subjects.forEach { ref ->
-                InputChip(
-                    selected = true,
-                    onClick = { vm.removeSubject(ref) },
-                    label = { Text(ref.name) },
-                    trailingIcon = {
-                        Icon(
-                            painterResource(R.drawable.close_small_24dp),
-                            null,
-                            Modifier.size(16.dp)
-                        )
-                    })
-            }
-        }
-        if (query.isNotBlank() && results.isNotEmpty()) FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(
-                8.dp
-            )
-        ) {
-            results.filter { r -> sel.subjects.none { it.id == r.id } }.take(10).forEach { ref ->
-                AssistChip(
-                    onClick = { vm.addSubject(ref) }, label = { Text(ref.name) },
-                    leadingIcon = {
-                        Icon(
-                            painterResource(R.drawable.add_24),
-                            null,
-                            Modifier.size(16.dp)
-                        )
-                    })
-            }
-        }
-
-        options?.categories?.takeIf { it.isNotEmpty() }?.let { cats ->
-            FilterLabel("Categories")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                cats.forEach { c ->
-                    FilterChip(
-                        selected = c.id in sel.categoryIds,
-                        onClick = { vm.toggleCategory(c.id) },
-                        label = { Text(c.name) })
-                }
-            }
-        }
-
-        options?.types?.takeIf { it.isNotEmpty() }?.let { types ->
-            FilterLabel("Type")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                types.forEach { t ->
-                    FilterChip(
-                        selected = t.isSelected(sel.typeIds),
-                        onClick = { vm.toggleType(t) },
-                        label = { Text(t.label) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DirChip(label: String, selected: Boolean, onClick: () -> Unit) =
-    FilterChip(selected = selected, onClick = onClick, label = { Text(label) })
-
-/** A compact date chip like Home's 1M / YTD ones; [description] is what TalkBack reads. */
-@Composable
-private fun BandChip(
-    text: String?,
-    description: String,
-    selected: Boolean,
-    icon: Boolean = false,
-    onClick: () -> Unit,
-) {
-    val calendar = @Composable {
-        Icon(painterResource(R.drawable.date_range), null, Modifier.size(FilterChipDefaults.IconSize))
-    }
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        modifier = Modifier.semantics { contentDescription = description },
-        leadingIcon = if (icon && text != null) calendar else null,
-        label = { if (text != null) Text(text, fontSize = 12.sp) else calendar() },
-    )
-}
-
-/* ---------------- date picker ---------------- */
-
-private fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-private fun Long.toUtcDate() = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DateRangeDialog(
-    start: LocalDate?,
-    end: LocalDate?,
-    today: LocalDate,
-    onDismiss: () -> Unit,
-    onPick: (LocalDate, LocalDate) -> Unit,
-) {
-    val lastDay = today.toUtcMillis()
-    val st = rememberDateRangePickerState(
-        initialSelectedStartDateMillis = start?.toUtcMillis(),
-        initialSelectedEndDateMillis = if (start != null) end?.toUtcMillis() else null,
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= lastDay
-        },
-    )
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                enabled = st.selectedStartDateMillis != null,
-                onClick = {
-                    st.selectedStartDateMillis?.let {
-                        val from = it.toUtcDate()
-                        onPick(from, st.selectedEndDateMillis?.toUtcDate() ?: from)
-                    }
-                },
-            ) { Text("OK") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    ) { DateRangePicker(st, showModeToggle = true) }
-}
-
 /* ---------------- helpers ---------------- */
 
 @Composable
@@ -546,15 +298,6 @@ private fun SectionLabel(t: String) =
         t.uppercase(),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-@Composable
-private fun FilterLabel(t: String) =
-    Text(
-        t.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
     )
 
 private fun scopeLine(
@@ -585,6 +328,7 @@ private fun openFile(context: Context, uri: Uri, mime: String) {
         shareFile(context, uri, mime)
     }
 }
+
 fun shareFile(context: Context, uri: Uri, mime: String) {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = mime
@@ -594,4 +338,38 @@ fun shareFile(context: Context, uri: Uri, mime: String) {
     context.startActivity(
         Intent.createChooser(send, "Share export").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     )
+}
+
+@Composable
+fun ProgressPanel(s: ExportState.InProgress, onCancel: () -> Unit) {
+    val fraction = s.total?.takeIf { it > 0 }?.let { (s.processed.toFloat() / it).coerceIn(0f, 1f) }
+    val animated by animateFloatAsState(fraction ?: 0f, tween(300), label = "progress")
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Exporting ${s.format.label}…", style = MaterialTheme.typography.titleSmall)
+            Text(
+                if (fraction != null) "${(animated * 100).toInt()}%"
+                else "${s.processed}",
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        if (fraction != null) LinearProgressIndicator({ animated }, Modifier.fillMaxWidth())
+        else LinearProgressIndicator(Modifier.fillMaxWidth())
+
+        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+            Text(
+                s.total?.let { "${s.processed} of $it" }?.plus(" • runs in background")
+                    ?: "Working… you can leave this screen",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onCancel) { Text("Cancel") }
+        }
+    }
 }

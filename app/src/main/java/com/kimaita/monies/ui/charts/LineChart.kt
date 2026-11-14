@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -29,7 +28,6 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -238,8 +236,7 @@ internal fun LineChartCanvas(
                 val first = series.firstOrNull()
                 val pointX = FloatArray(first?.xs?.size ?: 0) { px(first!!.xs[it]) }
                 val pointY = FloatArray(pointX.size) { scale.y(first!!.ys[it], top, bottom) }
-                val tips = if (tooltip == null) arrayOf<TextLayoutResult>()
-                else Array(pointX.size) { measurer.measure(tooltip(it), tipStyle) }
+                val tips = TooltipCache(measurer, tipStyle)
                 val pad = 8.dp.toPx()
                 val tipRadius = CornerRadius(8.dp.toPx())
                 val markerStroke = 1.dp.toPx()
@@ -264,7 +261,7 @@ internal fun LineChartCanvas(
                     }
 
                     val i = scrub
-                    if (i in tips.indices) {
+                    if (tooltip != null && i in pointX.indices) {
                         val x = pointX[i]
                         val y = pointY[i]
                         drawLine(
@@ -272,12 +269,7 @@ internal fun LineChartCanvas(
                         )
                         drawCircle(first!!.color, outerR, Offset(x, y))
                         drawCircle(pointColor, innerR, Offset(x, y))
-                        val t = tips[i]
-                        val w = t.size.width + pad * 2
-                        val h = t.size.height + pad
-                        val cx = (x - w / 2).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
-                        drawRoundRect(chart.tooltipBg, Offset(cx, 0f), Size(w, h), tipRadius)
-                        drawText(t, topLeft = Offset(cx + pad, pad / 2))
+                        drawTooltip(tips.layoutFor(i) { tooltip(i) }, x, chart.tooltipBg, pad, tipRadius)
                     }
                 }
             }

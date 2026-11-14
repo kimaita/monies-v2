@@ -13,6 +13,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,17 +34,20 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import com.kimaita.monies.data.DefaultTransactionsRepository
+import com.kimaita.monies.data.TransactionsRepository
+import com.kimaita.monies.models.ThemeMode
 import com.kimaita.monies.services.SmsContentObserver
 import com.kimaita.monies.services.SmsSyncer
 import com.kimaita.monies.ui.MainScaffold
 import com.kimaita.monies.ui.SmsSyncProgress
+import com.kimaita.monies.ui.StartupScreen
 import com.kimaita.monies.ui.onboarding.FirstRunImportScreen
 import com.kimaita.monies.ui.onboarding.OnboardingScreen
-import com.kimaita.monies.ui.permission.PermissionScreen
+import com.kimaita.monies.ui.onboarding.PermissionScreen
 import com.kimaita.monies.ui.rememberSmsImportProgress
+import com.kimaita.monies.ui.shouldStartFirstRunImport
+import com.kimaita.monies.ui.startupScreen
 import com.kimaita.monies.ui.theme.AppTheme
-import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.worker.SmsSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.awaitCancellation
@@ -52,7 +58,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var repository: DefaultTransactionsRepository
+    lateinit var repository: TransactionsRepository
 
     @Inject
     lateinit var smsSyncer: SmsSyncer
@@ -66,6 +72,7 @@ class MainActivity : ComponentActivity() {
             add(Manifest.permission.POST_NOTIFICATIONS)
     }.toTypedArray()
 
+    @OptIn(ExperimentalAnimationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -77,10 +84,11 @@ class MainActivity : ComponentActivity() {
                 var onboardingComplete by remember { mutableStateOf<Boolean?>(null) }
                 var hasRequiredPermissions by remember { mutableStateOf(checkPermissions()) }
 
-                // The theme is read first and the onboarding flag last, so the first real frame is themed.
+                // One read gives the theme and the onboarding flag together, so the first real frame is themed.
                 LaunchedEffect(Unit) {
-                    themeMode = repository.getThemeMode()
-                    onboardingComplete = repository.isOnboardingComplete()
+                    val startup = repository.startupState()
+                    themeMode = startup.theme
+                    onboardingComplete = startup.onboardingComplete
                     repository.themeMode.collect { themeMode = it }
                 }
 
@@ -134,38 +142,47 @@ class MainActivity : ComponentActivity() {
 
                     else -> {
                         val importProgress by rememberSmsImportProgress(applicationContext)
-                        var firstRun by remember { mutableStateOf<Boolean?>(null) }
+                        // "No cursor yet" only matters while no first-run work exists; it is re-read then,
+                        // never kept from before an import.
+                        val noImportWork = importProgress == SmsSyncProgress.Idle
+                        val firstRun by produceState<Boolean?>(null, noImportWork) {
+                            value = null
+                            value = repository.isFirstRun()
+                        }
+                        val screen = startupScreen(importProgress, firstRun)
 
-                        LaunchedEffect(Unit) {
-                            val first = repository.isFirstRun()
-                            firstRun = first
-                            if (first) SmsSyncWorker.enqueueImport(applicationContext) else smsSyncer.syncAll()
+                        // A sync on start waits out a running import, and the import is started only while no
+                        // first-run work exists.
+                        val startImport = shouldStartFirstRunImport(importProgress, firstRun)
+                        LaunchedEffect(startImport) {
+                            if (startImport) SmsSyncWorker.enqueueImport(applicationContext, firstRun = true)
+                        }
+                        LaunchedEffect(screen == StartupScreen.Blank) {
+                            if (screen == StartupScreen.App) smsSyncer.syncAll()
                         }
                         ObserveIncomingSms(smsContentObserver)
 
-                        val showImport = firstRun == true && importProgress !is SmsSyncProgress.Done
+                        // Everything the layers draw comes from the lambda argument, so the outgoing one keeps
+                        // its last progress while fading; the key keeps progress ticks from re-fading.
+                        updateTransition(screen, label = "import-handoff").Crossfade(
+                            contentKey = { it::class },
+                        ) { s ->
+                            when (s) {
+                                StartupScreen.Blank -> Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.surface)
+                                )
 
-                        Crossfade(targetState = showImport, label = "import-handoff") { importing ->
-                            when {
-                                firstRun == null ->
-                                    Box(
-                                        Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surface)
-                                    )
+                                is StartupScreen.Import -> FirstRunImportScreen(
+                                    processed = s.processed,
+                                    total = s.total,
+                                    year = s.year,
+                                    failed = s.failed,
+                                    onRetry = { SmsSyncWorker.enqueueImport(applicationContext, firstRun = true) },
+                                )
 
-                                importing -> {
-                                    val p = importProgress as? SmsSyncProgress.Running
-                                    FirstRunImportScreen(
-                                        processed = p?.processed ?: 0,
-                                        total = p?.total,
-                                        year = p?.year,
-                                        failed = importProgress is SmsSyncProgress.Failed,
-                                        onRetry = { SmsSyncWorker.enqueueImport(applicationContext) },
-                                    )
-                                }
-
-                                else -> MainScaffold()
+                                StartupScreen.App -> MainScaffold()
                             }
                         }
                     }

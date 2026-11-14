@@ -11,14 +11,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-
-enum class ThemeMode(val key: String) {
-    SYSTEM("system"), LIGHT("light"), DARK("dark");
-
-    companion object {
-        fun fromKey(key: String?) = entries.firstOrNull { it.key == key } ?: SYSTEM
-    }
-}
+import com.kimaita.monies.models.ThemeMode
 
 private val LightColors = lightColorScheme(
     primary = Emerald, onPrimary = Color.White,
