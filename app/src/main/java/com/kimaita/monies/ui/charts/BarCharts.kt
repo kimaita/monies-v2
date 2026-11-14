@@ -36,8 +36,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kimaita.monies.models.analytics.CashFlowWeek
-import com.kimaita.monies.models.analytics.CostMonth
 import com.kimaita.monies.ui.theme.MoniesTheme
 import com.kimaita.monies.ui.util.formatCompactAmount
 import kotlin.math.abs
@@ -54,9 +52,8 @@ internal fun Path.addBar(left: Float, right: Float, base: Float, tip: Float, rad
 
 /** Money in above the baseline, money out below it, and a dot at net. */
 @Composable
-fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
+fun CashFlowChart(buckets: List<BarBucket>, modifier: Modifier = Modifier) {
     val colors = chartColors()
-    val buckets = remember(data) { data.map { BarBucket(it.label, it.inflow, it.outflow, it.yearStart) } }
     val tooltip = remember {
         { b: BarBucket ->
             val net = b.up - b.down
@@ -73,9 +70,8 @@ fun CashFlowChart(data: List<CashFlowWeek>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun CostAnalyzerChart(data: List<CostMonth>, modifier: Modifier = Modifier) {
+fun CostAnalyzerChart(buckets: List<BarBucket>, modifier: Modifier = Modifier) {
     val gold = MoniesTheme.extra.gold
-    val buckets = remember(data) { data.map { BarBucket(it.month, it.fee, year = it.yearStart) } }
     val tooltip = remember {
         { b: BarBucket -> "${b.label} · fees ${formatCompactAmount(b.up.toDouble())}" }
     }

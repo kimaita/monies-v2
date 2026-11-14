@@ -9,17 +9,13 @@ import com.kimaita.monies.data.dao.dtos.CashFlowBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.CategorySpending
 import com.kimaita.monies.data.dao.dtos.IncExp
-import com.kimaita.monies.data.dao.dtos.SourceAmount
 import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.models.StatsFilter
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.analytics.BalancePoint
-import com.kimaita.monies.models.analytics.CashFlowWeek
-import com.kimaita.monies.models.analytics.CostMonth
 import com.kimaita.monies.models.analytics.HeatRow
-import com.kimaita.monies.models.analytics.MerchantSpend
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
@@ -46,6 +42,8 @@ import com.kimaita.monies.services.typeSlices
 import com.kimaita.monies.services.scopeLabel
 import com.kimaita.monies.services.balancePoints
 import com.kimaita.monies.services.yearStarts
+import com.kimaita.monies.ui.charts.BarBucket
+import com.kimaita.monies.ui.charts.RankedRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -167,7 +165,7 @@ class AnalyticsViewModel @Inject constructor(
 
     // ---------------- Cash flow tab: balance, flow, costs ----------------
     /** The two bar series of one query, labelled for the time filter the rows were queried for. */
-    private class CashFlowRows(val flow: List<CashFlowWeek>, val costs: List<CostMonth>)
+    private class CashFlowRows(val flow: List<BarBucket>, val costs: List<BarBucket>)
 
     private val cashFlowRows: StateFlow<CashFlowRows?> = key.flatMapLatest { k ->
         repository.getCashFlow(bucketFormatFor(k.time), k.stats)
@@ -176,19 +174,19 @@ class AnalyticsViewModel @Inject constructor(
                 val labels = rows.map { bucketLabel(it.bucket, k.time) }
                 CashFlowRows(
                     rows.mapIndexed { i, r ->
-                        CashFlowWeek(labels[i], r.income.toFloat(), r.expense.toFloat(), years[i])
+                        BarBucket(labels[i], r.income.toFloat(), r.expense.toFloat(), years[i])
                     },
                     rows.mapIndexed { i, r ->
-                        CostMonth(labels[i], r.expense.toFloat(), r.cost.toFloat(), years[i])
+                        BarBucket(labels[i], r.cost.toFloat(), year = years[i])
                     },
                 )
             }
     }.stateIn(viewModelScope, started, null)
 
-    val cashFlow: StateFlow<List<CashFlowWeek>?> =
+    val cashFlow: StateFlow<List<BarBucket>?> =
         cashFlowRows.map { it?.flow }.stateIn(viewModelScope, started, null)
 
-    val costs: StateFlow<List<CostMonth>?> =
+    val costs: StateFlow<List<BarBucket>?> =
         cashFlowRows.map { it?.costs }.stateIn(viewModelScope, started, null)
 
     // The balance reads only the time range, so it restarts on that alone.
@@ -236,7 +234,7 @@ class AnalyticsViewModel @Inject constructor(
         repository.getFilterOptions().stateIn(viewModelScope, started, null)
 
     /** Top merchants, narrowed to the breakdown row that is selected, in Category and Type mode alike. */
-    val topSubjects: StateFlow<List<MerchantSpend>?> =
+    val topSubjects: StateFlow<List<RankedRow>?> =
         combine(key, breakdown, _selectedSlice) { fk, rows, slice -> Triple(fk, rows, slice) }
             .flatMapLatest { (k, rows, slice) ->
                 if (rows == null) return@flatMapLatest emptyFlow()
@@ -245,16 +243,16 @@ class AnalyticsViewModel @Inject constructor(
                     k.stats.copy(categories = categories, types = types),
                     natureFilter = false,
                     limit = 8,
-                ).map { list -> list.map { MerchantSpend(it.name, it.amount) } }
+                ).map { list -> list.map { RankedRow(it.name, it.amount) } }
             }.stateIn(viewModelScope, started, null)
 
     /** The Overview "Top out" line: the biggest merchant for the filters, not affected by the selected slice. */
-    val topMerchant: StateFlow<List<MerchantSpend>?> = key.flatMapLatest { k ->
-        repository.getTopSubjectsByAmount(k.stats, natureFilter = false, limit = 1).map { list -> list.map { MerchantSpend(it.name, it.amount) } }
+    val topMerchant: StateFlow<List<RankedRow>?> = key.flatMapLatest { k ->
+        repository.getTopSubjectsByAmount(k.stats, natureFilter = false, limit = 1).map { list -> list.map { RankedRow(it.name, it.amount) } }
     }.stateIn(viewModelScope, started, null)
 
-    val incomeSources: StateFlow<List<SourceAmount>?> = key.flatMapLatest { k ->
-        repository.getIncomeBySource(k.stats, 8)
+    val incomeSources: StateFlow<List<RankedRow>?> = key.flatMapLatest { k ->
+        repository.getIncomeBySource(k.stats, 8).map { list -> list.map { RankedRow(it.name, it.amount) } }
     }.stateIn(viewModelScope, started, null)
 
     // ---------------- Activity tab ----------------

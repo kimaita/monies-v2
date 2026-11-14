@@ -38,7 +38,6 @@ import com.kimaita.monies.services.feeShare
 import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.ui.charts.*
-import com.kimaita.monies.ui.components.HighlightsFilter
 import com.kimaita.monies.ui.components.Segmented
 import com.kimaita.monies.ui.theme.MoniesTheme
 import com.kimaita.monies.ui.util.dayMonthFmt
@@ -195,8 +194,8 @@ private fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TopLine("Top in", sources != null, sources?.firstOrNull()?.let { it.name to it.amount })
-                TopLine("Top out", top != null, top?.firstOrNull()?.let { it.name to it.amount })
+                TopLine("Top in", sources != null, sources?.firstOrNull()?.let { it.label to it.amount })
+                TopLine("Top out", top != null, top?.firstOrNull()?.let { it.label to it.amount })
             }
         }
 
@@ -351,7 +350,6 @@ private fun SpendingOut(vm: AnalyticsViewModel, listState: LazyListState) {
     val slices = remember(breakdownRows) { breakdownRows?.map { RankedRow(it.label, it.value.toDouble()) } }
     // A selection whose row has gone (the period changed, say) is no longer a filter.
     val selected = slices?.let { rows -> selectedSlice?.takeIf { s -> rows.any { it.label == s } } }
-    val merchants = remember(top) { top?.map { RankedRow(it.name, it.amount) } }
 
     TabList(listState) {
         item(key = "direction") { DirectionToggle(SpendDirection.OUT, vm::setDirection) }
@@ -391,8 +389,8 @@ private fun SpendingOut(vm: AnalyticsViewModel, listState: LazyListState) {
                     )
                     Spacer(Modifier.height(8.dp))
                 }
-                if (merchants == null) EmptyHint(LOADING)
-                else if (merchants.isEmpty()) EmptyHint() else RankedBars(merchants, extra.outflow)
+                if (top == null) EmptyHint(LOADING)
+                else if (top.isEmpty()) EmptyHint() else RankedBars(top, extra.outflow)
             }
         }
     }
@@ -402,14 +400,13 @@ private fun SpendingOut(vm: AnalyticsViewModel, listState: LazyListState) {
 private fun SpendingIn(vm: AnalyticsViewModel, listState: LazyListState) {
     val sourcesOrNull by vm.incomeSources.collectAsStateWithLifecycle()
     val sources = sourcesOrNull
-    val sourceRows = remember(sources) { sources?.map { RankedRow(it.name, it.amount) } }
 
     TabList(listState) {
         item(key = "direction") { DirectionToggle(SpendDirection.IN, vm::setDirection) }
         item(key = "sources") {
             SectionCard("Income sources") {
-                if (sourceRows == null) EmptyHint(LOADING)
-                else if (sourceRows.isEmpty()) EmptyHint() else RankedBars(sourceRows, MoniesTheme.extra.inflow)
+                if (sources == null) EmptyHint(LOADING)
+                else if (sources.isEmpty()) EmptyHint() else RankedBars(sources, MoniesTheme.extra.inflow)
             }
         }
     }

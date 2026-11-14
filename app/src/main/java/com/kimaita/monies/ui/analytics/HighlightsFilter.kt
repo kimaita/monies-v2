@@ -1,4 +1,4 @@
-package com.kimaita.monies.ui.components
+package com.kimaita.monies.ui.analytics
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
