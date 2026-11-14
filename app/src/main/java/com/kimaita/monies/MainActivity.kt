@@ -43,7 +43,7 @@ import com.kimaita.monies.ui.SmsSyncProgress
 import com.kimaita.monies.ui.StartupScreen
 import com.kimaita.monies.ui.onboarding.FirstRunImportScreen
 import com.kimaita.monies.ui.onboarding.OnboardingScreen
-import com.kimaita.monies.ui.permission.PermissionScreen
+import com.kimaita.monies.ui.onboarding.PermissionScreen
 import com.kimaita.monies.ui.rememberSmsImportProgress
 import com.kimaita.monies.ui.shouldStartFirstRunImport
 import com.kimaita.monies.ui.startupScreen
