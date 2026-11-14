@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.scale
@@ -226,7 +225,7 @@ fun BarChart(
                             val yearY = bottom + 6.dp.toPx() + xLabels.maxOf { it.size.height }
                             val dividerColor = chart.axisLabel.copy(alpha = 0.4f)
 
-                            val tips = Array<TextLayoutResult>(n) { measurer.measure(tooltip(buckets[it]), tipStyle) }
+                            val tips = TooltipCache(measurer, tipStyle)
                             val pad = 8.dp.toPx()
                             val tipRadius = CornerRadius(8.dp.toPx())
 
@@ -258,12 +257,10 @@ fun BarChart(
                                 }
                                 for (k in yearShown) drawText(yearLabels[k], topLeft = Offset(yearX[k], yearY))
                                 if (sel in 0 until n) {
-                                    val t = tips[sel]
-                                    val w = t.size.width + pad * 2
-                                    val h = t.size.height + pad
-                                    val cx = (dotX[sel] - w / 2).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
-                                    drawRoundRect(chart.tooltipBg, Offset(cx, 0f), Size(w, h), tipRadius)
-                                    drawText(t, topLeft = Offset(cx + pad, pad / 2))
+                                    drawTooltip(
+                                        tips.layoutFor(sel) { tooltip(buckets[sel]) },
+                                        dotX[sel], chart.tooltipBg, pad, tipRadius,
+                                    )
                                 }
                             }
                         }

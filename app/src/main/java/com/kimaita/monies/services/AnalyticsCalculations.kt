@@ -8,11 +8,14 @@ import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.DailyTotal
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.analytics.BalancePoint
+import com.kimaita.monies.models.analytics.HeatRow
 import com.kimaita.monies.models.export.NamedRef
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -256,4 +259,69 @@ fun sumLineBalances(rows: List<LineBalanceBucket>): List<BalanceBucket> {
         byBucket.getValue(b).forEach { current[it.lineId] = it.balance.toDouble() }
         BalanceBucket(b, current.values.sum().toFloat())
     }
+}
+
+data class WeekdayBar(val label: String, val count: Int)
+
+/** The days of [daily] on or after [start]; one query over a wide window serves several shorter ones. */
+fun daysFrom(daily: List<DailyTotal>, start: LocalDate): List<DailyTotal> {
+    val from = start.toString()
+    return daily.filter { it.day >= from }
+}
+
+fun bucketFormatFor(tf: TimeFilter): String = when (tf) {
+    TimeFilter.DAY -> "%Y-%m-%d %H"
+    TimeFilter.WEEK -> "%Y-%m-%d"
+    TimeFilter.MONTH -> "%Y-%W"
+    TimeFilter.SIX_MONTHS, TimeFilter.YTD, TimeFilter.ALL -> "%Y-%m"
+    is TimeFilter.CustomRange -> "%Y-%m-%d"
+}
+
+/** Balance points are daily, or hourly for the short ranges. */
+fun balanceBucketFormatFor(tf: TimeFilter): String = when (tf) {
+    TimeFilter.DAY, TimeFilter.WEEK -> "%Y-%m-%d %H"
+    else -> "%Y-%m-%d"
+}
+
+private val monthAbbrev =
+    arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+fun bucketLabel(bucket: String, tf: TimeFilter): String = when (tf) {
+    TimeFilter.DAY -> bucket.substringAfter(" ", bucket) + "h"
+    TimeFilter.WEEK, is TimeFilter.CustomRange -> bucket.substringAfterLast("-")
+    TimeFilter.MONTH -> "Wk " + bucket.substringAfterLast("-")
+    else -> bucket.substringAfterLast("-").toIntOrNull()
+        ?.let { monthAbbrev.getOrElse(it - 1) { bucket } } ?: bucket
+}
+
+fun daysForFilter(tf: TimeFilter, spanDays: Int?, today: LocalDate = LocalDate.now()): Int = when (tf) {
+    TimeFilter.DAY -> 1
+    TimeFilter.WEEK -> 7
+    TimeFilter.MONTH -> 30
+    TimeFilter.SIX_MONTHS -> 182
+    TimeFilter.YTD -> today.dayOfYear
+    TimeFilter.ALL -> spanDays ?: 1
+    is TimeFilter.CustomRange ->
+        (ChronoUnit.DAYS.between(
+            tf.startDate.toLocalDate(),
+            tf.endDate.toLocalDate()
+        ) + 1).toInt()
+            .coerceAtLeast(1)
+}
+
+private val weekdayOrder = listOf(1, 2, 3, 4, 5, 6, 0)
+private val weekdayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+fun toHeatRows(cells: List<ActivityCell>): List<HeatRow> {
+    val map = cells.associate { (it.weekday to it.slot) to it.count }
+    return weekdayOrder.mapIndexed { i, wd ->
+        HeatRow(
+            weekdayNames[i],
+            (0..3).map { slot -> map[wd to slot] ?: 0 })
+    }
+}
+
+fun toWeekdayBars(counts: List<WeekdayCount>): List<WeekdayBar> {
+    val map = counts.associate { it.weekday to it.count }
+    return weekdayOrder.mapIndexed { i, wd -> WeekdayBar(weekdayNames[i], map[wd] ?: 0) }
 }
