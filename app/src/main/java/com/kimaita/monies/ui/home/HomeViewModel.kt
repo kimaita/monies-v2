@@ -7,6 +7,7 @@ import com.kimaita.monies.data.dao.dtos.AccountBalance
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.models.OtherBalances
 import com.kimaita.monies.models.Provider
+import com.kimaita.monies.models.StatsFilter
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.getDatesForFilter
@@ -116,11 +117,11 @@ class HomeViewModel @Inject constructor(
     private val periodData: Flow<PeriodData> = dateRange.flatMapLatest { (start, end) ->
         val prev = previousPeriod(start, end)
         val previousIncExp: Flow<IncExp?> =
-            if (prev != null) repository.getIncomeVsExpense(prev.first, prev.second).guarded()
+            if (prev != null) repository.getIncomeVsExpense(StatsFilter(prev.first, prev.second)).guarded()
             else flowOf(null)
 
         combine(
-            repository.getIncomeVsExpense(start, end).guarded(),
+            repository.getIncomeVsExpense(StatsFilter(start, end)).guarded(),
             previousIncExp,
         ) { incExp, prevIncExp ->
             PeriodData(incExp, prevIncExp)

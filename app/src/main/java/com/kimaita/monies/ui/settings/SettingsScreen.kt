@@ -47,7 +47,7 @@ import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.ui.components.CurrencyText
 import com.kimaita.monies.ui.components.TextDialog
 import com.kimaita.monies.ui.navigateSingleTop
-import com.kimaita.monies.ui.theme.ThemeMode
+import com.kimaita.monies.models.ThemeMode
 import com.kimaita.monies.ui.util.copyToClipboard
 import com.kimaita.monies.ui.util.formatKes
 import java.time.Instant

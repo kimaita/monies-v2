@@ -5,7 +5,7 @@ import com.kimaita.monies.data.dao.dtos.LineSummary
 import com.kimaita.monies.data.dao.dtos.accountLines
 import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.models.applyToAllOfSubject
-import com.kimaita.monies.ui.theme.ThemeMode
+import com.kimaita.monies.models.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

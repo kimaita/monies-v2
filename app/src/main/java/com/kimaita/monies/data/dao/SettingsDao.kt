@@ -14,6 +14,9 @@ interface SettingsDao {
     @Query("SELECT value FROM settings WHERE `key` = :key")
     suspend fun getSetting(key: String): String?
 
+    @Query("SELECT * FROM settings WHERE `key` IN (:keys)")
+    suspend fun getSettings(keys: List<String>): List<Setting>
+
     @Query("SELECT value FROM settings WHERE `key` = :key")
     fun observeSetting(key: String): Flow<String?>
 

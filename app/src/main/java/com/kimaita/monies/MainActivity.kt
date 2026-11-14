@@ -34,7 +34,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import com.kimaita.monies.data.DefaultTransactionsRepository
+import com.kimaita.monies.data.TransactionsRepository
+import com.kimaita.monies.models.ThemeMode
 import com.kimaita.monies.services.SmsContentObserver
 import com.kimaita.monies.services.SmsSyncer
 import com.kimaita.monies.ui.MainScaffold
@@ -47,7 +48,6 @@ import com.kimaita.monies.ui.rememberSmsImportProgress
 import com.kimaita.monies.ui.shouldStartFirstRunImport
 import com.kimaita.monies.ui.startupScreen
 import com.kimaita.monies.ui.theme.AppTheme
-import com.kimaita.monies.ui.theme.ThemeMode
 import com.kimaita.monies.worker.SmsSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.awaitCancellation
@@ -58,7 +58,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var repository: DefaultTransactionsRepository
+    lateinit var repository: TransactionsRepository
 
     @Inject
     lateinit var smsSyncer: SmsSyncer
@@ -84,10 +84,11 @@ class MainActivity : ComponentActivity() {
                 var onboardingComplete by remember { mutableStateOf<Boolean?>(null) }
                 var hasRequiredPermissions by remember { mutableStateOf(checkPermissions()) }
 
-                // The theme is read first and the onboarding flag last, so the first real frame is themed.
+                // One read gives the theme and the onboarding flag together, so the first real frame is themed.
                 LaunchedEffect(Unit) {
-                    themeMode = repository.getThemeMode()
-                    onboardingComplete = repository.isOnboardingComplete()
+                    val startup = repository.startupState()
+                    themeMode = startup.theme
+                    onboardingComplete = startup.onboardingComplete
                     repository.themeMode.collect { themeMode = it }
                 }
 

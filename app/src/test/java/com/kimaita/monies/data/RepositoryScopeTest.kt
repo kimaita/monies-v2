@@ -11,5 +11,5 @@ class RepositoryScopeTest {
      */
     @Test
     fun repositoryIsSingleton() =
-        assertTrue(DefaultTransactionsRepository::class.java.isAnnotationPresent(Singleton::class.java))
+        assertTrue(TransactionsRepository::class.java.isAnnotationPresent(Singleton::class.java))
 }

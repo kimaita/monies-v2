@@ -12,7 +12,7 @@ import com.kimaita.monies.data.database.models.UnparsedMessage
 import com.kimaita.monies.models.CategoryApplyMode
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.services.SmsSyncer
-import com.kimaita.monies.ui.theme.ThemeMode
+import com.kimaita.monies.models.ThemeMode
 import com.kimaita.monies.worker.SmsSyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
