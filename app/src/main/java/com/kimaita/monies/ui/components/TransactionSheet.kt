@@ -3,25 +3,28 @@ package com.kimaita.monies.ui.components
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.style.TextOverflow
+import com.kimaita.monies.ui.theme.MoniesTheme
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.IconButton
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.models.applyToAllOfSubject
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,14 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.kimaita.monies.R
 import com.kimaita.monies.models.Category
 import com.kimaita.monies.models.Subject
@@ -112,7 +112,7 @@ fun TransactionBottomSheet(
     }
 }
 
-private val sheetDateFmt = DateTimeFormatter.ofPattern("E MMM dd yyyy 'at' h:mma", Locale.ENGLISH)
+private val sheetDateFmt = DateTimeFormatter.ofPattern("EEE d MMM, h:mm a", Locale.ENGLISH)
 
 @Composable
 fun TransactionContent(
@@ -122,172 +122,169 @@ fun TransactionContent(
     onSubjectClick: () -> Unit,
 ) {
     val context = LocalContext.current
-
+    val subject = transaction.subject
+    val typeLabel = transaction.type.displayName ?: transaction.type.name
+    val subjectName = subject?.name?.takeIf { it.isNotBlank() }?.toTitleCase()
+    val initial = (subjectName ?: typeLabel).firstOrNull()?.uppercase() ?: "?"
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(bottom = 28.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = transaction.type.displayName ?: transaction.type.name,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            CurrencyText(transaction.amount) { text ->
-                Text(
-                    text,
-                    style = MaterialTheme.typography.displayMedium,
-                    maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(maxFontSize = MaterialTheme.typography.displayMedium.fontSize)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            transaction.transactionTime?.format(sheetDateFmt)?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            InitialAvatar(initial)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(typeLabel, style = MaterialTheme.typography.titleSmall)
+                transaction.transactionTime?.format(sheetDateFmt)?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = muted)
+                }
             }
         }
 
-        EditableCategoryChip(
-            currentCategory = transaction.category?.name ?: "Assign Category",
-            categories = categories,
-            onCategorySelected = onCategoryChange
-        )
+        CurrencyText(transaction.amount, isInc = transaction.isInc) { text ->
+            Text(
+                text,
+                modifier = Modifier.padding(top = 10.dp, bottom = 18.dp),
+                style = MaterialTheme.typography.displaySmall,
+                color = if (transaction.isInc) MoniesTheme.extra.positive else MoniesTheme.extra.negative,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(maxFontSize = MaterialTheme.typography.displaySmall.fontSize)
+            )
+        }
 
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            border = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onSubjectClick() }) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        DetailRow("Category") {
+            CategoryButton(transaction.category?.name, categories, onCategoryChange)
+        }
+        val cost = transaction.cost
+        if (cost != null && cost > 0) {
+            DetailRow("Fee") { MoneyValue(cost) }
+            DetailRow("Total") { MoneyValue(transaction.total) }
+        }
+        DetailRow("Code") {
+            Text(transaction.code, style = MaterialTheme.typography.labelLarge.copy(fontFamily = MaterialTheme.typography.labelMedium.fontFamily))
+            CopyIcon("Copy transaction code") { copyToClipboard(context, "Transaction ID", transaction.code) }
+        }
+
+        if (subject != null) {
+            val number = subject.number?.takeIf { it.isNotBlank() }
             Row(
                 modifier = Modifier
-                    .padding(8.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .clickable(onClick = onSubjectClick)
+                    .padding(vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        modifier = Modifier.size(36.dp),
-                        painter = painterResource(R.drawable.outline_account_circle_24),
-                        contentDescription = null,
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-                val number = transaction.subject?.number
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    val name = transaction.subject?.name?.uppercase()
-
-                    if (!name.isNullOrBlank()) {
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    if (!number.isNullOrBlank()) {
-                        if (!name.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                        }
-                        Text(
-                            text = number,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                InitialAvatar(initial)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(subjectName ?: number ?: typeLabel, style = MaterialTheme.typography.titleSmall)
+                    if (subjectName != null && number != null) {
+                        Text(number, style = MaterialTheme.typography.labelMedium, color = muted)
                     }
                 }
-
-                if (!number.isNullOrBlank()) IconButton(onClick = {
-                    copyToClipboard(context, "Phone", number)
-                }) {
-                    Icon(
-                        painter = painterResource(R.drawable.outline_copy),
-                        contentDescription = "Copy phone",
-                    )
+                if (number != null && '*' !in number) {
+                    CopyIcon("Copy phone") { copyToClipboard(context, "Phone", number) }
                 }
+                Icon(
+                    painter = painterResource(R.drawable.keyboard_arrow_right),
+                    contentDescription = "Open ${subjectName ?: "subject"}",
+                    tint = muted
+                )
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
 
-        Text(
-            text = transaction.message, style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ActionButton(
-                icon = painterResource(R.drawable.outline_copy),
-                label = "Message",
-                onClick = {
-                    copyToClipboard(context, "Message", transaction.message)
-                })
-            ActionButton(
-                icon = painterResource(R.drawable.outline_copy),
-                label = "Transaction ID",
-                onClick = {
-                    copyToClipboard(context, "Transaction ID", transaction.code)
-                })
-        }
+        SmsCard(transaction.message) { copyToClipboard(context, "Message", transaction.message) }
     }
 }
 
 @Composable
-fun EditableCategoryChip(
-    currentCategory: String, categories: List<Category>, onCategorySelected: (Category) -> Unit
+private fun InitialAvatar(initial: String) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            initial,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        value()
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+private fun MoneyValue(amount: Double) {
+    CurrencyText(amount) { Text(it, style = MaterialTheme.typography.labelLarge.copy(fontFamily = MaterialTheme.typography.labelMedium.fontFamily)) }
+}
+
+@Composable
+private fun CopyIcon(description: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(
+            painter = painterResource(R.drawable.outline_copy),
+            contentDescription = description,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun CategoryButton(
+    current: String?, categories: List<Category>, onCategorySelected: (Category) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val accent = if (current == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 
     Box {
-        Surface(
-            color = Color.Transparent,
+        Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .clickable { expanded = true }) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-
-                ) {
-                Icon(
-                    painter = painterResource(R.drawable.outline_category_search_24),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = currentCategory.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+                .border(1.dp, if (current == null) accent else MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                .clickable { expanded = true }
+                .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(current ?: "Add category", style = MaterialTheme.typography.labelLarge, color = accent)
+            Icon(
+                painter = painterResource(R.drawable.keyboard_arrow_right),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(20.dp)
+                    .rotate(90f),
+                tint = accent
+            )
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             categories.forEach { category ->
                 DropdownMenuItem(text = { Text(category.name) }, onClick = {
                     onCategorySelected(category)
@@ -299,19 +296,43 @@ fun EditableCategoryChip(
 }
 
 @Composable
-fun ActionButton(
-    icon: Painter, label: String, onClick: () -> Unit
-) {
-    TextButton(onClick = onClick) {
-        Icon(
-            painter = icon, contentDescription = null, modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label, style = MaterialTheme.typography.labelLarge
-        )
+private fun SmsCard(message: String, onCopy: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+    ) {
+        Column(
+            Modifier
+                .clickable { expanded = !expanded }
+                .padding(start = 14.dp, end = 4.dp, top = 12.dp)
+        ) {
+            Text(
+                message,
+                modifier = Modifier.padding(end = 10.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = if (expanded) Int.MAX_VALUE else 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (expanded) "Show less" else "Show full message",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                CopyIcon("Copy message", onCopy)
+            }
+        }
     }
 }
+
+private fun String.toTitleCase() =
+    lowercase().split(' ').joinToString(" ") { w -> w.replaceFirstChar { it.titlecase(Locale.ENGLISH) } }
 
 @Preview(showBackground = true)
 @Composable
@@ -324,18 +345,9 @@ fun PreviewSheetContent() {
         code = "RSL876GHJ1",
         transactionTime = LocalDateTime.now(),
         isInc = false,
-        subject = Subject(
-            id = 101L, name = "John Doe", number = "0712345678"
-        ),
-        type = TransactionType(
-            id = 1,
-            name = "paybill",
-            isInc = false,
-            displayName = "Pay Bill",
-        ),
-        category = Category(
-            id = 5, name = "Shopping"
-        ),
+        subject = Subject(id = 101L, name = "JOHN DOE", number = "0712345678"),
+        type = TransactionType(id = 1, name = "send", isInc = false, displayName = "Send Money"),
+        category = Category(id = 5, name = "Shopping"),
     )
 
     AppTheme {
