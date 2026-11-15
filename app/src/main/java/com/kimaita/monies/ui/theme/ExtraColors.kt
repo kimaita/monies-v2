@@ -18,6 +18,10 @@ data class ExtraColors(
     val outflow: Color,
     val gold: Color,
     val medals: List<Color>,
+    /** "before" bars, quiet segments and the "others" share */
+    val track2: Color,
+    /** text on the strongest treemap tile */
+    val onTile: Color,
 )
 
 val LightExtra = ExtraColors(
@@ -27,18 +31,20 @@ val LightExtra = ExtraColors(
     outflow = Coral,
     gold = Gold,
     medals = listOf(Color(0xFFE7C78A), Color(0xFFBFC4C9), Color(0xFFCB8B5E)),
-
-    )
+    track2 = LTrack2,
+    onTile = Ink,
+)
 
 val DarkExtra = ExtraColors(
     positive = EmeraldBright,
     negative = NegDark,
     inflow = EmeraldBright,
     outflow = CoralDark,
-    gold = Gold,
+    gold = GoldLight,
     medals = listOf(Color(0xFFE7C78A), Color(0xFFBFC4C9), Color(0xFFCB8B5E)),
-
-    )
+    track2 = DOutline,
+    onTile = OnEmeraldDark,
+)
 
 val LocalExtraColors = staticCompositionLocalOf { LightExtra }
 
