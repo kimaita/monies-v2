@@ -82,8 +82,6 @@ fun MoniesNavHost(
     modifier: Modifier = Modifier
 ) {
 
-    // No transitions: the default 700 ms cross-fade keeps both screens composed and makes a tab tap
-    // look unanswered on a slow phone.
     NavHost(
         navController = navController,
         startDestination = "home",

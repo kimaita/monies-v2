@@ -18,9 +18,7 @@ import com.kimaita.monies.ui.util.formatCompactKes
 import com.kimaita.monies.ui.util.formatSignedKes
 import kotlinx.coroutines.flow.map
 
-/* ----------------------------- Overview (bento) ----------------------------- */
-
-// Every card shows its own placeholder until its own value arrives.
+/** Every card shows its own placeholder until its own value arrives. */
 @Composable
 internal fun OverviewTab(vm: AnalyticsViewModel, listState: LazyListState, onJump: (AnalyticsTab) -> Unit) {
     val statsOrNull by vm.stats.collectAsStateWithLifecycle()

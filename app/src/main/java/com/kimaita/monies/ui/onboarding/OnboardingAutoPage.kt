@@ -36,9 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/* ---------- Page 2: live rows ---------- */
-
-// Colours come from the theme, so they are read when the row draws, not held here.
+/** Colours come from the theme, so they are read when the row draws, not held here. */
 private data class AutoRowData(
     val avatar: @Composable () -> Color,
     val glyph: String,

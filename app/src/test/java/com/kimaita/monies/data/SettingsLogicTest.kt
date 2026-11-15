@@ -28,7 +28,6 @@ class SettingsLogicTest {
         assertNull(applyToAllOfSubject(CategoryApplyMode.ASK, hasSubject = true))
         assertEquals(false, applyToAllOfSubject(CategoryApplyMode.ONE, hasSubject = true))
         assertEquals(true, applyToAllOfSubject(CategoryApplyMode.ALL, hasSubject = true))
-        // No subject: never ask, only the one transaction can change.
         assertEquals(false, applyToAllOfSubject(CategoryApplyMode.ASK, hasSubject = false))
         assertEquals(false, applyToAllOfSubject(CategoryApplyMode.ALL, hasSubject = false))
     }
@@ -50,7 +49,6 @@ class SettingsLogicTest {
             com.kimaita.monies.data.dao.dtos.LineBalance(2, "MPESA", null, null),
         )
         val names = com.kimaita.monies.data.dao.dtos.lineNames(all)
-        // Line 2 is the only active one, but its name is still numbered across all lines.
         assertEquals("M-PESA", names[1])
         assertEquals("M-PESA 2", names[2])
         val summaries = listOf(

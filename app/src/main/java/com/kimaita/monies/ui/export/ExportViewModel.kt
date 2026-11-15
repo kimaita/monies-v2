@@ -47,7 +47,6 @@ class ExportViewModel @Inject constructor(
     val sel: StateFlow<ExportSelections> = _sel.asStateFlow()
 
     init {
-        // Start on Home's account; a pick made here holds until Home's choice changes again.
         viewModelScope.launch {
             repository.selectedAccount.collect { id -> _sel.update { it.copy(accountId = id) } }
         }
@@ -69,7 +68,6 @@ class ExportViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, started, null)
 
-    // selection setters
     fun setFormat(f: ExportFormat) = _sel.update { it.copy(format = f) }
     fun setRange(start: LocalDate?, end: LocalDate?) =
         _sel.update { it.copy(startDate = start, endDate = end) }
@@ -104,7 +102,6 @@ class ExportViewModel @Inject constructor(
         return true
     }
 
-    // subject search (debounced, export-style)
     private val _subjectQuery = MutableStateFlow("")
     val subjectQuery: StateFlow<String> = _subjectQuery.asStateFlow()
     fun setSubjectQuery(q: String) {
@@ -116,7 +113,6 @@ class ExportViewModel @Inject constructor(
         .mapLatest { q -> if (q.isBlank()) repository.topSubjects() else repository.searchSubjects(q.trim()) }
         .stateIn(viewModelScope, started, emptyList())
 
-    // actions
     fun export() = manager.start(_sel.value.format, _sel.value.toExportFilters())
     fun cancel() = manager.cancel()
     fun acknowledge() = manager.acknowledge()
@@ -127,7 +123,6 @@ class ExportViewModel @Inject constructor(
 /** The Export selections that show the same rows as these Transactions filters. */
 internal fun TransactionFilters.toExportSelections(base: ExportSelections): ExportSelections {
     val (start, end) = getDatesForFilter(timeFilter)
-    // Presets end on the day after today (exclusive); a custom range ends on its own last day.
     val lastDay = end?.take(10)?.let(LocalDate::parse)
         ?.let { if (timeFilter is TimeFilter.CustomRange) it else it.minusDays(1) }
     return base.copy(

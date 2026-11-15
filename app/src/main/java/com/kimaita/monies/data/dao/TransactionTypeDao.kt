@@ -11,8 +11,6 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
     @Query("SELECT * FROM transaction_types")
     fun getAll(): Flow<List<TransactionType>>
 
-    // List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
-    // element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
     /**
      * Gets the total spending for each transaction type within a given date range.
      */

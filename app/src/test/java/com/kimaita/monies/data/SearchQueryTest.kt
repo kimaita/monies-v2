@@ -5,8 +5,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SearchQueryTest {
-    // ---- text in the message: names, codes, dates, phone and account numbers ----
-
     @Test
     fun namesAreOnePrefixPhraseEach() {
         assertEquals("\"Jane*\" \"Doe*\"", ftsQueryOf("  Jane   Doe "))
@@ -21,7 +19,6 @@ class SearchQueryTest {
 
     @Test
     fun punctuationInsideAWordSplitsItIntoConsecutiveTerms() {
-        // the index splits "Doe/AcmeShirt" and "Ksh1,500.00" at punctuation, so the query does too
         assertEquals("\"Doe AcmeShirt*\"", ftsQueryOf("Doe/AcmeShirt"))
         assertEquals("\"Ksh1 500*\"", ftsQueryOf("Ksh1,500"))
         assertEquals("\"Ksh1 500 00*\"", ftsQueryOf("Ksh1,500.00"))
@@ -39,7 +36,6 @@ class SearchQueryTest {
     fun fourDigitYearIsMatchedAsMessagesWriteIt() {
         assertEquals("\"13 11 26*\"", ftsQueryOf("13/11/2026"))
         assertEquals("\"1 2 24*\"", ftsQueryOf("1.2.2024"))
-        // not a date: the last part is not a four-digit year
         assertEquals("\"1 678 543*\"", ftsQueryOf("1,678,543"))
     }
 
@@ -47,16 +43,13 @@ class SearchQueryTest {
     fun phoneNumbersMatchWhetherOrNotTheMessageSplitsThem() {
         assertEquals("\"0700000001*\"", ftsQueryOf("0700000001"))
         assertEquals("\"254700000001*\"", ftsQueryOf("254700000001"))
-        // "0700-000001" is two terms, or the one token the message has
         assertEquals("\"0700 000001*\" OR \"0700000001*\"", ftsQueryOf("0700-000001"))
         assertEquals(
             "\"Jane*\" \"0700 000001*\" OR \"Jane*\" \"0700000001*\"",
             ftsQueryOf("Jane 0700-000001")
         )
         assertEquals("\"712 257 678*\" OR \"712257678*\"", ftsQueryOf("712-257-678"))
-        // too short to be a phone number
         assertEquals("\"1 500*\"", ftsQueryOf("1,500"))
-        // spaces separate words, each a prefix
         assertEquals("\"0700*\" \"000*\" \"001*\"", ftsQueryOf("0700 000 001"))
     }
 
@@ -74,8 +67,6 @@ class SearchQueryTest {
     fun operatorWordsAreJustWords() {
         assertEquals("\"OR*\" \"NOT*\"", ftsQueryOf("OR NOT"))
     }
-
-    // ---- amounts ----
 
     @Test
     fun numericQueryIsAnAmountPrefix() {
@@ -107,8 +98,6 @@ class SearchQueryTest {
         assertEquals("\"Ksh1 500*\"", amountWithKsh.fts)
         assertEquals("1500", amountWithKsh.amount)
     }
-
-    // ---- subjects the user renamed ----
 
     @Test
     fun subjectNamesMatchWordsInOrder() {

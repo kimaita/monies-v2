@@ -55,7 +55,7 @@ class ExportWorker @AssistedInject constructor(
             val uri = storage.write(fileName, format.mime) { out ->
                 val pages =
                     TransactionPages { onPage -> repository.forEachExportBatch(filters, onPage) }
-                writer.write(out, pages) { count ->                 // called once per page
+                writer.write(out, pages) { count ->
                     processed = count
                     setProgress(progressData(format, count, total))
                     setForeground(foregroundInfo(count, total))
@@ -77,8 +77,6 @@ class ExportWorker @AssistedInject constructor(
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: "Export failed")))
         }
     }
-
-    // --- progress / notification ---
 
     private fun progressData(f: ExportFormat, processed: Int, total: Int?) = workDataOf(
         KEY_FORMAT to f.name, KEY_PROCESSED to processed, KEY_TOTAL to (total ?: -1),

@@ -84,7 +84,6 @@ class MainActivity : ComponentActivity() {
                 var onboardingComplete by remember { mutableStateOf<Boolean?>(null) }
                 var hasRequiredPermissions by remember { mutableStateOf(checkPermissions()) }
 
-                // One read gives the theme and the onboarding flag together, so the first real frame is themed.
                 LaunchedEffect(Unit) {
                     val startup = repository.startupState()
                     themeMode = startup.theme
@@ -92,7 +91,6 @@ class MainActivity : ComponentActivity() {
                     repository.themeMode.collect { themeMode = it }
                 }
 
-                // The user may grant the permission in system settings, so re-check on every resume.
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
                     hasRequiredPermissions = checkPermissions()
                 }
@@ -129,7 +127,6 @@ class MainActivity : ComponentActivity() {
 
                     !hasRequiredPermissions ->
                         PermissionScreen(onGrantClick = {
-                            // After a permanent denial the system dialog no longer shows: open app settings.
                             if (askedForPermissions && !shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS))
                                 startActivity(
                                     Intent(
@@ -142,8 +139,6 @@ class MainActivity : ComponentActivity() {
 
                     else -> {
                         val importProgress by rememberSmsImportProgress(applicationContext)
-                        // "No cursor yet" only matters while no first-run work exists; it is re-read then,
-                        // never kept from before an import.
                         val noImportWork = importProgress == SmsSyncProgress.Idle
                         val firstRun by produceState<Boolean?>(null, noImportWork) {
                             value = null
@@ -151,8 +146,6 @@ class MainActivity : ComponentActivity() {
                         }
                         val screen = startupScreen(importProgress, firstRun)
 
-                        // A sync on start waits out a running import, and the import is started only while no
-                        // first-run work exists.
                         val startImport = shouldStartFirstRunImport(importProgress, firstRun)
                         LaunchedEffect(startImport) {
                             if (startImport) SmsSyncWorker.enqueueImport(applicationContext, firstRun = true)
@@ -162,8 +155,6 @@ class MainActivity : ComponentActivity() {
                         }
                         ObserveIncomingSms(smsContentObserver)
 
-                        // Everything the layers draw comes from the lambda argument, so the outgoing one keeps
-                        // its last progress while fading; the key keeps progress ticks from re-fading.
                         updateTransition(screen, label = "import-handoff").Crossfade(
                             contentKey = { it::class },
                         ) { s ->

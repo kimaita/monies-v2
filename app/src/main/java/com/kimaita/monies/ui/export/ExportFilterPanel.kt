@@ -37,8 +37,6 @@ import androidx.compose.ui.unit.dp
 import com.kimaita.monies.R
 import com.kimaita.monies.services.isSelected
 
-/* ---------------- filters ---------------- */
-
 @Composable
 internal fun AddFiltersRow(activeCount: Int, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme

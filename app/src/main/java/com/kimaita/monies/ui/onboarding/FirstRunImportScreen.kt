@@ -56,7 +56,7 @@ private val creativeLines: List<String> = listOf(
     "Crunching the numbers",
 )
 
-// Before any batch reports a year.
+/** Before any batch reports a year. */
 private val readingLines: List<String> = listOf(
     "Reading your message history",
     "Tunasoma messages zako",
@@ -112,7 +112,6 @@ fun FirstRunImportScreen(
     }
     val fractionTarget =
         total?.takeIf { it > 0 }?.let { (processed.toFloat() / it).coerceIn(0f, 1f) }
-    // Read only inside the indicator's draw lambda, so the ring animates without recomposing.
     val fraction = animateFloatAsState(
         targetValue = fractionTarget ?: 0f,
         animationSpec = tween(700, easing = FastOutSlowInEasing),

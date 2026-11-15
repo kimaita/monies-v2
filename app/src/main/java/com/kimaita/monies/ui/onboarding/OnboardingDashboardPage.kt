@@ -27,8 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/* ---------- Page 3: analytics dashboard ---------- */
-
 @Composable
 internal fun DashboardPage() {
     Column(Modifier

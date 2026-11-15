@@ -21,8 +21,6 @@ import com.kimaita.monies.ui.components.Segmented
 private val natureOptions: List<Pair<String, Boolean?>> =
     listOf("All" to null, "Money in" to true, "Money out" to false)
 
-/* ----------------------------- filter sheet ----------------------------- */
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun FiltersSheet(vm: AnalyticsViewModel, onDismiss: () -> Unit) {

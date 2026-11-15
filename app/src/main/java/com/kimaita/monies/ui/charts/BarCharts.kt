@@ -113,10 +113,9 @@ fun BarChart(
         val slotW = maxOf((maxWidth - YAxisWidth) / n, 24.dp)
         val barW = (slotW / 2).coerceIn(12.dp, 28.dp)
         val contentWidth = slotW * n
-        LaunchedEffect(contentWidth) { scroll.scrollTo(scroll.maxValue) }   // start at most recent
+        LaunchedEffect(contentWidth) { scroll.scrollTo(scroll.maxValue) }
 
         Row {
-            // y-axis labels, at their gridline's y
             Spacer(
                 Modifier
                     .width(YAxisWidth)
@@ -196,7 +195,6 @@ fun BarChart(
                                 if (buckets[it].up - buckets[it].down >= 0f) extra.positive else extra.negative
                             }
 
-                            // x labels, thinned so they never overlap; the last bucket is always labelled
                             val xLabels = Array<TextLayoutResult>(n) { measurer.measure(buckets[it].label, labelStyle) }
                             val widest = xLabels.maxOf { it.size.width } + 6.dp.toPx()
                             val stride = ceil(widest / slot).toInt().coerceAtLeast(1)
@@ -208,14 +206,13 @@ fun BarChart(
                                 )
                             }
 
-                            // years: a divider where one begins and its label on a second row under the months
                             val yearStyle = TextStyle(
                                 fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface
                             )
                             val yearAt = (0 until n).filter { buckets[it].year != null }
                             val yearLabels = yearAt.map { measurer.measure(buckets[it].year!!, yearStyle) }
                             val yearX = yearAt.map { it * slot + 3.dp.toPx() }
-                            val yearShown = yearAt.indices.filter { k ->   // drop one that would touch the next
+                            val yearShown = yearAt.indices.filter { k ->
                                 k == yearAt.lastIndex || yearX[k] + yearLabels[k].size.width + 4.dp.toPx() <= yearX[k + 1]
                             }
                             val yearY = bottom + 6.dp.toPx() + xLabels.maxOf { it.size.height }

@@ -190,7 +190,6 @@ private fun RowLine(name: String, value: String, owed: Boolean = false) =
         )
     }
 
-/* pill primitives */
 @Composable
 internal fun Pill(onClick: (() -> Unit)? = null, content: @Composable RowScope.() -> Unit) {
     val cs = MaterialTheme.colorScheme

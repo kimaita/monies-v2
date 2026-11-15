@@ -95,12 +95,10 @@ class RoomSyncStore(
     override suspend fun setMergedInto(accountId: Int, root: Int?) =
         accountDao.setMergedInto(accountId, root)
 
-    // No value counts as stale, so an install from before the flag recomputes once.
     override suspend fun mergesStale() = settingsDao.getSetting(SmsSyncer.MERGES_STALE_KEY) != "0"
     override suspend fun setMergesStale(stale: Boolean) =
         settingsDao.saveSetting(Setting(SmsSyncer.MERGES_STALE_KEY, if (stale) "1" else "0"))
 
-    // In chunks: SQLite before Android 12 allows only 999 arguments in one query.
     override suspend fun savedSubjects(rawNames: Collection<String>) =
         rawNames.chunked(500).flatMap { subjectDao.findByRawNames(it) }
     override suspend fun insertSubject(subject: Subject) = subjectDao.insert(subject)
@@ -187,7 +185,6 @@ class SmsSyncer(
 
                 val batch = timings.time("read") { smsDataSource.readBatch(Provider.allSenders, afterId, limit) }
                 if (batch.isEmpty()) {
-                    // Nothing new, so the merges need work only if an earlier sync left them stale.
                     if (store.mergesStale()) timings.time("merges") { store.inTransaction { recomputeMerges() } }
                     Timber.tag(LOG_TAG).i("Batch: 0 SMS; %s", timings)
                     return@withContext SmsBatchResult(0, null, timings)
@@ -199,9 +196,6 @@ class SmsSyncer(
                 store.inTransaction {
                     val saved = parseAndSave(batch, timings)
                     store.setCursor(maxId)
-                    // Merges depend on every account's span, so they are recomputed once, on the
-                    // batch that drains the inbox. A full batch may not be the last, so it only
-                    // marks them stale, and the flag survives the process being killed.
                     if (batch.size < limit && (saved || store.mergesStale())) timings.time("merges") { recomputeMerges() }
                     else if (saved) store.setMergesStale(true)
                 }
@@ -260,10 +254,6 @@ class SmsSyncer(
         if (unparsed.isNotEmpty()) timings.time("save") { store.insertUnparsed(unparsed) }
         if (parsed.isEmpty()) return false
 
-        // A new subject starts in its built-in category; one already saved keeps whatever it has.
-        // The batch's saved subjects come back in one query; only new ones cost a query each.
-        // Looked up per batch, not cached across batches, so a merge or category change the user
-        // makes during a long import applies to the batches after it.
         val subjects = timings.time("subjects") {
             val categoryIds = store.categoryIds()
             val parsedSubjects = parsed.mapNotNull { it.second }.distinctBy { it.rawName to it.number }

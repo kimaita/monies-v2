@@ -118,8 +118,6 @@ private fun PermissionMarker(required: Boolean) {
     )
 }
 
-/* ---------- Page 4: permissions ---------- */
-
 @Composable
 internal fun PermissionsPage(active: Boolean) {
     val rationales = permissionRationales()

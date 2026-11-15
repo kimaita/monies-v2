@@ -19,7 +19,6 @@ interface FormatWriter {
     suspend fun write(out: OutputStream, pages: TransactionPages, onProgress: suspend (Int) -> Unit)
 }
 
-// ---------------- CSV ----------------
 class CsvWriter @Inject constructor() : FormatWriter {
     override val format = ExportFormat.CSV
 
@@ -66,8 +65,6 @@ class CsvWriter @Inject constructor() : FormatWriter {
     }
 }
 
-// ---------------- JSON ----------------
-
 class JsonWriter @Inject constructor() : FormatWriter {
     override val format = ExportFormat.JSON
 
@@ -100,8 +97,6 @@ class JsonWriter @Inject constructor() : FormatWriter {
         jw.flush()
     }
 }
-
-// ---------------- XLSX (streaming zip, inline strings, zero-dependency) ----------------
 
 class XlsxWriter @Inject constructor() : FormatWriter {
     override val format = ExportFormat.XLSX
@@ -173,7 +168,6 @@ class XlsxWriter @Inject constructor() : FormatWriter {
     }
 }
 
-// ---------------- PDF (paginated Canvas) ----------------
 class PdfWriter @Inject constructor() : FormatWriter {
     override val format = ExportFormat.PDF
 
@@ -184,7 +178,7 @@ class PdfWriter @Inject constructor() : FormatWriter {
         val ph = 842;
         val margin = 36f;
         val rowH = 16f;
-        val gap = 4f   // A4 @ 72dpi
+        val gap = 4f
         val usable = pw - 2 * margin
 
         val headers = listOf(
@@ -198,7 +192,7 @@ class PdfWriter @Inject constructor() : FormatWriter {
             "Type"
         )
         val weights =
-            floatArrayOf(0.11f, 0.10f, 0.10f, 0.12f, 0.10f, 0.19f, 0.15f, 0.13f)  // sums to 1.0
+            floatArrayOf(0.11f, 0.10f, 0.10f, 0.12f, 0.10f, 0.19f, 0.15f, 0.13f)
         val widths = FloatArray(headers.size) { weights[it] * usable }
         val xs = FloatArray(headers.size)
         run {
@@ -265,7 +259,7 @@ class PdfWriter @Inject constructor() : FormatWriter {
         pdf.close()
     }
 
-    // Truncate with an ellipsis to fit a column width (measured, so no overlap regardless of font).
+    /** Truncate with an ellipsis to fit a column width (measured, so no overlap regardless of font). */
     private fun fit(text: String, paint: Paint, maxWidth: Float): String {
         if (maxWidth <= 0f || paint.measureText(text) <= maxWidth) return text
         val ellipsis = "…"
@@ -275,7 +269,6 @@ class PdfWriter @Inject constructor() : FormatWriter {
         return text.substring(0, end) + ellipsis
     }
 }
-// ---------------- file-private XLSX helpers ----------------
 
 private fun inlineCell(sb: StringBuilder, ref: String, value: String) {
     sb.append("<c r=\"").append(ref).append("\" t=\"inlineStr\"><is><t xml:space=\"preserve\">")

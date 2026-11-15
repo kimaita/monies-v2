@@ -7,11 +7,12 @@ data class BalancePoint(val label: String, val balance: Float, val axisLabel: St
 data class HeatRow(
     val day: String,
     val values: List<Int>
-)   // 4 blocks: Morning/Afternoon/Evening/Night
+)
 
 data class RecurringPayment(
     val name: String,
-    val cadenceLabel: String,   // "Weekly", "Monthly", "Every 3 days", "~Monthly"…
+    /** "Weekly", "Monthly", "Every 3 days", "~Monthly"… */
+    val cadenceLabel: String,
     val typicalAmount: Double,
     val lastDate: LocalDateTime,
     val nextEstimate: LocalDateTime,

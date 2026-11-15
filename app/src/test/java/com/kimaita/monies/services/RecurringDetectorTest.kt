@@ -14,7 +14,6 @@ class RecurringDetectorTest {
     @Test
     fun detectsMonthlyPaymentFromStoredTimes() {
         val now = LocalDateTime.of(2025, 8, 20, 12, 0, 0)
-        // Stored format: ISO_LOCAL_DATE_TIME text with a 'T'.
         val rows = listOf(
             "2025-01-05T08:28:00", "2025-02-05T08:30:00", "2025-03-05T09:00:00",
             "2025-04-05T08:15:00", "2025-05-05T08:28:00", "2025-06-05T08:40:00",

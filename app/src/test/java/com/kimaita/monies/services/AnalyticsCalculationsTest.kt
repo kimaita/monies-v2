@@ -22,7 +22,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun monthBoundaries_firstOfMonthAndYearRollover() {
-        // Today is 1 Jan: last month is December, and 31 Dec spending must not leak into January.
         val pace = computePace(
             listOf(day("2025-12-15", 100.0), day("2025-12-31", 50.0), day("2026-01-01", 30.0)),
             LocalDate.of(2026, 1, 1),
@@ -31,7 +30,6 @@ class AnalyticsCalculationsTest {
         assertEquals(31, pace.lastMonth.size)
         assertEquals(150.0, pace.lastMonth.last(), 0.0)
         assertEquals(30.0, pace.spent, 0.0)
-        // Compared at day 1: last month had 0 by then, so there is no percentage.
         assertNull(pace.changePct)
     }
 
@@ -44,10 +42,9 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun thirtyOneDayMonthAgainstThirtyDayMonth() {
-        // Today is 31 May; April has 30 days, so the comparison is made at day 30.
         val pace = computePace(
             listOf(
-                day("2026-04-10", 100.0), day("2026-04-30", 100.0),   // April: 200 by day 30
+                day("2026-04-10", 100.0), day("2026-04-30", 100.0),
                 day("2026-05-05", 150.0), day("2026-05-30", 150.0), day("2026-05-31", 40.0),
             ),
             LocalDate.of(2026, 5, 31),
@@ -55,7 +52,6 @@ class AnalyticsCalculationsTest {
         assertEquals(31, pace.thisMonth.size)
         assertEquals(30, pace.lastMonth.size)
         assertEquals(340.0, pace.spent, 0.0)
-        // this month at day 30 = 300 vs 200 last month -> +50%
         assertEquals(50.0, pace.changePct!!, 1e-9)
     }
 
@@ -108,7 +104,6 @@ class AnalyticsCalculationsTest {
         val groups = typeGroups(types)
         assertEquals(listOf("Send Money", "Airtime"), groups.map { it.label })
         assertEquals(listOf(2, 3), groups[1].ids)
-        // A type without a display name falls back to its readable key.
         assertEquals("Mshwari deposit", typeGroups(listOf(TransactionType(id = 9, name = "mshwari.deposit", isInc = true)))[0].label)
     }
 
@@ -119,7 +114,6 @@ class AnalyticsCalculationsTest {
         picked = picked.toggleGroup(airtime)
         assertEquals(setOf(1, 2, 3), picked)
         assertTrue(airtime.isSelected(picked))
-        // Only some of its ids in: not shown as selected, and a tap completes it.
         assertFalse(airtime.isSelected(setOf(2)))
         assertEquals(setOf(2, 3), setOf(2).toggleGroup(airtime))
         picked = picked.toggleGroup(airtime)
@@ -133,7 +127,6 @@ class AnalyticsCalculationsTest {
         assertEquals(1, countTypeChoices(setOf(2, 3), groups))
         assertEquals(1, countTypeChoices(setOf(2), groups))
         assertEquals(2, countTypeChoices(setOf(1, 2, 3), groups))
-        // Ids no group knows count one each.
         assertEquals(2, countTypeChoices(setOf(8, 9), groups))
     }
 
@@ -156,17 +149,13 @@ class AnalyticsCalculationsTest {
         val byType = typeSlices(listOf(CategorySpending("send_money", 300.0, 0.0)), types)
         val filters: List<Int>? = listOf(9)
 
-        // Tap a category row: categories narrow to it, types stay as they were.
         var selected = toggleSlice(null, "Food")
         assertEquals(listOf(7) to filters, sliceFilter(byCategory, selected, filters, filters))
-        // Tap a type row: the same, the other way round.
         selected = toggleSlice(null, "Send Money")
         assertEquals(filters to listOf(1), sliceFilter(byType, selected, filters, filters))
-        // Tap the same row again: back to the filters in force.
         selected = toggleSlice(selected, "Send Money")
         assertNull(selected)
         assertEquals(filters to filters, sliceFilter(byType, selected, filters, filters))
-        // A selection whose row has gone narrows nothing.
         assertEquals(null to null, sliceFilter(byType, "Food", null, null))
     }
 
@@ -252,7 +241,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun activeSummary_weekdaySlotWhenWeekdaysDominate() {
-        // 10 on weekdays is 2 a day, 1 at the weekend is 0.5 a day.
         val cells = listOf(cell(1, 2, 5), cell(3, 2, 5), cell(6, 2, 1), cell(2, 0, 2))
         assertEquals("Most active on weekday evenings, 5–10 pm", activeSummary(cells))
     }
@@ -265,7 +253,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun activeSummary_evenSpreadNamesOnlyTheSlot() {
-        // 5 weekday and 2 weekend transactions are the same rate.
         val cells = listOf(cell(1, 1, 5), cell(0, 1, 2), cell(2, 0, 1))
         assertEquals("Most active in the afternoons, 12–5 pm", activeSummary(cells))
         assertEquals(
@@ -283,7 +270,6 @@ class AnalyticsCalculationsTest {
         )
         val sum = sumLineBalances(rows)
         assertEquals(listOf("2026-11-01", "2026-11-02", "2026-11-03"), sum.map { it.bucket })
-        // Line 2 starts on the 2nd (adds nothing before); line 1 carries 100 into the 2nd.
         assertEquals(listOf(100f, 150f, 130f), sum.map { it.balance })
     }
 
@@ -300,12 +286,9 @@ class AnalyticsCalculationsTest {
         assertEquals(emptyList<BalanceBucket>(), sumLineBalances(emptyList()))
     }
 
-    // ---- bucket labels and range lengths ----
-
     @Test
     fun bucketLabel_hourlyDayShowsTheHour() {
         assertEquals("09h", bucketLabel("2026-03-14 09", TimeFilter.DAY))
-        // No space in the bucket: the whole key is kept.
         assertEquals("2026-03-14h", bucketLabel("2026-03-14", TimeFilter.DAY))
     }
 
@@ -326,7 +309,6 @@ class AnalyticsCalculationsTest {
         assertEquals("Jan", bucketLabel("2026-01", TimeFilter.SIX_MONTHS))
         assertEquals("Dec", bucketLabel("2025-12", TimeFilter.YTD))
         assertEquals("Mar", bucketLabel("2026-03", TimeFilter.ALL))
-        // A month outside 1..12, or no number at all, leaves the bucket as it is.
         assertEquals("2026-13", bucketLabel("2026-13", TimeFilter.ALL))
         assertEquals("junk", bucketLabel("junk", TimeFilter.ALL))
     }

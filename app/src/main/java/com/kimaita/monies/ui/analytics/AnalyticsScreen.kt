@@ -87,9 +87,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
     if (showFilters) FiltersSheet(viewModel) { showFilters = false }
 }
 
-/* ----------------------------- chrome ----------------------------- */
-
-// Collects only timeFilter so unrelated filter edits don't recompose the chips.
+/** Collects only timeFilter so unrelated filter edits don't recompose the chips. */
 @Composable
 private fun TimeChips(vm: AnalyticsViewModel) {
     val flow = remember(vm) { vm.filters.map { it.timeFilter }.distinctUntilChanged() }

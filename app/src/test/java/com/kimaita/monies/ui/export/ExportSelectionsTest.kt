@@ -73,7 +73,6 @@ class ExportSelectionsTest {
     fun clearFiltersKeepsAccountFormatAndDates() {
         val start = LocalDate.of(2026, 1, 1)
         val sel = base.copy(accountId = 3, startDate = start, nature = true, search = "x")
-        // Mirrors ExportViewModel.clearFilters.
         val cleared = sel.copy(nature = null, search = "")
         assertEquals(0, cleared.activeFilterCount())
         assertEquals(3, cleared.accountId)
@@ -101,7 +100,6 @@ class ExportSelectionsTest {
             listOf("MTD", "OCT", "3M", "YTD", "2025", "ALL"),
             DateBand.entries.map { it.shortLabel(today) },
         )
-        // In January, last month and last year both name the previous year's December and year.
         assertEquals("DEC", DateBand.LAST_MONTH.shortLabel(date(2026, 1, 15)))
         assertEquals("2025", DateBand.LAST_YEAR.shortLabel(date(2026, 1, 15)))
     }
@@ -143,7 +141,6 @@ class ExportSelectionsTest {
     fun anyOtherRangeIsCustom() {
         val today = date(2026, 11, 14)
         assertNull(base.copy(startDate = date(2026, 1, 3), endDate = date(2026, 2, 14)).band(today))
-        // A rolling month that a Transactions handoff can bring is not a calendar band.
         assertNull(base.copy(startDate = date(2026, 10, 15), endDate = today).band(today))
         assertNull(base.copy(startDate = date(2026, 11, 1)).band(today))
     }

@@ -27,11 +27,9 @@ class SmsContentObserver @Inject constructor(
     private var observer: ContentObserver? = null
 
     fun start() {
-        if (observer != null) return                       // already observing
+        if (observer != null) return
         val obs = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
-                // The messaging app may emit several changes per message — coalesce them,
-                // and cancel any in-flight sync so we don't overlap.
                 pendingSync?.cancel()
                 pendingSync = scope.launch {
                     delay(DEBOUNCE_MS.milliseconds)

@@ -46,12 +46,9 @@ class CategoryRule(val category: String, pattern: String) {
  */
 val defaultCategoryRules: List<CategoryRule> = listOf(
     CategoryRule("Electricity", """\bKPLC\b|\bKENYA POWER\b"""),
-    // Quidex Plus prepays Bolt; Super Metro buses are "SM705", "SM2000"; Nicco Movers names carry a plate.
     CategoryRule("Transport", """\bQUIDEX|^SM\d|\bSUPER\s*METRO\b|\bNICCO\s*MOVERS\b"""),
     CategoryRule("Meals", """\bJAVA\s*HOUSE|\bART\s*CAF+E|\bGALITO"""),
-    // Before Airtime & Data, so Safaricom Home fibre is never taken for a data bundle.
     CategoryRule("Internet", """\bSAFARICOM\s*HOME\b"""),
-    // M-PESA and Airtel airtime parse as "airtime"; Airtel bundles are paid to Airtel Networks.
     CategoryRule(
         "Airtime & Data",
         """^AIRTIME$|\bSAFARICOM\b.*\b(?:DATA|BUNDLES?|OFFERS?|AIRTIME)\b|\bAIRTEL NETWORKS\b""",

@@ -98,7 +98,6 @@ fun TransactionsScreen(
         onUpdateFilters = viewModel::updateFilters,
         onExport = {
             viewModel.exportResults()
-            // Pop without saving, so Transactions is not restored later and Back from Export lands on Home.
             navController.popBackStack()
             navController.navigateToTab("export")
         },
@@ -185,12 +184,6 @@ fun TransactionsScreenContent(
                     painter = painterResource(id = R.drawable.filter), contentDescription = "Filter"
                 )
             }
-//            IconButton(onClick = { scope.launch { onExport() } }) {
-//                Icon(
-//                    painter = painterResource(id = R.drawable.csv_export),
-//                    contentDescription = "Export"
-//                )
-//            }
             SortMenu(filters.sortOrder, onSetSortOrder)
 
         })

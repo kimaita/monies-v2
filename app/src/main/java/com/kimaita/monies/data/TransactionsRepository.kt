@@ -436,8 +436,6 @@ class TransactionsRepository @Inject constructor(
             runCatching { LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }.getOrNull()
         }
 
-    // ---- Settings ----
-
     private fun setting(key: String) = settingsDao.observeSetting(key)
     private suspend fun save(key: String, value: String) = settingsDao.saveSetting(Setting(key, value))
 
@@ -454,8 +452,6 @@ class TransactionsRepository @Inject constructor(
     suspend fun setCategoryApplyMode(mode: CategoryApplyMode) =
         save(CATEGORY_APPLY_MODE_KEY, mode.key)
 
-    // ---- Accounts ----
-
     /** Every line, dormant ones included. */
     fun getAccountLines() = accountDao.getLineSummaries().map { accountLines(it) }.flowOn(Dispatchers.Default)
 
@@ -470,8 +466,6 @@ class TransactionsRepository @Inject constructor(
 
     suspend fun mergeAccounts(sourceId: Int, targetId: Int) =
         accountDao.mergeLines(sourceId, targetId)
-
-    // ---- Categories ----
 
     suspend fun addCategory(name: String, monthlyBudget: Double?) {
         categoryDao.insert(Category(name = name.trim(), monthlyBudget = monthlyBudget))
@@ -497,8 +491,6 @@ class TransactionsRepository @Inject constructor(
         val end = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX).withNano(0).format(fmt)
         categoryDao.getBudgets(start, end, account)
     }
-
-    // ---- Unrecognised messages and re-import ----
 
     fun getUnparsedMessages(): Flow<List<UnparsedMessage>> = unparsedDao.getAll()
     fun getUnparsedCount(): Flow<Int> = unparsedDao.count()

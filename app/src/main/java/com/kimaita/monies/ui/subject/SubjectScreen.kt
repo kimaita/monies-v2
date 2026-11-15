@@ -223,7 +223,7 @@ fun SubjectScreenContent(
                     TransactionListItem(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         transaction = transaction,
-                        onSubjectClick = { /* Already on subject screen */ })
+                        onSubjectClick = {})
                     if (index < transactions.itemCount - 1) {
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 8.dp),
@@ -258,7 +258,6 @@ fun TransactionsHeader(
     }
 }
 
-// Mock Data Helper for Previews
 private fun getMockTransaction(id: Long, isInc: Boolean, amount: Double) = Transaction(
     id = id,
     amount = amount,
@@ -299,7 +298,7 @@ fun SubjectProfilePreview() {
             outgoingCount = 2,
             totalCost = 0.0,
             filters = TransactionFilters(),
-            onSortOrderChange = { })
+            onSortOrderChange = {})
     }
 }
 
@@ -326,6 +325,6 @@ fun BusinessProfilePreview() {
             outgoingCount = 6,
             totalCost = 5.0,
             filters = TransactionFilters(),
-            onSortOrderChange = { })
+            onSortOrderChange = {})
     }
 }

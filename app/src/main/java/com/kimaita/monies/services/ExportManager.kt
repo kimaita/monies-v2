@@ -44,7 +44,6 @@ class ExportManager @Inject constructor(
         val request = OneTimeWorkRequestBuilder<ExportWorker>()
             .setInputData(ExportWorker.buildInput(format, filters))
             .build()
-        // KEEP = ignore a tap if an export is already running; replaces a finished one
         workManager.enqueueUniqueWork(ExportWorker.WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 

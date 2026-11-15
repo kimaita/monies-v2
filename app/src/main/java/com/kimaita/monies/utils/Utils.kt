@@ -21,7 +21,6 @@ fun parseDateTime(
             try {
                 return LocalDateTime.parse(combinedString, formatter)
             } catch (e: Exception) {
-                // Try the next format
             }
         }
     }

@@ -31,8 +31,6 @@ import androidx.compose.ui.unit.dp
 import com.kimaita.monies.models.TimeFilter
 import kotlin.math.abs
 
-/* ---------------- change-in-balance pill ---------------- */
-
 @Composable
 internal fun ChangePill(change: Double?, filter: TimeFilter, onClick: () -> Unit) {
     if (change == null) return
@@ -58,8 +56,6 @@ internal fun ChangePill(change: Double?, filter: TimeFilter, onClick: () -> Unit
         Text("›", color = fg.copy(alpha = 0.6f))
     }
 }
-
-/* ---------------- in & out card ---------------- */
 
 @Composable
 internal fun InOutCard(

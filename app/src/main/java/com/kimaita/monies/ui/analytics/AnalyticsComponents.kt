@@ -27,8 +27,6 @@ import com.kimaita.monies.ui.util.formatCompactKes
 import com.kimaita.monies.ui.util.formatKes
 import java.util.Locale
 
-/* ----------------------------- small components ----------------------------- */
-
 @Composable
 internal fun TabList(state: LazyListState, content: LazyListScope.() -> Unit) {
     LazyColumn(
@@ -254,8 +252,6 @@ internal fun EmptyHint(text: String = "Nothing here yet") =
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
-
-/* ----------------------------- helpers ----------------------------- */
 
 internal const val LOADING = "Loading…"
 

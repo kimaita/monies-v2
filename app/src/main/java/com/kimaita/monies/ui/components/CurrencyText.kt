@@ -11,8 +11,10 @@ import java.text.NumberFormat
 import java.util.Currency
 import kotlin.math.absoluteValue
 
-// Shared across rows. NumberFormat is not thread-safe, so this is only touched from the main
-// thread, inside composition.
+/**
+ * Shared across rows. NumberFormat is not thread-safe, so this is only touched from the main
+ * thread, inside composition.
+ */
 private val kesFormat: NumberFormat =
     NumberFormat.getCurrencyInstance(java.util.Locale("en", "KE")).apply {
         currency = Currency.getInstance("KES")

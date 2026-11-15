@@ -2,7 +2,6 @@ package com.kimaita.monies.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ---- Light (warm cream / emerald) ----
 val Paper = Color(0xFFFFFDF6)
 val Ink = Color(0xFF15130D)
 val Emerald = Color(0xFF0E8C5A)
@@ -20,7 +19,6 @@ val LOutline = Color(0xFFC9C2AF)
 val LOutlineVariant = Color(0xFFECE7D8)
 val LMuted = Color(0xFF8A8475)
 
-// ---- Dark (true black, OLED) ----
 val Black = Color(0xFF000000)
 val DarkInk = Color(0xFFF2EDE0)
 val DarkMuted = Color(0xFF8C8574)

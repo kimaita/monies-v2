@@ -20,7 +20,7 @@ class SmsReceiver : BroadcastReceiver() {
         if (!fromProvider) return
 
         val request = OneTimeWorkRequestBuilder<SmsSyncWorker>()
-            .setInitialDelay( // let the default SMS app persist the row first
+            .setInitialDelay(
                 3,
                 TimeUnit.SECONDS
             )

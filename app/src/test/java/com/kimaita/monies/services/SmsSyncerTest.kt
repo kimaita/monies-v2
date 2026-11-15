@@ -18,7 +18,7 @@ import org.junit.Test
 class SmsSyncerTest {
 
     private class FakeInbox(var messages: List<SmsParser.SmsMessage>) : SmsSource {
-        // Mirrors the real query: case-insensitive sender match, keyset on _id.
+        /** Mirrors the real query: case-insensitive sender match, keyset on _id. */
         override suspend fun readBatch(senders: Collection<String>, afterId: Long, limit: Int) =
             messages.filter { m -> (m.id ?: 0) > afterId && senders.any { it.equals(m.originatingAddress, true) } }
                 .sortedBy { it.id }.take(limit)
@@ -72,7 +72,8 @@ class SmsSyncerTest {
             accounts[i] = accounts[i].copy(mergedInto = root)
         }
 
-        var mergesStale = true // like the real store before the flag is first written
+        /** like the real store before the flag is first written */
+        var mergesStale = true
         override suspend fun mergesStale() = mergesStale
         override suspend fun setMergesStale(stale: Boolean) { mergesStale = stale }
 
@@ -264,10 +265,8 @@ class SmsSyncerTest {
         val store = FakeStore(getDefaultTransactionTypes())
         val inbox = FakeInbox(listOf(msg(1, sub = 1), msg(2, sub = 2)))
         run(inbox, store)
-        // Same sample date on both: they overlap, so no merge.
         assertEquals(listOf(null, null), store.accounts.map { it.mergedInto })
 
-        // Stands in for new activity on the account, which a sync that saves transactions flags.
         fun retime(account: Int, time: String) {
             store.transactions.replaceAll { if (it.accountId == account) it.copy(transactionTime = java.time.LocalDateTime.parse(time)) else it }
             store.mergesStale = true
@@ -277,7 +276,7 @@ class SmsSyncerTest {
         run(inbox, store)
         assertEquals(listOf(null, 1), store.accounts.map { it.mergedInto })
 
-        retime(1, "2024-01-01T10:00:00") // sub 1 now also active when sub 2 starts
+        retime(1, "2024-01-01T10:00:00")
         run(inbox, store)
         assertEquals(listOf(null, null), store.accounts.map { it.mergedInto })
     }
@@ -288,7 +287,7 @@ class SmsSyncerTest {
         run(FakeInbox(listOf(msg(1))), store)
         val source = store.transactions.single().subject!!
         val target = source + 100
-        store.mergedInto[source] = target // what SubjectDao.merge records
+        store.mergedInto[source] = target
         run(FakeInbox(listOf(msg(1), msg(2))), store)
         assertEquals(target, store.transactions.last().subject)
     }
@@ -300,9 +299,9 @@ class SmsSyncerTest {
         run(inbox, store)
         assertEquals(1, store.activityReads)
 
-        run(inbox, store) // app opened again, nothing new
+        run(inbox, store)
         inbox.messages += msg(2, body = promo)
-        run(inbox, store) // only a promo arrived
+        run(inbox, store)
         assertEquals(1, store.activityReads)
     }
 
@@ -311,9 +310,9 @@ class SmsSyncerTest {
         val store = FakeStore(getDefaultTransactionTypes()).apply { mergesStale = false }
         val s = syncer(FakeInbox(listOf(msg(1), msg(2))), store)
         runBlocking {
-            s.syncBatch(2) // full: may not be the last, so merges wait
+            s.syncBatch(2)
             assertEquals(0, store.activityReads)
-            s.syncBatch(2) // empty: the inbox is drained
+            s.syncBatch(2)
             s.syncBatch(2)
         }
         assertEquals(1, store.activityReads)

@@ -24,11 +24,13 @@ import kotlin.math.roundToInt
 /** One bar slot: [up] rises from the baseline, [down] hangs below it. [year] marks where a year begins. */
 data class BarBucket(val label: String, val up: Float, val down: Float = 0f, val year: String? = null)
 
-// Plot geometry shared by the line and bar charts.
+/** Plot geometry shared by the line and bar charts. */
 internal val YAxisWidth = 40.dp
 internal val PlotTopPad = 8.dp
-internal val PlotBottomPad = 22.dp   // room for the x-axis labels
-internal val YearRowHeight = 16.dp   // extra room, when a chart marks years, for a second label row
+/** room for the x-axis labels */
+internal val PlotBottomPad = 22.dp
+/** extra room, when a chart marks years, for a second label row */
+internal val YearRowHeight = 16.dp
 
 /** Returns (axisMax, step) giving ~[lines] evenly-spaced, round gridlines. */
 fun niceAxis(max: Float, lines: Int = 4): Pair<Float, Float> {

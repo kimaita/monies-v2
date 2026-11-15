@@ -38,7 +38,7 @@ private fun airtel(name: String, displayName: String, isInc: Boolean, pattern: S
         provider = Provider.AIRTEL.name,
     )
 
-// Airtel amounts may have no decimals ("Ksh 50", "Ksh 2,000") and balances one ("2004.0").
+/** Airtel amounts may have no decimals ("Ksh 50", "Ksh 2,000") and balances one ("2004.0"). */
 private const val AIRTEL_NUM = """[\d,]+(?:\.\d+)?"""
 private const val AIRTEL_CODE = """[A-Z0-9]{10,11}"""
 private const val AIRTEL_WHEN = """(?<Date>[\d\/]+)(?: at)? (?<Time>\d{1,2}:\d{2}(?: [AP]M)?)"""
@@ -56,7 +56,6 @@ private const val AIRTEL_WHEN = """(?<Date>[\d\/]+)(?: at)? (?<Time>\d{1,2}:\d{2
  * `name` is the stable key used to sync these rows, so don't rename an existing entry.
  */
 fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
-    // Payments and transfers out
     mpesa(
         name = "paybill", displayName = "Paybill", isInc = false,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) for account (?<Number>.*)on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\.? New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
@@ -74,7 +73,6 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed. Ksh(?<Amount>[\d,]+\.\d{2}) sent to (?<Name>.*) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
     ),
 
-    // Money in
     mpesa(
         name = "received.person", displayName = "Received", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
@@ -83,15 +81,11 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         name = "received.bank", displayName = "Received", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) on (?<Date>[\d\/]+) (at )?(?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
     ),
-    // e.g. "...Confirmed.  You have received a dividend payment from SAFARICOM PLC INTERIM DIVIDEND 2025
-    // of Ksh1,000.00 on 26/3/25  at 8:28 AM. Your new Account balance is Ksh2,000.00."
-    // Name drops the "INTERIM DIVIDEND 2025" suffix so every payout groups under one payer.
     mpesa(
         name = "dividend", displayName = "Dividend", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\.\s+You have received a dividend payment from (?<Name>.+?)(?: (?:INTERIM|FINAL|SPECIAL) DIVIDEND \d{4})? of Ksh(?<Amount>[\d,]+\.\d{2}) on (?<Date>[\d\/]+)\s+at (?<Time>\d{1,2}:\d{2} [AP]M)\. Your new Account balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
     ),
 
-    // Airtime
     mpesa(
         name = "airtime.own", displayName = "Airtime", isInc = false,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.You bought Ksh(?<Amount>[\d,]+\.\d{2}) of (?<Name>airtime) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M)\.New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
@@ -101,7 +95,6 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.You bought Ksh(?<Amount>[\d,]+\.\d{2}) of (?<Name>airtime) for (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M)\.New *balance is Ksh(?<Balance>[\d,]+\.\d{2}). Transaction cost, Ksh(?<Cost>[\d,]+\.\d{2}))""",
     ),
 
-    // Cash
     mpesa(
         name = "cash_deposit", displayName = "Cash Deposit", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. On (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M) Give Ksh(?<Amount>[\d,\.]+) cash to\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
@@ -115,7 +108,6 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\.on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)Withdraw Ksh(?<Amount>[\d,\.]+) from\s+(?<Name>.*) New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2})\. Transaction cost, Ksh(?<Cost>[\d]+\.\d{2}))""",
     ),
 
-    // M-Shwari and Lock Savings
     mpesa(
         name = "mshwari.deposit", displayName = "M-Shwari Deposit", isInc = false,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.Ksh(?<Amount>[\d,]+\.\d{2}) transferred to (?<Name>M-Shwari account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}) \.New M-Shwari saving account balance is Ksh(?<MshwariBal>[\d,]+\.\d{2})\. Transaction cost Ksh\.(?<Cost>[\d,]+\.\d{2}))""",
@@ -124,12 +116,10 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         name = "mshwari.withdrawal", displayName = "M-Shwari Withdrawal", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed\.Ksh(?<Amount>[\d,]+\.\d{2}) transferred from (?<Name>M-Shwari account) on (?<Date>[\d\/]+) at (?<Time>[\d:]+ [AP]M)\. M-Shwari balance is Ksh(?<MshwariBal>[\d,]+\.\d{2}) \.M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2}) \.Transaction cost Ksh\.(?<Cost>[\d,]+\.\d{2}))""",
     ),
-    // The approval message states no outstanding loan figure, so only the M-PESA side is recorded.
     mpesa(
         name = "mshwari.loan", displayName = "M-Shwari Loan", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Your M-Shwari loan has been approved on (?<Date>[\d\/]+) (?<Time>\d{1,2}:\d{2} [AP]M) and Ksh(?<Amount>[\d,]+\.\d{2}) less excise duty has been deposited to your M-PESA account\. New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}))""",
     ),
-    // The short form ("repaid from M-PESA ... Loan balance is") states the outstanding loan (LoanBal), no M-PESA or M-Shwari balance.
     mpesa(
         name = "mshwari.loan_repayment", displayName = "M-Shwari Loan Repayment", isInc = false,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed\. Loan of Ksh(?<Amount>[\d,]+\.\d{2}) repaid from (?:your M-PESA account|M-PESA) on (?<Date>[\d\/]+) at (?<Time>\d{1,2}:\d{2} [AP]M)\. (?:M-PESA balance is Ksh(?<MpesaBal>[\d,]+\.\d{2})\..*?New M-Shwari balance is Ksh(?<MshwariBal>[\d,]+\.\d{2})|Loan balance is Ksh(?<LoanBal>[\d,]+\.\d{2}))\.\s+Transaction cost Kshs?\.? ?(?<Cost>[\d,]+\.\d{2}))""",
@@ -143,7 +133,6 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         pattern = """Dear customer, Ksh (?<Amount>[\d,]+\.\d{2}) has been moved from your (?<Name>Lock Savings Account) to your M-Shwari account\. New M-Shwari balance is Ksh (?<MshwariBal>[\d,]+\.\d{2}). Transaction cost (?<Cost>[\d,]+\.\d{2})""",
     ),
 
-    // Fuliza
     mpesa(
         name = "fuliza.loan", displayName = "Fuliza Loan", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) Confirmed.*(?<Name>Fuliza) M-PESA amount is Ksh (?<Amount>[\d,]+\.\d{2}).*(?:Interest|Access Fee|Fee) charged Ksh (?<Cost>[\d,]+\.\d{2}).*Total Fuliza M-PESA outstanding amount is Ksh[. ]?(?<TotalLoan>[\d,]+\.\d{2}) due on (?<DueDate>[\d\/]+).)""",
@@ -157,38 +146,27 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s*[cC]onfirmed\.\s*Ksh (?<Amount>[\d,]+\.\d{2}) from your M-PESA has been used to fully pay your outstanding (?<Name>Fuliza) M-PESA\. Available Fuliza M-PESA limit is Ksh (?<AvailableFuliza>[\d,]+\.\d{2})\. (?:Your\s+)?M-PESA balance is (?:Ksh)?(?<MpesaBal>[\d,]+\.\d{2}))""",
     ),
 
-    // Reversals. The lookahead fills Name from either wording with a single group: the payee after
-    // "in favour of", or the word "Reversal" when the message names nobody. Some credits state no balance.
     mpesa(
         name = "reversal", displayName = "Reversal", isInc = true,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s+confirmed\. (?=(?:Your original transaction [A-Z0-9]{10} in favour of )?(?<Name>Reversal|.+?) (?:of transaction|has been reversed))(?:Reversal of transaction|Your original transaction) [A-Z0-9]{10}.*?(?:successfully reversed|reversed successfully|completed successfully)\s+on (?<Date>[\d\/]+)\s+at (?<Time>\d{1,2}:\d{2} [AP]M)\s+and Ksh(?<Amount>[\d,]+\.\d{2}) (?:is|has been) credited to your M-PESA account\.(?: (?:Your )?new M-PESA account balance is Ksh(?<Balance>[\d,]+\.\d{2}))?)""",
     ),
-    // A reversal that takes money out of the account ("... is debited from your M-PESA account").
     mpesa(
         name = "reversal.debit", displayName = "Reversal (debit)", isInc = false,
         pattern = """(?<Body>(?<Code>[A-Z0-9]{10})\s+confirmed\. (?<Name>Reversal) of transaction [A-Z0-9]{10}.*?(?:successfully reversed|reversed successfully|completed successfully)\s+on (?<Date>[\d\/]+)\s+at (?<Time>\d{1,2}:\d{2} [AP]M)\s+and Ksh(?<Amount>[\d,]+\.\d{2}) (?:is|has been) debited from your M-PESA account\.(?: (?:Your )?new M-PESA account balance is Ksh(?<Balance>[\d,]+\.\d{2}))?)""",
     ),
 
-    // Airtel Money
     airtel(
         name = "airtel.send_money", displayName = "Airtel Send Money", isInc = false,
         pattern = """(?<Body>(?<Code>$AIRTEL_CODE)\. Ksh (?<Amount>$AIRTEL_NUM) sent to (?<Name>.+?) (?<Number>\d+) on $AIRTEL_WHEN\. Fee: Ksh (?<Cost>$AIRTEL_NUM)\. Bal: Ksh (?<Balance>$AIRTEL_NUM)\.(?: Receiving TID: [A-Z0-9]+\.?)?)""",
     ),
-    // Several wordings: "Confirmed." may be missing, the fee may read "Cost", "Transaction cost" or "Fee",
-    // and the trailing id is "Receiving TXN ID", "Receiving TID" or "MPESA ID". The lookahead keeps the
-    // merchant-less "Lipa Na Mpesa via Airtel Money" notice for `airtel.pay.receipt` below.
     airtel(
         name = "airtel.pay", displayName = "Airtel Pay", isInc = false,
         pattern = """(?<Body>(?<Code>$AIRTEL_CODE)(?: Confirmed)?\. Ksh (?<Amount>$AIRTEL_NUM) (?:successfully )?paid to (?!Lipa Na Mpesa via)(?<Name>.+?)(?: (?:for )?account (?<Number>\S+))? on $AIRTEL_WHEN\. ?(?:Transaction cost|Cost|Fee:?) Ksh (?<Cost>$AIRTEL_NUM)\. (?:New Airtel Money )?Bal:\s*Ksh (?<Balance>$AIRTEL_NUM)\.?(?: (?:Receiving (?:TXN ID|TID):?|MPESA ID:) ?[A-Z0-9]+\.?)?)""",
     ),
-    // The second notice of a till payment; it names no merchant, so SmsSyncer drops it when the
-    // `airtel.pay` notice with the same code exists.
     airtel(
         name = "airtel.pay.receipt", displayName = "Airtel Pay", isInc = false,
         pattern = """(?<Body>(?<Code>$AIRTEL_CODE)\. Ksh (?<Amount>$AIRTEL_NUM) paid to Lipa Na Mpesa via Airtel Money on $AIRTEL_WHEN\. Fee: Ksh (?<Cost>$AIRTEL_NUM)\. Bal: Ksh (?<Balance>$AIRTEL_NUM)\.?(?: Receiving TID: [A-Z0-9]+)?)""",
     ),
-    // The code is the leading code, or the one after "TID:" / "Txn ID:"; the lookahead reads it with one group.
-    // The amount reads "You have received Ksh 50", "Received Ksh 50" or "Ksh 50 received"; "PM.Bal" has no space.
     airtel(
         name = "airtel.received", displayName = "Airtel Received", isInc = true,
         pattern = """(?<Body>(?=(?:.*?(?:TID|Txn ID): ?)?(?<Code>$AIRTEL_CODE))(?:TID:\w+\. |\w+\. )?(?:(?:You have received|Received) Ksh |(?=Ksh $AIRTEL_NUM received )Ksh )(?<Amount>$AIRTEL_NUM)(?: received)? from (?:MPESA(?: -)? )?(?<Name>.+?)(?: (?<Number>(?:254|0)\d{9}))?(?: on $AIRTEL_WHEN)?\.(?: (?:TID|Txn ID): [A-Z0-9]+\.)?(?: Fee: Ksh (?<Cost>$AIRTEL_NUM)\.)? ?Bal:\s*Ksh\s*(?<Balance>$AIRTEL_NUM))""",
@@ -197,13 +175,10 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
         name = "airtel.airtime", displayName = "Airtel Airtime", isInc = false,
         pattern = """(?<Body>(?<Code>\d{10,11}) successful\. (?<Name>Airtime) top up of Ksh (?<Amount>$AIRTEL_NUM) to (?<Number>\d+) on $AIRTEL_WHEN\.)""",
     ),
-    // The short form: "top up for line <n> of Ksh <a> is successful", no date, but with the balance.
     airtel(
         name = "airtel.airtime.line", displayName = "Airtel Airtime", isInc = false,
         pattern = """(?<Body>(?<Code>$AIRTEL_CODE) successful\. (?<Name>Airtime) top up (?:for|of your) line (?<Number>\d+) of Ksh (?<Amount>$AIRTEL_NUM) is successful\.(?: \d+% bonus airtime received\.)? Bal: Ksh (?<Balance>$AIRTEL_NUM)\.?)""",
     ),
-    // Either "You have successfully purchased a bundle of Ksh 50 [for your line] via ..." with a fee,
-    // or "Bundle purchase successful of Ksh 50 via ..." without one.
     airtel(
         name = "airtel.bundle", displayName = "Airtel Bundle", isInc = false,
         pattern = """(?<Body>(?<Code>$AIRTEL_CODE) Confirmed\. (?:You have successfully purchased a bundle|Bundle purchase successful) of Ksh (?<Amount>$AIRTEL_NUM) (?:for your line )?via (?<Name>Airtel Networks Kenya Ltd) on $AIRTEL_WHEN\.(?: Fee: Ksh (?<Cost>$AIRTEL_NUM)\.)? Bal: Ksh (?<Balance>$AIRTEL_NUM)\.?)""",

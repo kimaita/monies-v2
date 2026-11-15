@@ -114,7 +114,6 @@ class AnalyticsViewModel @Inject constructor(
 
     fun setTimeFilter(f: TimeFilter) = updateFilters { it.copy(timeFilter = f) }
 
-    // Nature reaches only the activity queries, not the breakdown, so a slice stays valid.
     fun setNature(n: Boolean?) = _filters.update { it.copy(natureFilter = n) }
     fun setTypeFilters(ids: List<Int>) = updateFilters { it.copy(typeFilters = ids) }
     fun setCategoryFilters(ids: List<Int>) = updateFilters { it.copy(categoryFilters = ids) }
@@ -137,7 +136,6 @@ class AnalyticsViewModel @Inject constructor(
         _subjectQuery.value = ""
     }
 
-    // ---------------- derived keys ----------------
     /** What most queries restart on. [time] is here, not only its dates, so labels follow their rows. */
     private data class FilterKey(val stats: StatsFilter, val time: TimeFilter)
 
@@ -163,7 +161,6 @@ class AnalyticsViewModel @Inject constructor(
     private val natureKey: Flow<Pair<FilterKey, Boolean?>> =
         combine(_filters, today) { f, day -> keyOf(f, day) to f.natureFilter }.distinctUntilChanged()
 
-    // ---------------- Cash flow tab: balance, flow, costs ----------------
     /** The two bar series of one query, labelled for the time filter the rows were queried for. */
     private class CashFlowRows(val flow: List<BarBucket>, val costs: List<BarBucket>)
 
@@ -189,7 +186,6 @@ class AnalyticsViewModel @Inject constructor(
     val costs: StateFlow<List<BarBucket>?> =
         cashFlowRows.map { it?.costs }.stateIn(viewModelScope, started, null)
 
-    // The balance reads only the time range, so it restarts on that alone.
     val balanceTrend: StateFlow<List<BalancePoint>?> =
         combine(_filters.map { it.timeFilter }.distinctUntilChanged(), today) { tf, day ->
             val (s, e) = getDatesForFilter(tf, day)
@@ -199,18 +195,15 @@ class AnalyticsViewModel @Inject constructor(
                 .map { rows -> balancePoints(rows) }
         }.stateIn(viewModelScope, started, null)
 
-    // ---------------- headline stats (net / in / out / fees) ----------------
     val stats: StateFlow<IncExp?> = key.flatMapLatest { k ->
         repository.getIncomeVsExpense(k.stats)
     }.stateIn(viewModelScope, started, null)
 
-    // ---------------- Spending tab: breakdown, subjects (cross-filtered), income tree ----------------
     /** The rows the breakdown shows, and whether they are by type (chosen, or because there are no categories). */
     private class BreakdownRows(val byType: Boolean, val rows: List<CategorySpending>)
 
     private fun typeRows(k: FilterKey) = repository.getTypeSpending(k.stats, natureFilter = false).map { BreakdownRows(true, it) }
 
-    // One query for the selected mode; the type query runs only when there are no categories.
     private val breakdownRows: Flow<BreakdownRows> =
         combine(key, _breakdownMode, ::Pair).flatMapLatest { (k, mode) ->
             if (mode == Breakdown.TYPE) typeRows(k)
@@ -255,7 +248,6 @@ class AnalyticsViewModel @Inject constructor(
         repository.getIncomeBySource(k.stats, 8).map { list -> list.map { RankedRow(it.name, it.amount) } }
     }.stateIn(viewModelScope, started, null)
 
-    // ---------------- Activity tab ----------------
     val activityRaw: StateFlow<List<ActivityCell>?> =
         natureKey.flatMapLatest { (k, nature) ->
             repository.getActivityByTimeOfDay(k.stats, nature)

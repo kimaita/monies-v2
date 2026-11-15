@@ -40,8 +40,10 @@ private const val RECURRING_ROWS = """
 
 private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
 
-// List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
-// element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
+/**
+ * List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
+ * element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
+ */
 private const val TRANSACTIONS_FILTER = """
         WHERE $DATE_RANGE
         AND (:subjectId IS NULL OR t.subject = :subjectId)
@@ -67,8 +69,10 @@ interface TransactionsDao : BaseDao<Transaction> {
     )
     suspend fun deletePairedAirtelReceipts()
 
-    // The four list queries differ only in ORDER BY. Each sorts by a plain indexed column with id as the
-    // tie-break, so SQLite reads the index in order instead of sorting every matching row for each page.
+    /**
+     * The four list queries differ only in ORDER BY. Each sorts by a plain indexed column with id as the
+     * tie-break, so SQLite reads the index in order instead of sorting every matching row for each page.
+     */
     @androidx.room.Transaction
     @Query(TRANSACTIONS_SELECT + TRANSACTIONS_FILTER + SEARCH_FILTER + "ORDER BY t.transactionTime DESC, t.id DESC")
     fun getTransactionsNewest(

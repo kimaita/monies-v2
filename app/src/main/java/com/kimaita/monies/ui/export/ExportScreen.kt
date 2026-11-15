@@ -133,7 +133,6 @@ fun ExportScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            // header + live scope line
             Column {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -185,7 +184,6 @@ fun ExportScreen(
                             viewModel.setRange(start, end)
                         }
                     }
-                    // Custom: a calendar icon, or the picked dates once a custom range is in force.
                     val custom = band == null
                     BandChip(
                         if (custom) rangeText(sel.startDate, sel.endDate, today) else null,
@@ -246,8 +244,6 @@ fun ExportScreen(
     }
 }
 
-/* ---------------- format ---------------- */
-
 @Composable
 private fun FormatCell(
     format: ExportFormat,
@@ -289,8 +285,6 @@ private fun FormatCell(
         )
     }
 }
-
-/* ---------------- helpers ---------------- */
 
 @Composable
 private fun SectionLabel(t: String) =

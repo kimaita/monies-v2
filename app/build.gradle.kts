@@ -80,16 +80,13 @@ dependencies {
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    // Compose Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
     ksp(libs.androidx.room.compiler)
 
-    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.ui)
@@ -98,7 +95,6 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.paging.compose)
 
-    // Dependency Injection
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.common)
     implementation(libs.androidx.hilt.work)
@@ -110,7 +106,6 @@ dependencies {
 
 
 
-    // Timber Logger
     implementation(libs.timber)
 
     testImplementation(libs.junit)

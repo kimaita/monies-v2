@@ -38,7 +38,6 @@ class TypeFilterTest {
         val cleared = filters.withNature(null, all)
         assertEquals(null, cleared.natureFilter)
         assertEquals(listOf(3, 4), cleared.typeFilters)
-        // even before the types have loaded
         assertEquals(listOf(3, 4), filters.withNature(null, emptyList()).typeFilters)
     }
 

@@ -146,7 +146,6 @@ class HomeViewModel @Inject constructor(
         val balances = balancesOrNull.orEmpty()
         val other = otherOrNull ?: OtherBalances()
         val shown = if (selected == null) balances else balances.filter { it.accountId == selected }
-        // Fuliza and M-Shwari belong to M-PESA: hide them when another provider's line is selected.
         val mpesaView = selected == null || lines.any { it.accountId == selected && it.provider == Provider.MPESA.name }
         val totalMoved = period.incExp?.let { it.income + it.expense }
         val prevMoved = period.previousIncExp?.let { it.income + it.expense }

@@ -8,10 +8,14 @@ import androidx.compose.ui.graphics.Color
 
 @Immutable
 data class ExtraColors(
-    val positive: Color,    // money in (text/figures)
-    val negative: Color,    // money out / debt (Fuliza used, loans)
-    val inflow: Color,      // chart inflow
-    val outflow: Color,     // chart outflow
+    /** money in (text/figures) */
+    val positive: Color,
+    /** money out / debt (Fuliza used, loans) */
+    val negative: Color,
+    /** chart inflow */
+    val inflow: Color,
+    /** chart outflow */
+    val outflow: Color,
     val gold: Color,
     val medals: List<Color>,
 )

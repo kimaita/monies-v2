@@ -13,7 +13,7 @@ import java.time.ZoneId
 
 class SmsParserSamplesTest {
 
-    // Give each default type a distinct id, as the database would, so we can tell which one matched.
+    /** Give each default type a distinct id, as the database would, so we can tell which one matched. */
     private val types = getDefaultTransactionTypes().mapIndexed { i, t -> t.copy(id = i + 1) }
     private val typeIdByName = types.associate { it.name to it.id }
     private val smsTimestamp = 1_700_000_000_000L
@@ -54,7 +54,7 @@ class SmsParserSamplesTest {
 
     @Test
     fun everyDefaultMpesaTypeHasASample() {
-        val covered = mpesaSamples.map { it.type }.toSet() + "airtime.other" // no sample for this one
+        val covered = mpesaSamples.map { it.type }.toSet() + "airtime.other"
         assertEquals(emptySet<String>(), types.filter { it.provider == Provider.MPESA.name }.map { it.name }.toSet() - covered)
     }
 

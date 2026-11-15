@@ -39,7 +39,6 @@ class SmsParser @Inject constructor() {
 
         val transactionList = mutableListOf<Pair<Transaction, Subject?>>()
 
-        // Only a message's own provider's patterns are tried; a sender nobody knows is never matched.
         val patternsByProvider = transactionTypes
             .filter { it.pattern != null }
             .groupBy({ it.provider }, { Pair(it.id, regexFor(it.pattern!!)) })
@@ -117,7 +116,7 @@ class SmsParser @Inject constructor() {
             subject = null,
             transactionType = typeId,
             transactionCategory = null,
-            accountId = 0 // placeholder; SmsSyncer sets the real account
+            accountId = 0
         )
         return Pair(transaction, newSubject)
     }

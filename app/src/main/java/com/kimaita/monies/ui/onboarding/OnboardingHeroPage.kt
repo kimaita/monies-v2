@@ -41,8 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 
-/* ---------- Page 1: SMS → record ---------- */
-
 @Composable
 internal fun HeroPage(active: Boolean, parallax: () -> Float) {
     val t = remember { Animatable(0f) }

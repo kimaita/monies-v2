@@ -27,7 +27,8 @@ data class StreakSummary(
 )
 
 data class RhythmStats(
-    val busiestWeekday: Int?,   // 0=Sun..6=Sat
+    /** 0=Sun..6=Sat */
+    val busiestWeekday: Int?,
     val mostActiveSlot: Int?,
     val avgPerDay: Double,
     val longestQuietDays: Int,
@@ -51,7 +52,6 @@ fun computeStreaks(daily: List<DailyTotal>, start: LocalDate, end: LocalDate): S
         }
         d = d.plusDays(1)
     }
-    // current streak = consecutive active days ending at `end`
     d = end
     while (!d.isBefore(start) && (byDay[d] ?: 0.0) > 0.0) {
         current++; d = d.minusDays(1)
@@ -79,10 +79,14 @@ fun computeRhythm(
  * [lastMonth] is empty when last month has no spending; [changePct] is then null too.
  */
 data class PaceSummary(
-    val thisMonth: List<Double>,   // day 1 .. today
-    val lastMonth: List<Double>,   // day 1 .. last day of last month
-    val spent: Double,             // spent so far this month
-    val changePct: Double?,        // this month vs last month, both at min(today's day, last month's length)
+    /** day 1 .. today */
+    val thisMonth: List<Double>,
+    /** day 1 .. last day of last month */
+    val lastMonth: List<Double>,
+    /** spent so far this month */
+    val spent: Double,
+    /** this month vs last month, both at min(today's day, last month's length) */
+    val changePct: Double?,
 )
 
 fun computePace(daily: List<DailyTotal>, today: LocalDate): PaceSummary {

@@ -20,9 +20,7 @@ import kotlinx.coroutines.flow.map
 private val directionOptions = listOf("Out" to SpendDirection.OUT, "In" to SpendDirection.IN)
 private val breakdownOptions = listOf("Category" to Breakdown.CATEGORY, "Type" to Breakdown.TYPE)
 
-/* ----------------------------- Spending ----------------------------- */
-
-// One side at a time, so each collects (and queries for) only what it shows.
+/** One side at a time, so each collects (and queries for) only what it shows. */
 @Composable
 internal fun SpendingTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val direction by vm.direction.collectAsStateWithLifecycle()
@@ -41,7 +39,6 @@ private fun SpendingOut(vm: AnalyticsViewModel, listState: LazyListState) {
     val breakdownRows = breakdownOrNull
     val top = topOrNull
     val slices = remember(breakdownRows) { breakdownRows?.map { RankedRow(it.label, it.value.toDouble()) } }
-    // A selection whose row has gone (the period changed, say) is no longer a filter.
     val selected = slices?.let { rows -> selectedSlice?.takeIf { s -> rows.any { it.label == s } } }
 
     TabList(listState) {
@@ -108,8 +105,6 @@ private fun SpendingIn(vm: AnalyticsViewModel, listState: LazyListState) {
 @Composable
 private fun DirectionToggle(direction: SpendDirection, onSelect: (SpendDirection) -> Unit) =
     Segmented(directionOptions, direction, onSelect)
-
-/* ----------------------------- Cash flow ----------------------------- */
 
 @Composable
 internal fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {

@@ -26,8 +26,10 @@ annotation class ApplicationScope
 @InstallIn(SingletonComponent::class)
 abstract class ExportModule {
 
-    // Multibinding: every FormatWriter feeds the Set<FormatWriter> that ExportWorker injects.
-    // Adding a format later = one new class + one @Binds line here.
+    /**
+     * Multibinding: every FormatWriter feeds the Set<FormatWriter> that ExportWorker injects.
+     * Adding a format later = one new class + one @Binds line here.
+     */
     @Binds
     @IntoSet
     abstract fun bindCsv(w: CsvWriter): FormatWriter

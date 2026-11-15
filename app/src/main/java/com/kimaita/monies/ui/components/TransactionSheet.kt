@@ -158,14 +158,12 @@ fun TransactionContent(
             }
         }
 
-        // --- Editable Category Section ---
         EditableCategoryChip(
             currentCategory = transaction.category?.name ?: "Assign Category",
             categories = categories,
             onCategorySelected = onCategoryChange
         )
 
-        // --- Sender Detail Card ---
         Card(
             shape = RoundedCornerShape(16.dp),
             border = null,
@@ -178,7 +176,6 @@ fun TransactionContent(
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -195,7 +192,6 @@ fun TransactionContent(
                 Spacer(modifier = Modifier.width(8.dp))
                 val number = transaction.subject?.number
 
-                // Name and Phone
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.Center
@@ -317,9 +313,6 @@ fun ActionButton(
     }
 }
 
-// ... inside TransactionSheet.kt
-
-// --- Preview for testing ---
 @Preview(showBackground = true)
 @Composable
 fun PreviewSheetContent() {
@@ -345,7 +338,7 @@ fun PreviewSheetContent() {
         ),
     )
 
-    AppTheme { // Wrapping in theme for accurate colors
+    AppTheme {
         Box(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.surface)

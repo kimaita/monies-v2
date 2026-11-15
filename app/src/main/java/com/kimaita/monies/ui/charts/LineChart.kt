@@ -162,7 +162,6 @@ internal fun LineChartCanvas(
                 val span = (xMax - xMin).coerceAtLeast(1e-6f)
                 fun px(x: Float) = left + (x - xMin) / span * (right - left)
 
-                // gridlines and y labels
                 val gridPx = 1.dp.toPx()
                 val gridYs = FloatArray(scale.values.size) { scale.y(scale.values[it], top, bottom) }
                 val yLabels = Array(scale.values.size) {
@@ -183,8 +182,6 @@ internal fun LineChartCanvas(
                         bottom + 6.dp.toPx()
                     )
                 }
-                // Labels are given left to right; one that would touch the previous is dropped, but
-                // the last always stays (it takes the place of any that it would touch).
                 val labelGap = 6.dp.toPx()
                 fun touches(a: Int, b: Int) = xLabelPos[a].x + xLabelLayouts[a].size.width + labelGap > xLabelPos[b].x
                 val shown = ArrayList<Int>()
@@ -193,7 +190,6 @@ internal fun LineChartCanvas(
                     if (shown.isEmpty() || !touches(shown.last(), i)) shown.add(i)
                 }
 
-                // lines
                 val paths = Array(series.size) { i ->
                     val s = series[i]
                     Path().apply {
@@ -232,7 +228,6 @@ internal fun LineChartCanvas(
                     if (s.xs.size == 1) Offset(px(s.xs[0]), scale.y(s.ys[0], top, bottom)) else null
                 }
 
-                // scrub marker and tooltip, precomputed for every index
                 val first = series.firstOrNull()
                 val pointX = FloatArray(first?.xs?.size ?: 0) { px(first!!.xs[it]) }
                 val pointY = FloatArray(pointX.size) { scale.y(first!!.ys[it], top, bottom) }
@@ -294,7 +289,6 @@ fun BalanceTrendChart(
         )
     }
     val xLabels = remember(data) {
-        // Five evenly spaced dates; the chart drops any that would touch their neighbour.
         listOf(0, data.lastIndex / 4, data.lastIndex / 2, data.lastIndex * 3 / 4, data.lastIndex)
             .distinct().map { it.toFloat() to data[it].axisLabel }
     }

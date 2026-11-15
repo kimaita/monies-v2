@@ -11,8 +11,6 @@ import com.kimaita.monies.services.StreakSummary
 import com.kimaita.monies.ui.charts.*
 import java.time.LocalDate
 
-/* ----------------------------- Activity ----------------------------- */
-
 @Composable
 internal fun ActivityTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val rhythmOrNull by vm.rhythm.collectAsStateWithLifecycle()

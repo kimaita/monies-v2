@@ -38,8 +38,6 @@ class SmsDataSource @Inject constructor(
         )
 
         val out = ArrayList<SmsParser.SmsMessage>(limit)
-        // LIMIT matters even though the loop stops at `limit`: a cursor from another process is
-        // counted in full before it is returned, so without it every batch walks the rest of the inbox.
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI, projection, selection, args,
             "${Telephony.Sms.Inbox._ID} ASC LIMIT $limit",

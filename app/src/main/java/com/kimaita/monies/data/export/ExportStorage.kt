@@ -40,16 +40,14 @@ class ExportStorage @Inject constructor(
                 resolver.openOutputStream(uri)?.use { out -> body(out) }
                     ?: throw IOException("Could not open output stream for $uri")
             } catch (t: Throwable) {
-                resolver.delete(uri, null, null)        // drop the partial/pending file
+                resolver.delete(uri, null, null)
                 throw t
             }
             values.clear()
             values.put(MediaStore.MediaColumns.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
-            uri                                          // branch result
+            uri
         } else {
-            // API 26-28: public Downloads needs WRITE_EXTERNAL_STORAGE, so write to the app's own
-            // external folder and hand out a content:// URI (a file:// URI crashes the share intent).
             val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                 ?: throw IOException("External storage is not available")
             val file = File(dir, fileName)
@@ -59,7 +57,7 @@ class ExportStorage @Inject constructor(
                 file.delete()
                 throw t
             }
-            FileProvider.getUriForFile(context, "${context.packageName}.files", file)                         // branch result
+            FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         }
     }
 

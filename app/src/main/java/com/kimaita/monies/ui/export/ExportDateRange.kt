@@ -43,8 +43,6 @@ internal fun BandChip(
     )
 }
 
-/* ---------------- date picker ---------------- */
-
 private fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 private fun Long.toUtcDate() = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 
