@@ -15,6 +15,7 @@ import com.kimaita.monies.services.SmsSyncer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -81,8 +83,13 @@ class HomeViewModel @Inject constructor(
     private val _timeFilter = MutableStateFlow<TimeFilter>(TimeFilter.DAY)
     val filters: StateFlow<TimeFilter> = _timeFilter.asStateFlow()
 
+    // The sync on every open usually finds nothing new in ~200 ms; showing the bar only once a sync
+    // has run for 500 ms keeps that check from flashing it. Hiding is immediate.
+    @OptIn(FlowPreview::class)
     val isSyncing: StateFlow<Boolean> =
-        smsSyncer.isSyncing.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+        smsSyncer.isSyncing
+            .debounce { if (it) 500L else 0L }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _errorEvents = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
