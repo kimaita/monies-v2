@@ -233,6 +233,38 @@ class SmsSyncerTest {
         assertEquals(listOf(store.categories["rent"]), store.transactions.map { it.transactionCategory })
     }
 
+    private val maskedJane = mpesaSamples.first { it.number == "0700***003" }.body
+    private val fullJane = mpesaSamples.first { it.number == "0700000003" }.body
+
+    @Test
+    fun aMaskedNumberJoinsTheSavedSubjectWithTheFullNumber() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        store.subjects["JANE DOE" to "0700000003"] = 7L
+        store.subjects["JANE DOE" to "0700000004"] = 8L
+        run(FakeInbox(listOf(msg(1, maskedJane))), store)
+        assertEquals(listOf(7L), store.transactions.map { it.subject })
+        assertEquals(2, store.subjects.size)
+    }
+
+    @Test
+    fun aMaskedNumberFindsAFullOneSavedInTheSameBatch() {
+        val store = FakeStore(getDefaultTransactionTypes())
+        run(FakeInbox(listOf(msg(1, maskedJane), msg(2, fullJane))), store)
+        assertEquals(listOf("JANE DOE" to "0700000003"), store.subjects.keys.toList())
+        assertEquals(1, store.transactions.map { it.subject }.distinct().size)
+    }
+
+    @Test
+    fun aMaskedNumberThatFitsNoneOrSeveralGetsItsOwnSubject() {
+        for (saved in listOf(emptyList(), listOf("0700000003", "0700999003"))) {
+            val store = FakeStore(getDefaultTransactionTypes())
+            saved.forEachIndexed { i, n -> store.subjects["JANE DOE" to n] = 10L + i }
+            run(FakeInbox(listOf(msg(1, maskedJane), msg(2, maskedJane.replace("TCQ000DDD4", "TCQ000DDD5")))), store)
+            val own = store.subjects.getValue("JANE DOE" to "0700***003")
+            assertEquals(listOf(own, own), store.transactions.map { it.subject })
+        }
+    }
+
     private fun act(id: Int, min: String, max: String, provider: String = "MPESA") =
         AccountActivity(id, provider, min, max)
 

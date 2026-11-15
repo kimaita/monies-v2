@@ -29,9 +29,7 @@ class SmsParser @Inject constructor() {
      * Unanchored, a pattern that does not fit is retried at every offset of the body, which made
      * matching about ten times slower.
      */
-    private fun regexFor(pattern: String) = regexCache.getOrPut(pattern) {
-        "^\\s*(?:$pattern)".toRegex(setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
-    }
+    private fun regexFor(pattern: String) = regexCache.getOrPut(pattern) { typeRegex(pattern) }
 
     fun parse(
         messages: List<SmsMessage>, transactionTypes: List<TransactionType>
@@ -125,3 +123,7 @@ class SmsParser @Inject constructor() {
         val REPEATED_SPACES = Regex("\\s{2,}")
     }
 }
+
+/** A transaction type's pattern as the parser runs it: anchored at the start of the message. */
+internal fun typeRegex(pattern: String) =
+    "^\\s*(?:$pattern)".toRegex(setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))

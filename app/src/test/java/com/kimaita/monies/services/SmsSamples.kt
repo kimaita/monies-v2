@@ -65,6 +65,10 @@ val mpesaSamples: List<Sample> = listOf(
         "MPESA", "received.person", 500.0, 0.0, 3500.0, "JANE DOE", "0700000003", dt(2025, 4, 2, 10, 15),
     ),
     Sample(
+        "TCQ000DDD4 Confirmed.You have received Ksh500.00 from JANE DOE 0700***003 on 2/11/26 at 10:15 AM  New M-PESA balance is Ksh3,500.00.",
+        "MPESA", "received.person", 500.0, 0.0, 3500.0, "JANE DOE", "0700***003", dt(2026, 11, 2, 10, 15),
+    ),
+    Sample(
         "QR574KRN21 Confirmed. You have received Ksh60.00 from ACME BANK LIMITED- APP on 1/11/24 at 9:34 AM. New M-PESA balance is Ksh60.00. Buy goods with M-PESA.",
         "MPESA", "received.bank", 60.0, 0.0, 60.0, "ACME BANK LIMITED- APP", null, dt(2024, 11, 1, 9, 34),
     ),
