@@ -12,6 +12,7 @@ import com.kimaita.monies.data.dao.UnparsedMessageDao
 import com.kimaita.monies.data.database.AppDatabase
 import com.kimaita.monies.data.database.DatabaseInitializer
 import com.kimaita.monies.data.database.MIGRATION_2_3
+import com.kimaita.monies.data.database.MIGRATION_3_4
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,7 +32,7 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context, AppDatabase::class.java, "monies-db",
         )
-            .addMigrations(MIGRATION_2_3)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
             .fallbackToDestructiveMigrationFrom(true, 1)
             .addCallback(DatabaseInitializer())
             .build()

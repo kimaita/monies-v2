@@ -50,6 +50,8 @@ private const val AIRTEL_WHEN = """(?<Date>[\d\/]+)(?: at)? (?<Time>\d{1,2}:\d{2
  * Cost, Name, Number, Date, Time, plus balance groups (Balance, then MpesaBal, becomes Transaction.balance) and the other balances (
  * MshwariBal, LockSavingsBal, AvailableFuliza, TotalLoan, LoanBal).
  * Names that need cleaning (trailing dot, repeated spaces) are cleaned by the parser, not here.
+ * M-PESA hides some digits of the sender's number in received messages ("0712***880"), so
+ * received.person's Number accepts asterisks; without that the message falls to received.bank.
  *
  * Order matters: the parser takes the first pattern that matches, so a more specific format must
  * come before a looser one (send_money before pochi, received.person before received.bank).
@@ -75,7 +77,7 @@ fun getDefaultTransactionTypes(): List<TransactionType> = listOf(
 
     mpesa(
         name = "received.person", displayName = "Received", isInc = true,
-        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) (?<Number>\d+) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
+        pattern = """(?<Body>(?<Code>[A-Z0-9]{10}) [cC]onfirmed.*You have received Ksh(?<Amount>[\d,]+\.\d{2}) from (?<Name>.*) (?<Number>\d+(?:\*+\d+)?) on (?<Date>[\d\/]+) at (?<Time>\d{1,}:\d{2} [AP]M).*New M-PESA balance is Ksh(?<Balance>[\d,]+\.\d{2}).)""",
     ),
     mpesa(
         name = "received.bank", displayName = "Received", isInc = true,

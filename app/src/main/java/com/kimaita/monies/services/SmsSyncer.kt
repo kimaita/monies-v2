@@ -258,12 +258,15 @@ class SmsSyncer(
             val categoryIds = store.categoryIds()
             val parsedSubjects = parsed.mapNotNull { it.second }.distinctBy { it.rawName to it.number }
             val savedByKey = store.savedSubjects(parsedSubjects.map { it.rawName }.distinct())
-                .associateBy { it.rawName to it.number }
-            parsedSubjects.associate { s ->
+                .associateByTo(HashMap()) { it.rawName to it.number }
+            // Full numbers first, so a masked one finds a subject this batch has just saved.
+            parsedSubjects.sortedBy { '*' in it.number }.associate { s ->
                 val key = s.rawName to s.number
-                key to (savedByKey[key] ?: defaultCategoryId(s.rawName, categoryIds).let { category ->
-                    SavedSubject(s.rawName, s.number, store.insertSubject(s.copy(categoryId = category)), category)
-                })
+                key to (savedByKey[key]
+                    ?: unmaskedSubject(s.rawName, s.number, savedByKey.values)
+                    ?: defaultCategoryId(s.rawName, categoryIds).let { category ->
+                        SavedSubject(s.rawName, s.number, store.insertSubject(s.copy(categoryId = category)), category)
+                    }).also { savedByKey.putIfAbsent(key, it) }
             }
         }
 

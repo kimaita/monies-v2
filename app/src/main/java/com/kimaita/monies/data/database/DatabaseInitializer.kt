@@ -11,12 +11,72 @@ import com.kimaita.monies.data.database.models.defaultCategoryRulesVersion
 import com.kimaita.monies.data.database.models.getDefaultCategories
 import com.kimaita.monies.data.database.models.getDefaultTransactionTypes
 import com.kimaita.monies.services.SmsSyncer
+import com.kimaita.monies.services.fitsMask
+import com.kimaita.monies.services.splitMaskedName
+import com.kimaita.monies.services.typeRegex
 
 /** Adds `accounts.mergedInto` and clears the carrier-derived labels the old sync wrote. */
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE accounts ADD COLUMN mergedInto INTEGER")
         db.execSQL("UPDATE accounts SET label = NULL")
+    }
+}
+
+/**
+ * Repairs received messages saved before the patterns accepted masked numbers ("0712***880"). They
+ * fell to received.bank with the number left in the subject's name. Each row gets received.person;
+ * each such subject gets its name and number apart and, when it is not merged yet and exactly one
+ * saved subject has a number that fits, is merged into that subject.
+ * Merges the user made by hand stay as they are.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        retypeMaskedRows(db, from = "received.bank", to = "received.person")
+        splitMaskedSubjects(db)
+    }
+}
+
+private fun SupportSQLiteDatabase.typeId(name: String): Long? =
+    query("SELECT id FROM transaction_types WHERE name = ?", arrayOf(name))
+        .use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+
+private fun retypeMaskedRows(db: SupportSQLiteDatabase, from: String, to: String) {
+    val fromId = db.typeId(from) ?: return
+    val toId = db.typeId(to) ?: return
+    val regex = typeRegex(getDefaultTransactionTypes().first { it.name == to }.pattern!!)
+    val ids = ArrayList<Long>()
+    db.query("SELECT id, message FROM transactions WHERE transactionType = ? AND message LIKE '%*%'", arrayOf(fromId))
+        .use { c -> while (c.moveToNext()) if (regex.containsMatchIn(c.getString(1))) ids += c.getLong(0) }
+    for (id in ids) db.execSQL("UPDATE transactions SET transactionType = ? WHERE id = ?", arrayOf<Any>(toId, id))
+}
+
+private fun splitMaskedSubjects(db: SupportSQLiteDatabase) {
+    class Row(val id: Long, val rawName: String, val merged: Boolean, val categoryId: Int?)
+
+    val rows = ArrayList<Row>()
+    db.query("SELECT id, rawName, mergedInto, categoryId FROM subjects WHERE number = '' AND rawName LIKE '%*%'").use { c ->
+        while (c.moveToNext()) rows += Row(c.getLong(0), c.getString(1), !c.isNull(2), if (c.isNull(3)) null else c.getInt(3))
+    }
+    for (row in rows) {
+        val (name, number) = splitMaskedName(row.rawName) ?: continue
+        if (!row.merged) {
+            val roots = HashSet<Long>()
+            db.query("SELECT number, COALESCE(mergedInto, id) FROM subjects WHERE rawName = ?", arrayOf(name))
+                .use { c -> while (c.moveToNext()) if (fitsMask(number, c.getString(0))) roots += c.getLong(1) }
+            // A root equal to this row means the user merged the full-number subject into it: keep that.
+            roots.singleOrNull()?.takeIf { it != row.id }?.let { root ->
+                row.categoryId?.let {
+                    db.execSQL("UPDATE subjects SET categoryId = ? WHERE id = ? AND categoryId IS NULL", arrayOf<Any>(it, root))
+                }
+                db.execSQL("UPDATE transactions SET subject = ? WHERE subject = ?", arrayOf<Any>(root, row.id))
+                db.execSQL("UPDATE subjects SET mergedInto = ? WHERE id = ? OR mergedInto = ?", arrayOf<Any>(root, row.id, row.id))
+            }
+        }
+        db.execSQL(
+            "UPDATE OR IGNORE subjects SET rawName = ?, number = ?, name = CASE WHEN name = rawName THEN ? ELSE name END WHERE id = ?",
+            arrayOf<Any>(name, number, name, row.id)
+        )
     }
 }
 
