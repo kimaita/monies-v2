@@ -11,7 +11,8 @@ private val AtkinsonNext = FontFamily(
     Font(R.font.atkinson_next_bold, FontWeight.Bold),
 )
 
-private val AtkinsonMono = FontFamily(
+/** Figures and small labels. Bold is synthesised: only the regular weight is bundled. */
+val AtkinsonMono = FontFamily(
     Font(R.font.atkinson_mono_regular, FontWeight.Normal),
 )
 

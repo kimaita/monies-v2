@@ -48,6 +48,21 @@ data class CashFlowBucket(
 
 data class ActivityCell(val weekday: Int, val slot: Int, val count: Int)
 
+/** What moved the balance in a range: see [com.kimaita.monies.data.dao.TransactionsDao.getWalkTotals]. */
+data class WalkTotals(
+    val income: Double = 0.0,
+    val expense: Double = 0.0,
+    val fees: Double = 0.0,
+    val mshwariIn: Double = 0.0,
+    val mshwariOut: Double = 0.0,
+    val fulizaIn: Double = 0.0,
+    val fulizaOut: Double = 0.0,
+    val fulizaFees: Double = 0.0,
+)
+
+/** The biggest single payment in ([isInc]) or out of a range; [time] is ISO text. */
+data class LargestPayment(val isInc: Boolean, val amount: Double, val time: String, val category: String?)
+
 /** Latest balance per bucket — the balance-trend line. */
 data class BalanceBucket(val bucket: String, val balance: Float)
 

@@ -13,7 +13,6 @@ import com.kimaita.monies.models.analytics.BalancePoint
 import com.kimaita.monies.models.analytics.HeatRow
 import com.kimaita.monies.models.export.NamedRef
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -72,46 +71,6 @@ fun computeRhythm(
         .maxByOrNull { it.value }?.key
     val avg = if (rangeDays > 0) totalCount.toDouble() / rangeDays else 0.0
     return RhythmStats(busiest, slot, avg, longestNoSpend)
-}
-
-/**
- * Cumulative spending by day of month. Index 0 is day 1.
- * [lastMonth] is empty when last month has no spending; [changePct] is then null too.
- */
-data class PaceSummary(
-    /** day 1 .. today */
-    val thisMonth: List<Double>,
-    /** day 1 .. last day of last month */
-    val lastMonth: List<Double>,
-    /** spent so far this month */
-    val spent: Double,
-    /** this month vs last month, both at min(today's day, last month's length) */
-    val changePct: Double?,
-)
-
-fun computePace(daily: List<DailyTotal>, today: LocalDate): PaceSummary {
-    val thisYm = YearMonth.from(today)
-    val lastYm = thisYm.minusMonths(1)
-    val thisDays = DoubleArray(today.dayOfMonth)
-    val lastDays = DoubleArray(lastYm.lengthOfMonth())
-    for (d in daily) {
-        val date = LocalDate.parse(d.day)
-        when (YearMonth.from(date)) {
-            thisYm -> if (date.dayOfMonth <= thisDays.size) thisDays[date.dayOfMonth - 1] += d.total
-            lastYm -> lastDays[date.dayOfMonth - 1] += d.total
-        }
-    }
-    fun cumulative(a: DoubleArray): List<Double> {
-        var run = 0.0
-        return a.map { run += it; run }
-    }
-    val thisCum = cumulative(thisDays)
-    val lastCum = cumulative(lastDays)
-    if (lastCum.last() <= 0.0) return PaceSummary(thisCum, emptyList(), thisCum.last(), null)
-
-    val at = minOf(today.dayOfMonth, lastCum.size) - 1
-    val change = lastCum[at].takeIf { it > 0.0 }?.let { (thisCum[at] - it) / it * 100.0 }
-    return PaceSummary(thisCum, lastCum, thisCum.last(), change)
 }
 
 /** The line Analytics is showing: its name, or "All accounts"; null when there is a single line and nothing to tell apart. */
@@ -216,7 +175,7 @@ fun balancePoints(rows: List<BalanceBucket>, maxPoints: Int = 90): List<BalanceP
             several -> date.format(dateShortYearFmt)
             else -> date.format(dateFmt)
         }
-        BalancePoint(label, r.balance, axis)
+        BalancePoint(label, r.balance, axis, date)
     }
 }
 
@@ -232,7 +191,8 @@ private val slotRanges = listOf("5 am–12 pm", "12–5 pm", "5–10 pm", "10 pm
 /**
  * One sentence on when the activity is, from the time-of-day cells (slot 0 morning .. 3 night,
  * weekday 0 = Sunday): the busiest slot, and "weekday" or "weekend" when that slot's per-day rate is
- * over 1.5 times the other's. Null when there are fewer than 5 transactions.
+ * over 1.5 times the other's. The slot is between `**` marks, to be shown bold. Null when there are
+ * fewer than 5 transactions.
  */
 fun activeSummary(cells: List<ActivityCell>): String? {
     if (cells.sumOf { it.count } < 5) return null
@@ -243,9 +203,9 @@ fun activeSummary(cells: List<ActivityCell>): String? {
     val name = slotNames[slot]
     val range = slotRanges[slot]
     return when {
-        weekdayRate > weekendRate * 1.5 -> "Most active on weekday $name, $range"
-        weekendRate > weekdayRate * 1.5 -> "Most active on weekend $name, $range"
-        else -> "Most active in the $name, $range"
+        weekdayRate > weekendRate * 1.5 -> "Most active on **weekday $name**, $range."
+        weekendRate > weekdayRate * 1.5 -> "Most active on **weekend $name**, $range."
+        else -> "Most active in the **$name**, $range."
     }
 }
 
@@ -329,3 +289,22 @@ fun toWeekdayBars(counts: List<WeekdayCount>): List<WeekdayBar> {
     val map = counts.associate { it.weekday to it.count }
     return weekdayOrder.mapIndexed { i, wd -> WeekdayBar(weekdayNames[i], map[wd] ?: 0) }
 }
+
+/**
+ * The days a "%Y-%W" bucket covers, as SQLite counts weeks: week 1 starts on the year's first Monday,
+ * week 0 is the days before it. Kept within the year. Null for another key.
+ */
+fun weekDays(bucket: String): ClosedRange<LocalDate>? {
+    val year = bucket.take(4).toIntOrNull() ?: return null
+    val week = bucket.substringAfter('-', "").toIntOrNull() ?: return null
+    val jan1 = LocalDate.of(year, 1, 1)
+    val firstMonday = jan1.with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.MONDAY))
+    val start = if (week == 0) jan1 else firstMonday.plusWeeks(week - 1L)
+    val end = if (week == 0) firstMonday.minusDays(1) else start.plusDays(6)
+    return start..minOf(end, LocalDate.of(year, 12, 31))
+}
+
+/** "2–8 Nov", or "28 Oct – 3 Nov" across months. */
+fun dayRangeLabel(r: ClosedRange<LocalDate>): String =
+    if (r.start.month == r.endInclusive.month) "${r.start.dayOfMonth}–${r.endInclusive.format(dateFmt)}"
+    else "${r.start.format(dateFmt)} – ${r.endInclusive.format(dateFmt)}"

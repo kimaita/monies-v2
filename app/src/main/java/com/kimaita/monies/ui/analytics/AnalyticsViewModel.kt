@@ -21,6 +21,21 @@ import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.services.PaceSummary
+import com.kimaita.monies.services.weekDays
+import com.kimaita.monies.services.dayRangeLabel
+import com.kimaita.monies.services.PacePeriod
+import com.kimaita.monies.services.pacePeriod
+import com.kimaita.monies.services.computePace
+import com.kimaita.monies.services.projectPeriodEnd
+import com.kimaita.monies.services.stillDue
+import com.kimaita.monies.services.early
+import kotlinx.coroutines.flow.filterNotNull
+import com.kimaita.monies.services.mostlyCategory
+import com.kimaita.monies.services.paydayDate
+import com.kimaita.monies.services.flowSides
+import com.kimaita.monies.services.moneyWalk
+import com.kimaita.monies.services.FlowSides
+import com.kimaita.monies.services.MoneyWalk
 import com.kimaita.monies.services.WeekdayBar
 import com.kimaita.monies.services.balanceBucketFormatFor
 import com.kimaita.monies.services.bucketFormatFor
@@ -32,7 +47,6 @@ import com.kimaita.monies.services.toWeekdayBars
 import com.kimaita.monies.services.RhythmStats
 import com.kimaita.monies.services.SliceValue
 import com.kimaita.monies.services.StreakSummary
-import com.kimaita.monies.services.computePace
 import com.kimaita.monies.services.computeRhythm
 import com.kimaita.monies.services.categorySlices
 import com.kimaita.monies.services.computeStreaks
@@ -90,6 +104,9 @@ class AnalyticsViewModel @Inject constructor(
 
     private val _filters = MutableStateFlow(TransactionFilters(timeFilter = TimeFilter.MONTH))
     val filters: StateFlow<TransactionFilters> = _filters.asStateFlow()
+
+    val timeFilter: StateFlow<TimeFilter> = _filters.map { it.timeFilter }.distinctUntilChanged()
+        .stateIn(viewModelScope, started, _filters.value.timeFilter)
 
     private val _direction = MutableStateFlow(SpendDirection.OUT)
     val direction: StateFlow<SpendDirection> = _direction.asStateFlow()
@@ -171,7 +188,10 @@ class AnalyticsViewModel @Inject constructor(
                 val labels = rows.map { bucketLabel(it.bucket, k.time) }
                 CashFlowRows(
                     rows.mapIndexed { i, r ->
-                        BarBucket(labels[i], r.income.toFloat(), r.expense.toFloat(), years[i])
+                        BarBucket(
+                            labels[i], r.income.toFloat(), r.expense.toFloat(), years[i],
+                            if (k.time == TimeFilter.MONTH) weekDays(r.bucket)?.let(::dayRangeLabel) else null,
+                        )
                     },
                     rows.mapIndexed { i, r ->
                         BarBucket(labels[i], r.cost.toFloat(), year = years[i])
@@ -186,14 +206,66 @@ class AnalyticsViewModel @Inject constructor(
     val costs: StateFlow<List<BarBucket>?> =
         cashFlowRows.map { it?.costs }.stateIn(viewModelScope, started, null)
 
-    val balanceTrend: StateFlow<List<BalancePoint>?> =
+    /** The period's dates alone: what the balance, and the money that moved it, are counted over. */
+    private data class Period(val time: TimeFilter, val start: String?, val end: String?)
+
+    private val period: Flow<Period> =
         combine(_filters.map { it.timeFilter }.distinctUntilChanged(), today) { tf, day ->
             val (s, e) = getDatesForFilter(tf, day)
-            Triple(tf, s, e)
-        }.distinctUntilChanged().flatMapLatest { (tf, s, e) ->
-            repository.getBalanceTrend(balanceBucketFormatFor(tf), s, e)
-                .map { rows -> balancePoints(rows) }
-        }.stateIn(viewModelScope, started, null)
+            Period(tf, s, e)
+        }.distinctUntilChanged()
+
+    private class BalanceRows(val period: Period, val points: List<BalancePoint>)
+
+    private val balanceRows: StateFlow<BalanceRows?> = period.flatMapLatest { p ->
+        repository.getBalanceTrend(balanceBucketFormatFor(p.time), p.start, p.end)
+            .map { rows -> BalanceRows(p, balancePoints(rows)) }
+    }.stateIn(viewModelScope, started, null)
+
+    val balanceTrend: StateFlow<List<BalancePoint>?> =
+        balanceRows.map { it?.points }.stateIn(viewModelScope, started, null)
+
+    /**
+     * The balance over the period and what moved it, filters aside. [start] is the period's first day
+     * (the first point's for ALL); [paydayAt] indexes [points].
+     */
+    class MoneyState(
+        val time: TimeFilter,
+        val start: LocalDate?,
+        val points: List<BalancePoint>,
+        val walk: MoneyWalk,
+        val flow: FlowSides,
+        val paydayAt: Int?,
+        /** The day payday fell on, and the biggest payment out (a quarter or more of spending) with its category. */
+        val payday: LocalDate?,
+        val bigOut: Pair<LocalDate, String>?,
+    )
+
+    val money: StateFlow<MoneyState?> = balanceRows.filterNotNull().flatMapLatest { b ->
+        val p = b.period
+        combine(
+            repository.getWalkTotals(p.start, p.end),
+            repository.getOpeningBalance(p.start),
+            repository.getIncomeBySource(StatsFilter(p.start, p.end), 50),
+            repository.getLargestPayments(p.start, p.end),
+        ) { totals, opening, sources, largest ->
+            val points = b.points
+            val closing = points.lastOrNull()?.balance?.toDouble() ?: opening ?: 0.0
+            val walk = moneyWalk(totals, opening ?: points.firstOrNull()?.balance?.toDouble() ?: closing, closing)
+            val payday = paydayDate(largest, totals.income)
+            MoneyState(
+                p.time,
+                p.start?.let { LocalDate.parse(it.take(10)) } ?: points.firstOrNull()?.date,
+                points,
+                walk,
+                flowSides(walk, sources.map { it.name to it.amount }),
+                payday?.let { d -> points.indices.filter { points[it].date == d }.maxByOrNull { points[it].balance } },
+                payday,
+                largest.firstOrNull { !it.isInc && it.amount >= totals.expense / 4 && it.category != null }
+                    ?.let { LocalDate.parse(it.time.take(10)) to it.category!!.lowercase() },
+            )
+        }
+    }.stateIn(viewModelScope, started, null)
 
     val stats: StateFlow<IncExp?> = key.flatMapLatest { k ->
         repository.getIncomeVsExpense(k.stats)
@@ -239,11 +311,6 @@ class AnalyticsViewModel @Inject constructor(
                 ).map { list -> list.map { RankedRow(it.name, it.amount) } }
             }.stateIn(viewModelScope, started, null)
 
-    /** The Overview "Top out" line: the biggest merchant for the filters, not affected by the selected slice. */
-    val topMerchant: StateFlow<List<RankedRow>?> = key.flatMapLatest { k ->
-        repository.getTopSubjectsByAmount(k.stats, natureFilter = false, limit = 1).map { list -> list.map { RankedRow(it.name, it.amount) } }
-    }.stateIn(viewModelScope, started, null)
-
     val incomeSources: StateFlow<List<RankedRow>?> = key.flatMapLatest { k ->
         repository.getIncomeBySource(k.stats, 8).map { list -> list.map { RankedRow(it.name, it.amount) } }
     }.stateIn(viewModelScope, started, null)
@@ -272,21 +339,27 @@ class AnalyticsViewModel @Inject constructor(
         repository.getTopSubjectsByCount(k.stats, nature, 10)
     }.stateIn(viewModelScope, started, null)
 
+    /** The pace card's period for the chip (null for ALL), with the day it was worked out on. */
+    private val chipPeriod: Flow<Pair<PacePeriod?, LocalDate>> =
+        combine(_filters.map { it.timeFilter }.distinctUntilChanged(), today) { tf, day -> pacePeriod(tf, day) to day }
+            .distinctUntilChanged()
+
     /**
      * One day-totals query wide enough for both summaries that read it, ending tomorrow: the streak
-     * (its own 13 weeks, independent of the time chip) and the pace (last month's first day on).
-     * Each summary keeps its own days in Kotlin. Both ignore the filters; expense days only.
+     * (its own 13 weeks, independent of the time chip) and the pace card ([period] and the period it
+     * is compared with). Each summary keeps its own days in Kotlin. Both ignore the filters; expense
+     * days only.
      */
-    private class DailyWindow(val today: LocalDate) {
+    private class DailyWindow(val today: LocalDate, val period: PacePeriod?) {
         val streakStart: LocalDate = today.minusWeeks(13)
-        val paceStart: LocalDate = today.minusMonths(1).withDayOfMonth(1)
-        val from: String = minOf(streakStart, paceStart).atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        val from: String = minOf(streakStart, period?.compareStart ?: streakStart).atStartOfDay()
+            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         val to: String = today.plusDays(1).atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
     }
 
     private class DailyRows(val window: DailyWindow, val days: List<DailyTotal>)
 
-    private val dailyWindow: Flow<DailyWindow> = today.map { DailyWindow(it) }
+    private val dailyWindow: Flow<DailyWindow> = chipPeriod.map { (p, day) -> DailyWindow(day, p) }
 
     private val dailyTotals: StateFlow<DailyRows?> = dailyWindow.flatMapLatest { w ->
         repository.getDailyTotals(w.from, w.to, natureFilter = false).map { DailyRows(w, it) }
@@ -307,15 +380,15 @@ class AnalyticsViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, started, null)
 
-    val pace: StateFlow<PaceSummary?> = dailyTotals
-        .map { r -> r?.let { computePace(daysFrom(it.days, it.window.paceStart), it.window.today) } }
-        .stateIn(viewModelScope, started, null)
+    /** The day recorded history starts, for the ALL filter's label and span. Null until loaded or with none. */
+    val historyStart: StateFlow<LocalDate?> =
+        repository.selectedAccount.mapLatest { repository.getEarliestTransactionDate()?.toLocalDate() }
+            .stateIn(viewModelScope, onceStarted, null)
 
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =
-        combine(repository.selectedAccount, today) { _, day -> day }.mapLatest { day ->
-            val first = repository.getEarliestTransactionDate()
-            first?.let { (ChronoUnit.DAYS.between(it.toLocalDate(), day) + 1).toInt() }
+        combine(historyStart, today) { first, day ->
+            first?.let { (ChronoUnit.DAYS.between(it, day) + 1).toInt() }
         }.stateIn(viewModelScope, onceStarted, null)
 
     /** Which line these numbers are for: its name, or "All accounts"; null when there is only one line. */
@@ -343,6 +416,45 @@ class AnalyticsViewModel @Inject constructor(
             onceStarted,
             null
         )
+
+    /**
+     * The period's spending by category so far, filters aside, while it is too early to project:
+     * for "Mostly rent.". Empty, without a query, the rest of the time.
+     */
+    private val earlyCategories: Flow<List<CategorySpending>> = chipPeriod.flatMapLatest { (p, day) ->
+        if (p == null || !p.early(day)) flowOf(emptyList())
+        else repository.getCategorySpending(
+            StatsFilter(p.start.toString(), day.plusDays(1).toString()), natureFilter = false,
+        )
+    }
+
+    /**
+     * The Overview pace card for the chip's period: spending so far against the period before, where
+     * it is heading, and the regulars still due. [period] and [pace] are null for ALL, whose card
+     * shows the all-time total instead.
+     */
+    class Outlook(
+        val period: PacePeriod?,
+        val today: LocalDate,
+        val pace: PaceSummary?,
+        val projected: Double?,
+        val stillDue: Double,
+        val mostly: String?,
+    )
+
+    val outlook: StateFlow<Outlook?> =
+        combine(dailyTotals, recurring, earlyCategories) { rows, rec, cats ->
+            if (rows == null || rec == null) return@combine null
+            val day = rows.window.today
+            val p = rows.window.period ?: return@combine Outlook(null, day, null, null, 0.0, null)
+            val days = daysFrom(rows.days, p.compareStart)
+            val pace = computePace(days, p, day)
+            val due = stillDue(rec, p, day)
+            Outlook(
+                p, day, pace, projectPeriodEnd(days, p, day, pace.spent, due), due,
+                if (p.early(day)) mostlyCategory(cats) else null,
+            )
+        }.stateIn(viewModelScope, started, null)
 
     private val _subjectQuery = MutableStateFlow("")
     val subjectQuery: StateFlow<String> = _subjectQuery.asStateFlow()

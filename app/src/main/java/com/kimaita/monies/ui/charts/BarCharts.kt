@@ -50,37 +50,10 @@ internal fun Path.addBar(left: Float, right: Float, base: Float, tip: Float, rad
     else addRoundRect(RoundRect(left, base, right, tip, z, z, r, r))
 }
 
-/** Money in above the baseline, money out below it, and a dot at net. */
-@Composable
-fun CashFlowChart(buckets: List<BarBucket>, modifier: Modifier = Modifier) {
-    val colors = chartColors()
-    val tooltip = remember {
-        { b: BarBucket ->
-            val net = b.up - b.down
-            val sign = if (net >= 0f) "+" else "-"
-            "${b.label} · in ${formatCompactAmount(b.up.toDouble())} · " +
-                    "out ${formatCompactAmount(b.down.toDouble())} · " +
-                    "net $sign${formatCompactAmount(abs(net).toDouble())}"
-        }
-    }
-    BarChart(
-        buckets, modifier, colors.inflow, colors.outflow,
-        showNet = true, tooltip = tooltip,
-    )
-}
-
-@Composable
-fun CostAnalyzerChart(buckets: List<BarBucket>, modifier: Modifier = Modifier) {
-    val gold = MoniesTheme.extra.gold
-    val tooltip = remember {
-        { b: BarBucket -> "${b.label} · fees ${formatCompactAmount(b.up.toDouble())}" }
-    }
-    BarChart(buckets, modifier, gold, tooltip = tooltip)
-}
-
 /**
  * One bar per bucket: [BarBucket.up] rises from the baseline, [BarBucket.down] hangs below it.
  * Bars are 12-28 dp wide and fill the width; the chart scrolls only when they would be narrower.
+ * A value label shows only where it fits its slot; tapping a bar still shows its tooltip.
  */
 @Composable
 fun BarChart(
@@ -91,6 +64,10 @@ fun BarChart(
     plotHeight: Dp = 180.dp,
     showNet: Boolean = false,
     tooltip: (BarBucket) -> String = { it.label },
+    picked: Int? = null,
+    onPick: ((Int) -> Unit)? = null,
+    valueLabels: ((BarBucket) -> String)? = null,
+    notes: Map<Int, Pair<String?, String?>> = emptyMap(),
 ) {
     if (buckets.isEmpty()) return
     val measurer = rememberTextMeasurer()
@@ -99,7 +76,8 @@ fun BarChart(
     val extra = MoniesTheme.extra
     val scale = remember(buckets) { barScale(buckets.maxOf { it.up }, buckets.maxOf { it.down }) }
 
-    var selected by remember(buckets) { mutableIntStateOf(-1) }
+    var tapped by remember(buckets) { mutableIntStateOf(-1) }
+    val selected = if (onPick != null) picked ?: -1 else tapped
     val grow = remember(buckets) { Animatable(0f) }
     LaunchedEffect(buckets) {
         grow.snapTo(0f); grow.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
@@ -148,14 +126,15 @@ fun BarChart(
                     Modifier
                         .width(contentWidth)
                         .height(height)
-                        .pointerInput(buckets, slotW, barW) {
+                        .pointerInput(buckets, slotW, barW, selected) {
                             val slot = slotW.toPx()
                             val reach = max(barW.toPx(), 24.dp.toPx()) / 2f
                             detectTapGestures { off ->
                                 val idx = (off.x / slot).toInt()
                                 val onBar = idx in buckets.indices &&
                                         abs(off.x - (idx + 0.5f) * slot) <= reach
-                                selected = if (onBar && idx != selected) idx else -1
+                                val next = if (onBar && idx != selected) idx else -1
+                                if (onPick != null) onPick(next) else tapped = next
                             }
                         }
                         .drawWithCache {
@@ -219,6 +198,37 @@ fun BarChart(
                             val dividerColor = chart.axisLabel.copy(alpha = 0.4f)
 
                             val tips = TooltipCache(measurer, tipStyle)
+                            val valueStyle = TextStyle(fontSize = 10.sp, fontFamily = ChartFont, fontWeight = FontWeight.Bold, color = cs.onSurface)
+                            val values = valueLabels?.let { f -> Array(n) { measurer.measure(f(buckets[it]), valueStyle) } }
+                            val valuePos = values?.let { v ->
+                                Array(n) {
+                                    val b = buckets[it]
+                                    val up = b.up >= b.down
+                                    val tip = if (up) scale.y(b.up, top, bottom) - 4.dp.toPx() - v[it].size.height
+                                    else scale.y(-b.down, top, bottom) + 4.dp.toPx()
+                                    Offset(
+                                        (dotX[it] - v[it].size.width / 2f).coerceIn(0f, (size.width - v[it].size.width).coerceAtLeast(0f)),
+                                        tip.coerceIn(0f, size.height - v[it].size.height),
+                                    )
+                                }
+                            }
+                            val noteStyle = TextStyle(fontSize = 10.sp, fontFamily = ChartFont, color = chart.axisLabel)
+                            val notePlaced = notes.flatMap { (i, pair) ->
+                                if (i !in 0 until n) return@flatMap emptyList()
+                                val x = dotX[i] + barW.toPx() / 2 + 6.dp.toPx()
+                                listOfNotNull(
+                                    pair.first?.let { t ->
+                                        val l = measurer.measure(t, noteStyle)
+                                        l to Offset(x.coerceAtMost(size.width - l.size.width), (scale.y(buckets[i].up, top, bottom)).coerceIn(0f, size.height - l.size.height))
+                                    },
+                                    pair.second?.let { t ->
+                                        val l = measurer.measure(t, noteStyle)
+                                        l to Offset(x.coerceAtMost(size.width - l.size.width), (scale.y(-buckets[i].down, top, bottom) - l.size.height).coerceIn(0f, size.height - l.size.height))
+                                    },
+                                )
+                            }
+                            val band = chart.axisLabel.copy(alpha = 0.08f)
+                            val bandW = maxOf(barW.toPx() + 12.dp.toPx(), slot * 0.7f)
                             val pad = 8.dp.toPx()
                             val tipRadius = CornerRadius(8.dp.toPx())
 
@@ -234,11 +244,16 @@ fun BarChart(
 
                                 val sel = selected
                                 val g = grow.value
+                                if (onPick != null && sel in 0 until n) drawRoundRect(
+                                    band, Offset(dotX[sel] - bandW / 2, 0f), androidx.compose.ui.geometry.Size(bandW, bottom + 2.dp.toPx()),
+                                    CornerRadius(8.dp.toPx()),
+                                )
                                 scale(1f, g, pivot) {
                                     for (i in 0 until n) {
                                         val a = if (sel != -1 && sel != i) 0.3f else 1f
-                                        upPaths[i]?.let { drawPath(it, upColor, a) }
-                                        downPaths[i]?.let { drawPath(it, downColor, a) }
+                                        val a2 = if (onPick != null && a < 1f) 0.35f else a
+                                        upPaths[i]?.let { drawPath(it, upColor, a2) }
+                                        downPaths[i]?.let { drawPath(it, downColor, a2) }
                                     }
                                 }
                                 if (showNet) for (i in 0 until n) {
@@ -249,7 +264,11 @@ fun BarChart(
                                     if ((n - 1 - i) % stride == 0) drawText(xLabels[i], topLeft = xPos[i])
                                 }
                                 for (k in yearShown) drawText(yearLabels[k], topLeft = Offset(yearX[k], yearY))
-                                if (sel in 0 until n) {
+                                if (g >= 1f) notePlaced.forEach { (l, at) -> drawText(l, topLeft = at) }
+                                if (values != null && g >= 1f) values.forEachIndexed { i, l ->
+                                    if (l.size.width <= slot - 2.dp.toPx()) drawText(l, topLeft = valuePos!![i])
+                                }
+                                if (onPick == null && sel in 0 until n) {
                                     drawTooltip(
                                         tips.layoutFor(sel) { tooltip(buckets[sel]) },
                                         dotX[sel], chart.tooltipBg, pad, tipRadius,

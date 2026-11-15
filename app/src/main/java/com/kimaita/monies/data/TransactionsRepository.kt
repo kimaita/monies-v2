@@ -403,6 +403,24 @@ class TransactionsRepository @Inject constructor(
                 .map(::sumLineBalances)
         }.flowOn(Dispatchers.Default)
 
+    /**
+     * The balance just before [startDate]: the selected line's, or the lines' added up as
+     * [getBalanceTrend] adds them. Null when nothing is recorded before it, or with no start.
+     */
+    fun getOpeningBalance(startDate: String?): Flow<Double?> =
+        if (startDate == null) flowOf(null)
+        else forAccount {
+            if (it != null) transactionsDao.getBalanceBefore(startDate, it)
+            else transactionsDao.getLineBalancesBefore(startDate)
+                .map { rows -> rows.takeIf { r -> r.isNotEmpty() }?.sumOf { r -> r.balance.toDouble() } }
+        }
+
+    fun getWalkTotals(startDate: String?, endDate: String?) =
+        forAccount { transactionsDao.getWalkTotals(startDate, endDate, it) }
+
+    fun getLargestPayments(startDate: String?, endDate: String?) =
+        forAccount { transactionsDao.getLargestPayments(startDate, endDate, it) }
+
     fun getWeekdayCounts(f: StatsFilter, natureFilter: Boolean? = null) = forAccount {
         transactionsDao.getWeekdayCounts(
             f.start, f.end, f.subjects, f.categories, f.types, natureFilter, it

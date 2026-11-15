@@ -14,6 +14,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
+import com.kimaita.monies.ui.theme.AtkinsonMono
 import com.kimaita.monies.ui.theme.MoniesTheme
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -21,8 +22,11 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** One bar slot: [up] rises from the baseline, [down] hangs below it. [year] marks where a year begins. */
-data class BarBucket(val label: String, val up: Float, val down: Float = 0f, val year: String? = null)
+/** One bar slot: [up] rises from the baseline, [down] hangs below it. [year] marks where a year begins; [days] are the dates it covers, when that helps ("2–8 Nov"). */
+data class BarBucket(val label: String, val up: Float, val down: Float = 0f, val year: String? = null, val days: String? = null)
+
+/** Axis labels and figures drawn on charts. */
+internal val ChartFont = AtkinsonMono
 
 /** Plot geometry shared by the line and bar charts. */
 internal val YAxisWidth = 40.dp

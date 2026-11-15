@@ -11,7 +11,9 @@ import com.kimaita.monies.data.dao.dtos.FulizaRow
 import com.kimaita.monies.data.dao.dtos.LineBalance
 import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.IncExp
+import com.kimaita.monies.data.dao.dtos.LargestPayment
 import com.kimaita.monies.data.dao.dtos.SubjectOccurrence
+import com.kimaita.monies.data.dao.dtos.WalkTotals
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionWithDetails
@@ -29,13 +31,42 @@ private const val SEARCH_FILTER = """
 """
 
 /**
- * The rows the recurring detector may see, on alias `t`. Used both for the rows returned and for
- * counting rows per subject, so a subject qualifies only on rows the detector would receive.
+ * The rows the recurring detector may see, on alias `t`: payments out, not transfers. Used both for
+ * the rows returned and for counting rows per subject, so a subject qualifies only on rows the
+ * detector would receive.
  */
 private const val RECURRING_ROWS = """
         t.subject IS NOT NULL AND t.transactionTime >= :since
-        AND t.transactionType NOT IN (SELECT id FROM transaction_types WHERE isTransfer = 1)
+        AND t.transactionType IN (SELECT id FROM transaction_types WHERE isInc = 0 AND isTransfer = 0)
         AND $ACCOUNT_FILTER
+"""
+
+/**
+ * `lines`: the lines (root accounts) that are not dormant, as [TransactionsDao.getAccountBalances]
+ * counts them. `ledger`: every balance of those lines, merged accounts under their root.
+ */
+private const val LINE_LEDGER = """
+    lines AS (
+        SELECT a.id AS id FROM accounts a
+        WHERE a.mergedInto IS NULL
+          AND (SELECT MAX(t.transactionTime) FROM transactions t
+               WHERE t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = a.id))
+              >= (SELECT strftime('%Y-%m-%dT%H:%M:%S', MAX(transactionTime), '-90 days') FROM transactions)
+    ), ledger AS (
+        SELECT COALESCE(a.mergedInto, a.id) AS line, t.id AS id, t.transactionTime AS time, t.balance AS balance
+        FROM transactions t JOIN accounts a ON a.id = t.accountId
+        WHERE t.balance IS NOT NULL AND COALESCE(a.mergedInto, a.id) IN (SELECT id FROM lines)
+    )
+"""
+
+/** Each line's latest balance before :startDate, with a null bucket; no rows when :startDate is null. */
+private const val LINE_BALANCES_BEFORE = """
+    SELECT line AS lineId, NULL AS bucket, balance FROM (
+        SELECT line, balance, MAX(time) AS time FROM (
+            SELECT line, time, balance, MAX(id) AS id FROM ledger
+            WHERE :startDate IS NOT NULL AND time < :startDate GROUP BY line, time
+        ) GROUP BY line
+    )
 """
 
 private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
@@ -378,17 +409,7 @@ interface TransactionsDao : BaseDao<Transaction> {
      */
     @Query(
         """
-    WITH lines AS (
-        SELECT a.id AS id FROM accounts a
-        WHERE a.mergedInto IS NULL
-          AND (SELECT MAX(t.transactionTime) FROM transactions t
-               WHERE t.accountId IN (SELECT id FROM accounts WHERE COALESCE(mergedInto, id) = a.id))
-              >= (SELECT strftime('%Y-%m-%dT%H:%M:%S', MAX(transactionTime), '-90 days') FROM transactions)
-    ), ledger AS (
-        SELECT COALESCE(a.mergedInto, a.id) AS line, t.id AS id, t.transactionTime AS time, t.balance AS balance
-        FROM transactions t JOIN accounts a ON a.id = t.accountId
-        WHERE t.balance IS NOT NULL AND COALESCE(a.mergedInto, a.id) IN (SELECT id FROM lines)
-    ), cells AS (
+    WITH $LINE_LEDGER, cells AS (
         SELECT line, strftime(:bucketFormat, time) AS bucket, time, id, balance
         FROM ledger
         WHERE (:startDate IS NULL OR time >= :startDate) AND (:endDate IS NULL OR time <= :endDate)
@@ -399,12 +420,7 @@ interface TransactionsDao : BaseDao<Transaction> {
         ) GROUP BY line, bucket
     )
     UNION ALL
-    SELECT line AS lineId, NULL AS bucket, balance FROM (
-        SELECT line, balance, MAX(time) AS time FROM (
-            SELECT line, time, balance, MAX(id) AS id FROM ledger
-            WHERE :startDate IS NOT NULL AND time < :startDate GROUP BY line, time
-        ) GROUP BY line
-    )
+    $LINE_BALANCES_BEFORE
 """
     )
     fun getLineBalanceBuckets(
@@ -412,6 +428,67 @@ interface TransactionsDao : BaseDao<Transaction> {
         startDate: String?,
         endDate: String?
     ): Flow<List<LineBalanceBucket>>
+
+    /** Each line's latest balance before [startDate] (lines as [getLineBalanceBuckets] counts them). */
+    @Query("WITH $LINE_LEDGER $LINE_BALANCES_BEFORE")
+    fun getLineBalancesBefore(startDate: String): Flow<List<LineBalanceBucket>>
+
+    /** One line's latest balance before [startDate]; null when it has none. */
+    @Query(
+        """
+    SELECT t.balance FROM transactions t
+    WHERE t.balance IS NOT NULL AND t.transactionTime < :startDate AND $ACCOUNT_FILTER
+    ORDER BY t.transactionTime DESC, t.id DESC LIMIT 1
+"""
+    )
+    fun getBalanceBefore(startDate: String, account: Int?): Flow<Double?>
+
+    /**
+     * What moved the balance in the range, filters aside: money in and out (not transfers), every
+     * fee, and the transfers to and from M-Shwari and Fuliza. Lock Savings withdrawals go to
+     * M-Shwari, not M-PESA, so they are left out.
+     */
+    @Query(
+        """
+    SELECT
+        SUM(CASE WHEN tt.isTransfer = 0 AND tt.isInc = 1 THEN t.amount ELSE 0 END) AS income,
+        SUM(CASE WHEN tt.isTransfer = 0 AND tt.isInc = 0 THEN t.amount ELSE 0 END) AS expense,
+        SUM(COALESCE(t.cost, 0)) AS fees,
+        SUM(CASE WHEN tt.name LIKE 'mshwari.%' AND tt.name <> 'mshwari.lock_savings.withdrawal'
+                  AND tt.isInc = 1 THEN t.amount ELSE 0 END) AS mshwariIn,
+        SUM(CASE WHEN tt.name LIKE 'mshwari.%' AND tt.name <> 'mshwari.lock_savings.withdrawal'
+                  AND tt.isInc = 0 THEN t.amount ELSE 0 END) AS mshwariOut,
+        SUM(CASE WHEN tt.name LIKE 'fuliza.%' AND tt.isInc = 1 THEN t.amount ELSE 0 END) AS fulizaIn,
+        SUM(CASE WHEN tt.name LIKE 'fuliza.%' AND tt.isInc = 0 THEN t.amount ELSE 0 END) AS fulizaOut,
+        SUM(CASE WHEN tt.name LIKE 'fuliza.%' THEN COALESCE(t.cost, 0) ELSE 0 END) AS fulizaFees
+    FROM transactions t
+    JOIN transaction_types tt ON t.transactionType = tt.id
+    WHERE $DATE_RANGE AND $ACCOUNT_FILTER
+"""
+    )
+    fun getWalkTotals(startDate: String?, endDate: String?, account: Int?): Flow<WalkTotals>
+
+    /**
+     * The biggest single payment in and the biggest out (not transfers) in the range, with its time
+     * and category. SQLite takes the bare id from the row holding each MAX.
+     */
+    @Query(
+        """
+    SELECT tt.isInc AS isInc, t.amount AS amount, t.transactionTime AS time, c.name AS category
+    FROM transactions t
+    JOIN transaction_types tt ON t.transactionType = tt.id
+    LEFT JOIN categories c ON c.id = t.transactionCategory
+    WHERE t.id IN (
+        SELECT id FROM (
+            SELECT t.id AS id, MAX(t.amount) FROM transactions t
+            JOIN transaction_types tt ON t.transactionType = tt.id
+            WHERE tt.isTransfer = 0 AND $DATE_RANGE AND $ACCOUNT_FILTER
+            GROUP BY tt.isInc
+        )
+    )
+"""
+    )
+    fun getLargestPayments(startDate: String?, endDate: String?, account: Int?): Flow<List<LargestPayment>>
 
     @Query(
         """

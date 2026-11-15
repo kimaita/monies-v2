@@ -70,6 +70,7 @@ class RecurringDetector @Inject constructor(
             nextEstimate = last.plusDays(cadence.roundToLong()),
             occurrences = group.size,
             irregular = irregular,
+            periodDays = nominalPeriodDays(cadence),
         )
     }
 
@@ -100,4 +101,18 @@ class RecurringDetector @Inject constructor(
         val sd = sqrt(xs.sumOf { (it - mean) * (it - mean) } / xs.size)
         return sd / mean
     }
+}
+
+/** Days in an average month, for turning a cadence into a monthly figure. */
+const val DAYS_PER_MONTH = 30.44
+
+/** The period a median gap of [days] reads as, in days, by the same bands as the cadence label. */
+fun nominalPeriodDays(days: Double): Double = when {
+    days < 2.0 -> 1.0
+    days < 4.0 -> days.roundToInt().toDouble()
+    days <= 10.0 -> 7.0
+    days <= 18.0 -> 14.0
+    days <= 45.0 -> DAYS_PER_MONTH
+    days <= 75.0 -> 2 * DAYS_PER_MONTH
+    else -> (days / 30).roundToInt() * DAYS_PER_MONTH
 }

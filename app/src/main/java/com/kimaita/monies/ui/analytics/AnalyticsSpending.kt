@@ -107,59 +107,6 @@ private fun DirectionToggle(direction: SpendDirection, onSelect: (SpendDirection
     Segmented(directionOptions, direction, onSelect)
 
 @Composable
-internal fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
-    val balanceOrNull by vm.balanceTrend.collectAsStateWithLifecycle()
-    val cashFlowOrNull by vm.cashFlow.collectAsStateWithLifecycle()
-    val costsOrNull by vm.costs.collectAsStateWithLifecycle()
-    val statsOrNull by vm.stats.collectAsStateWithLifecycle()
-    val balance = balanceOrNull
-    val cashFlow = cashFlowOrNull
-    val costs = costsOrNull
-    val stats = statsOrNull
-    val feesHeader = remember(stats) {
-        stats?.let {
-            val fees = it.incomeCost + it.expenseCost
-            "You paid ${formatKes(fees)} in fees" +
-                    (feeShareText(fees, it.expense)?.let { share -> " · $share" } ?: "")
-        }
-    }
-
-    TabList(listState) {
-        item(key = "trend") {
-            SectionCard("Balance trend") {
-                if (balance == null) EmptyHint(LOADING)
-                else if (balance.isEmpty()) EmptyHint()
-                else BalanceTrendChart(balance, Modifier.fillMaxWidth())
-            }
-        }
-        item(key = "inout") {
-            SectionCard("Money in vs out") {
-                if (cashFlow == null) EmptyHint(LOADING)
-                else if (cashFlow.isEmpty()) EmptyHint() else CashFlowChart(
-                    cashFlow,
-                    Modifier.fillMaxWidth()
-                )
-            }
-        }
-        item(key = "fees") {
-            SectionCard("Fees") {
-                Text(
-                    feesHeader ?: LOADING,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                if (costs == null) EmptyHint(LOADING)
-                else if (costs.isEmpty()) EmptyHint() else CostAnalyzerChart(
-                    costs,
-                    Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun BudgetRow(b: CategoryBudget) {
     val color = if (b.isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

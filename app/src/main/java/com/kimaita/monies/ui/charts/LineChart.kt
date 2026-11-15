@@ -28,25 +28,53 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kimaita.monies.models.analytics.BalancePoint
-import com.kimaita.monies.ui.util.formatCompactAmount
+import com.kimaita.monies.ui.util.formatShortAmount
 import com.kimaita.monies.ui.util.formatKes
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.abs
 
-/** One line of a [LineChartCanvas]. [xs] are in the chart's x domain and must be increasing. */
+/**
+ * One line of a [LineChartCanvas]. [xs] are in the chart's x domain and must be increasing. [dash] is
+ * (on, off) for a dashed line.
+ */
 internal class LineSeries(
     val xs: FloatArray,
     val ys: FloatArray,
     val color: Color,
     val width: Dp,
-    val dashed: Boolean = false,
+    val dash: Pair<Dp, Dp>? = null,
     val fill: Boolean = false,
+)
+
+enum class MarkerStyle { DOT, RING, NONE }
+
+/** Where a marker's label sits against its point. */
+enum class LabelPlace { RIGHT, ABOVE_LEFT, BELOW_LEFT, BELOW_RIGHT }
+
+/**
+ * A point drawn over a [LineChartCanvas], in the chart's units: a filled dot, a ring filled with
+ * [fill] (the card behind it), or nothing; with a bold [label] and a lighter [note] under it.
+ */
+internal class ChartMarker(
+    val x: Float,
+    val y: Float,
+    val color: Color,
+    val style: MarkerStyle = MarkerStyle.DOT,
+    val fill: Color = Color.Transparent,
+    val label: String? = null,
+    val note: String? = null,
+    val place: LabelPlace = LabelPlace.ABOVE_LEFT,
+    val labelColor: Color? = null,
 )
 
 /**
@@ -87,8 +115,9 @@ internal fun Path.monotoneCurve(xs: FloatArray, ys: FloatArray) {
 }
 
 /**
- * Gridlines, y labels, x labels, grow-in animation and (when [tooltip] is set) scrubbing for one or
- * more lines. Callers must remember [series] and [tooltip] against their data: a new instance
+ * Gridlines, y labels, x labels, grow-in animation, [markers] and (when [tooltip] is set) scrubbing
+ * for one or more lines. The x label at [strongX] is bold and wins over neighbours it would touch.
+ * Callers must remember [series], [markers] and [tooltip] against their data: a new instance
  * rebuilds the cached geometry and restarts the animation.
  */
 @Composable
@@ -101,6 +130,9 @@ internal fun LineChartCanvas(
     plotHeight: Dp = 180.dp,
     zeroBased: Boolean = false,
     tooltip: ((Int) -> String)? = null,
+    markers: List<ChartMarker> = emptyList(),
+    strongX: Float? = null,
+    gridColor: Color? = null,
 ) {
     val measurer = rememberTextMeasurer()
     val haptic = LocalHapticFeedback.current
@@ -109,6 +141,7 @@ internal fun LineChartCanvas(
     val labelColor = cs.onSurfaceVariant
     val pointColor = cs.surfaceContainerHighest
 
+    val inkColor = cs.onSurface
     var scrub by remember(series) { mutableIntStateOf(-1) }
     val grow = remember(series) { Animatable(0f) }
     LaunchedEffect(series) { grow.snapTo(0f); grow.animateTo(1f, tween(800)) }
@@ -145,12 +178,16 @@ internal fun LineChartCanvas(
                 )
             }
             .drawWithCache {
-                val axisStyle = TextStyle(fontSize = 10.sp, color = labelColor)
+                val axisStyle = TextStyle(fontSize = 10.sp, color = labelColor, fontFamily = ChartFont)
+                val strongStyle = axisStyle.copy(color = inkColor, fontWeight = FontWeight.Bold)
                 val tipStyle = TextStyle(fontSize = 11.sp, color = cs.onSurface)
                 var mn = Float.MAX_VALUE
                 var mx = -Float.MAX_VALUE
                 for (s in series) for (y in s.ys) {
                     if (y < mn) mn = y; if (y > mx) mx = y
+                }
+                for (m in markers) {
+                    if (m.y < mn) mn = m.y; if (m.y > mx) mx = m.y
                 }
                 if (mn > mx) { mn = 0f; mx = 0f }
                 val scale = lineScale(mn, mx, zeroBased)
@@ -165,7 +202,7 @@ internal fun LineChartCanvas(
                 val gridPx = 1.dp.toPx()
                 val gridYs = FloatArray(scale.values.size) { scale.y(scale.values[it], top, bottom) }
                 val yLabels = Array(scale.values.size) {
-                    measurer.measure(formatCompactAmount(scale.values[it].toDouble()), axisStyle)
+                    measurer.measure(formatShortAmount(scale.values[it].toDouble()), axisStyle)
                 }
                 val yLabelPos = Array(yLabels.size) {
                     Offset(
@@ -174,7 +211,10 @@ internal fun LineChartCanvas(
                             .coerceIn(0f, size.height - yLabels[it].size.height)
                     )
                 }
-                val xLabelLayouts = Array(xLabels.size) { measurer.measure(xLabels[it].second, axisStyle) }
+                val strongAt = xLabels.indexOfFirst { it.first == strongX }
+                val xLabelLayouts = Array(xLabels.size) {
+                    measurer.measure(xLabels[it].second, if (it == strongAt) strongStyle else axisStyle)
+                }
                 val xLabelPos = Array(xLabels.size) {
                     Offset(
                         (px(xLabels[it].first) - xLabelLayouts[it].size.width / 2f)
@@ -186,7 +226,8 @@ internal fun LineChartCanvas(
                 fun touches(a: Int, b: Int) = xLabelPos[a].x + xLabelLayouts[a].size.width + labelGap > xLabelPos[b].x
                 val shown = ArrayList<Int>()
                 for (i in xLabels.indices) {
-                    if (i == xLabels.lastIndex) while (shown.isNotEmpty() && touches(shown.last(), i)) shown.removeAt(shown.lastIndex)
+                    val wins = i == strongAt || (i == xLabels.lastIndex && shown.lastOrNull() != strongAt)
+                    if (wins) while (shown.isNotEmpty() && touches(shown.last(), i)) shown.removeAt(shown.lastIndex)
                     if (shown.isEmpty() || !touches(shown.last(), i)) shown.add(i)
                 }
 
@@ -213,8 +254,9 @@ internal fun LineChartCanvas(
                         width = series[i].width.toPx(),
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round,
-                        pathEffect = if (series[i].dashed)
-                            PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())) else null,
+                        pathEffect = series[i].dash?.let { (on, off) ->
+                            PathEffect.dashPathEffect(floatArrayOf(on.toPx(), off.toPx()))
+                        },
                     )
                 }
                 val brushes = Array(series.size) { i ->
@@ -238,9 +280,34 @@ internal fun LineChartCanvas(
                 val outerR = 5.dp.toPx()
                 val innerR = 2.5.dp.toPx()
 
+                val markStyle = strongStyle
+                val noteStyle = axisStyle
+                val dotR = 4.dp.toPx()
+                val ringStroke = Stroke(2.dp.toPx())
+                val gap = 8.dp.toPx()
+                val marks = markers.map { m ->
+                    val at = Offset(px(m.x), scale.y(m.y, top, bottom))
+                    val label = m.label?.let { measurer.measure(it, markStyle.copy(color = m.labelColor ?: inkColor)) }
+                    val note = m.note?.let { measurer.measure(it, noteStyle) }
+                    val w = maxOf(label?.size?.width ?: 0, note?.size?.width ?: 0).toFloat()
+                    val h = ((label?.size?.height ?: 0) + (note?.size?.height ?: 0)).toFloat()
+                    val lh = (label?.size?.height ?: 0).toFloat()
+                    val raw = when (m.place) {
+                        LabelPlace.RIGHT -> Offset(at.x + gap, at.y - lh * 0.75f)
+                        LabelPlace.ABOVE_LEFT -> Offset(at.x - gap / 2 - w, at.y - gap - h)
+                        LabelPlace.BELOW_LEFT -> Offset(at.x - gap - w, at.y + gap / 2)
+                        LabelPlace.BELOW_RIGHT -> Offset(at.x + gap, at.y + gap / 2)
+                    }
+                    val pos = Offset(
+                        raw.x.coerceIn(0f, (size.width - w).coerceAtLeast(0f)),
+                        raw.y.coerceIn(0f, (size.height - h).coerceAtLeast(0f)),
+                    )
+                    PlacedMarker(m, at, label, note, pos, pos.copy(y = pos.y + lh))
+                }
+
                 onDrawBehind {
                     gridYs.forEach { y ->
-                        drawLine(chart.grid, Offset(left, y), Offset(right, y), gridPx)
+                        drawLine(gridColor ?: chart.grid, Offset(left, y), Offset(right, y), gridPx)
                     }
                     yLabels.forEachIndexed { i, l -> drawText(l, topLeft = yLabelPos[i]) }
                     for (i in shown) drawText(xLabelLayouts[i], topLeft = xLabelPos[i])
@@ -252,6 +319,22 @@ internal fun LineChartCanvas(
                             areas[i]?.let { drawPath(it, brushes[i]) }
                             drawPath(paths[i], series[i].color, style = strokes[i])
                             lonePoints[i]?.let { drawCircle(series[i].color, series[i].width.toPx(), it) }
+                        }
+                    }
+
+                    for (pm in marks) {
+                        val m = pm.marker
+                        when (m.style) {
+                            MarkerStyle.DOT -> drawCircle(m.color, dotR, pm.at, alpha = g)
+                            MarkerStyle.RING -> {
+                                drawCircle(m.fill, dotR, pm.at, alpha = g)
+                                drawCircle(m.color, dotR - ringStroke.width / 2, pm.at, alpha = g, style = ringStroke)
+                            }
+                            MarkerStyle.NONE -> Unit
+                        }
+                        if (g >= 1f) {
+                            pm.label?.let { drawText(it, topLeft = pm.labelAt) }
+                            pm.note?.let { drawText(it, topLeft = pm.noteAt) }
                         }
                     }
 
@@ -271,14 +354,32 @@ internal fun LineChartCanvas(
     )
 }
 
+private class PlacedMarker(
+    val marker: ChartMarker,
+    val at: Offset,
+    val label: TextLayoutResult?,
+    val note: TextLayoutResult?,
+    val labelAt: Offset,
+    val noteAt: Offset,
+)
+
+/**
+ * The balance by point: a ring where it started and a dot with its figure where it ends. With
+ * [highLow], rings and labels at the highest and lowest points. [paydayAt] notes "payday" at that
+ * point, under the High label when they meet.
+ */
 @Composable
 fun BalanceTrendChart(
     data: List<BalancePoint>,
     modifier: Modifier = Modifier,
-    plotHeight: Dp = 180.dp
+    plotHeight: Dp = 180.dp,
+    highLow: Boolean = false,
+    paydayAt: Int? = null,
 ) {
     if (data.size < 2) return
-    val color = MaterialTheme.colorScheme.primary
+    val cs = MaterialTheme.colorScheme
+    val color = cs.primary
+    val card = cs.surfaceContainer
     val series = remember(data, color) {
         listOf(
             LineSeries(
@@ -289,13 +390,56 @@ fun BalanceTrendChart(
         )
     }
     val xLabels = remember(data) {
-        listOf(0, data.lastIndex / 4, data.lastIndex / 2, data.lastIndex * 3 / 4, data.lastIndex)
-            .distinct().map { it.toFloat() to data[it].axisLabel }
+        listOf(0, data.lastIndex / 2, data.lastIndex).distinct().map { it.toFloat() to data[it].axisLabel }
+    }
+    val markers = remember(data, color, card, highLow, paydayAt) {
+        balanceMarkers(data, color, card, highLow, paydayAt)
     }
     val tooltip = remember(data) {
         { i: Int -> "${data[i].label} · ${formatKes(data[i].balance.toDouble())}" }
     }
     LineChartCanvas(
-        series, 0f, data.lastIndex.toFloat(), xLabels, modifier, plotHeight, tooltip = tooltip
+        series, 0f, data.lastIndex.toFloat(), xLabels, modifier, plotHeight,
+        tooltip = tooltip, markers = markers,
     )
+}
+
+private val markerDate = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+
+private fun balanceMarkers(
+    data: List<BalancePoint>, color: Color, card: Color, highLow: Boolean, paydayAt: Int?,
+): List<ChartMarker> {
+    val last = data.lastIndex
+    fun ring(i: Int, label: String? = null, note: String? = null, place: LabelPlace = LabelPlace.RIGHT) =
+        ChartMarker(i.toFloat(), data[i].balance, color, MarkerStyle.RING, card, label, note, place)
+
+    val out = mutableListOf(ring(0))
+    val payday = paydayAt?.takeIf { it in data.indices }
+    var paydayNoted = false
+    if (highLow) {
+        val hi = data.indices.maxBy { data[it].balance }
+        val lo = data.indices.minBy { data[it].balance }
+        if (hi != 0 && hi != last) {
+            paydayNoted = payday == hi
+            out += ring(
+                hi, "High ${formatShortAmount(data[hi].balance.toDouble())} · ${data[hi].date.format(markerDate)}",
+                if (paydayNoted) "payday" else null,
+                if (hi > last * 0.6f) LabelPlace.BELOW_LEFT else LabelPlace.RIGHT,
+            )
+        }
+        if (lo != 0 && lo != last && lo != hi) {
+            out += ring(
+                lo, "Low ${formatShortAmount(data[lo].balance.toDouble())} · ${data[lo].date.format(markerDate)}",
+                place = if (lo < last * 0.3f) LabelPlace.BELOW_RIGHT else LabelPlace.BELOW_LEFT,
+            )
+        }
+    }
+    if (payday != null && !paydayNoted) {
+        out += ChartMarker(payday.toFloat(), data[payday].balance, color, MarkerStyle.NONE, note = "payday", place = LabelPlace.RIGHT)
+    }
+    out += ChartMarker(
+        last.toFloat(), data[last].balance, color, MarkerStyle.DOT,
+        label = formatShortAmount(data[last].balance.toDouble()), place = LabelPlace.ABOVE_LEFT,
+    )
+    return out
 }
