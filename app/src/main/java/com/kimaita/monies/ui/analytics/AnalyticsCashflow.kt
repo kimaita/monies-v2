@@ -28,7 +28,6 @@ import com.kimaita.monies.services.ledger
 import com.kimaita.monies.ui.charts.*
 import com.kimaita.monies.ui.theme.MoniesTheme
 import com.kimaita.monies.ui.util.formatAmount
-import kotlin.math.abs
 
 /** What one bar stands for under each chip: "week" for 1M. */
 private fun bucketWord(tf: TimeFilter): String = when (tf) {
@@ -52,7 +51,6 @@ internal fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
     TabList(listState) {
         item(key = "balance") { BalanceWalkCard(money, period) }
         item(key = "inout") { InVsOutCard(cashFlow, stats, time, period, money) }
-        item(key = "kept") { KeptCard(cashFlow, time) }
         item(key = "fees") { FeesRow(costs, stats, period, typeFees) }
     }
 }
@@ -252,42 +250,14 @@ private fun InVsOutCard(buckets: List<BarBucket>?, stats: IncExp?, time: TimeFil
         if (buckets.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             BarChart(
-                buckets, Modifier.fillMaxWidth(), extra.inflow, extra.outflow,
+                buckets, Modifier.fillMaxWidth(), extra.inflow, extra.outflow, showNet = true,
                 picked = picked, onPick = { picked = it.takeIf { i -> i >= 0 } },
                 notes = remember(buckets, m) { weekNotes(buckets, m) },
             )
             Spacer(Modifier.height(8.dp))
-            Note("Tap a ${bucketWord(time)} to see its figures.")
+            val word = bucketWord(time)
+            Note("The line is what you kept each $word: in minus out. Tap a $word to see its figures.")
         }
-    }
-}
-
-@Composable
-private fun KeptCard(buckets: List<BarBucket>?, time: TimeFilter) {
-    val extra = MoniesTheme.extra
-    BentoCard {
-        Text("Kept each ${bucketWord(time)}", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(2.dp))
-        Note("In minus out. Below the line, more went out.")
-        if (buckets == null) {
-            EmptyHint(LOADING)
-            return@BentoCard
-        }
-        if (buckets.isEmpty()) {
-            EmptyHint()
-            return@BentoCard
-        }
-        val net = remember(buckets) {
-            buckets.map { val k = it.up - it.down; BarBucket(it.label, maxOf(k, 0f), maxOf(-k, 0f), it.year) }
-        }
-        Spacer(Modifier.height(12.dp))
-        BarChart(
-            net, Modifier.fillMaxWidth(), extra.inflow, extra.outflow, plotHeight = 140.dp,
-            valueLabels = { signedAmount((it.up - it.down).toDouble()) },
-        )
-        Spacer(Modifier.height(8.dp))
-        val total = buckets.sumOf { (it.up - it.down).toDouble() }
-        Note("Adds up to the ${formatAmount(abs(total))} above.")
     }
 }
 

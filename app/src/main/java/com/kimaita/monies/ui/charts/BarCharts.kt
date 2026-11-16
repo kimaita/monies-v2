@@ -26,6 +26,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -37,7 +40,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kimaita.monies.ui.theme.MoniesTheme
-import com.kimaita.monies.ui.util.formatCompactAmount
+import com.kimaita.monies.ui.util.formatShortAmount
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -54,6 +57,8 @@ internal fun Path.addBar(left: Float, right: Float, base: Float, tip: Float, rad
  * One bar per bucket: [BarBucket.up] rises from the baseline, [BarBucket.down] hangs below it.
  * Bars are 12-28 dp wide and fill the width; the chart scrolls only when they would be narrower.
  * A value label shows only where it fits its slot; tapping a bar still shows its tooltip.
+ * [showNet] fades the bars and draws up minus down as a line, with a dot per bucket coloured
+ * by its sign. It shares the bars' scale, so it never leaves the plot.
  */
 @Composable
 fun BarChart(
@@ -104,7 +109,7 @@ fun BarChart(
                         val bottom = size.height - bottomPad.toPx()
                         val labels = Array(scale.values.size) {
                             measurer.measure(
-                                formatCompactAmount(abs(scale.values[it]).toDouble()), style
+                                formatShortAmount(abs(scale.values[it]).toDouble()), style
                             )
                         }
                         val pos = Array(labels.size) {
@@ -168,6 +173,7 @@ fun BarChart(
                             }
                             val pivot = Offset(0f, y0)
                             val dotR = 4.dp.toPx()
+                            val netLinePx = 2.dp.toPx()
                             val dotX = FloatArray(n) { (it + 0.5f) * slot }
                             val dotDy = FloatArray(n) { scale.y(buckets[it].up - buckets[it].down, top, bottom) - y0 }
                             val dotColors = Array(n) {
@@ -248,13 +254,26 @@ fun BarChart(
                                     band, Offset(dotX[sel] - bandW / 2, 0f), androidx.compose.ui.geometry.Size(bandW, bottom + 2.dp.toPx()),
                                     CornerRadius(8.dp.toPx()),
                                 )
+                                val barAlpha = if (showNet) 0.55f else 1f
                                 scale(1f, g, pivot) {
                                     for (i in 0 until n) {
                                         val a = if (sel != -1 && sel != i) 0.3f else 1f
-                                        val a2 = if (onPick != null && a < 1f) 0.35f else a
+                                        val a2 = (if (onPick != null && a < 1f) 0.35f else a) * barAlpha
                                         upPaths[i]?.let { drawPath(it, upColor, a2) }
                                         downPaths[i]?.let { drawPath(it, downColor, a2) }
                                     }
+                                }
+                                if (showNet && n > 1) {
+                                    val line = Path().apply {
+                                        for (i in 0 until n) {
+                                            val y = y0 + dotDy[i] * g
+                                            if (i == 0) moveTo(dotX[i], y) else lineTo(dotX[i], y)
+                                        }
+                                    }
+                                    drawPath(
+                                        line, cs.onSurface, if (sel != -1) 0.3f else 1f,
+                                        style = Stroke(netLinePx, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                    )
                                 }
                                 if (showNet) for (i in 0 until n) {
                                     val a = if (sel != -1 && sel != i) 0.3f else 1f
