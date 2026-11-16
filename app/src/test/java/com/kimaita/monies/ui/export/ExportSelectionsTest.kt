@@ -148,9 +148,9 @@ class ExportSelectionsTest {
     @Test
     fun customRangesReadShort() {
         val today = date(2026, 11, 14)
-        assertEquals("3 Jan – 14 Feb 2025", rangeText(date(2025, 1, 3), date(2025, 2, 14), today))
-        assertEquals("3 Jan – 14 Feb", rangeText(date(2026, 1, 3), date(2026, 2, 14), today))
-        assertEquals("28 Dec 2025 – 3 Jan 2026", rangeText(date(2025, 12, 28), date(2026, 1, 3), today))
+        assertEquals("3 Jan to 14 Feb 2025", rangeText(date(2025, 1, 3), date(2025, 2, 14), today))
+        assertEquals("3 Jan to 14 Feb", rangeText(date(2026, 1, 3), date(2026, 2, 14), today))
+        assertEquals("28 Dec 2025 to 3 Jan 2026", rangeText(date(2025, 12, 28), date(2026, 1, 3), today))
         assertEquals("5 Mar", rangeText(date(2026, 3, 5), date(2026, 3, 5), today))
         assertEquals("From 5 Mar", rangeText(date(2026, 3, 5), null, today))
     }

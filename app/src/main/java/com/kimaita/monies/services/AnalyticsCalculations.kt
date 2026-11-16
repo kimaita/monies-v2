@@ -191,7 +191,7 @@ fun balancePoints(rows: List<BalanceBucket>, maxPoints: Int = 90): List<BalanceP
 fun feeShare(fees: Double, expense: Double): Double? = if (expense > 0.0) fees / expense * 100 else null
 
 private val slotNames = listOf("mornings", "afternoons", "evenings", "nights")
-private val slotRanges = listOf("5 am–12 pm", "12–5 pm", "5–10 pm", "10 pm–5 am")
+private val slotRanges = listOf("5 am to 12 pm", "12 to 5 pm", "5 to 10 pm", "10 pm to 5 am")
 
 /**
  * One sentence on when the activity is, from the time-of-day cells (slot 0 morning .. 3 night,
@@ -291,7 +291,7 @@ fun weekDays(bucket: String): ClosedRange<LocalDate>? {
     return start..minOf(end, LocalDate.of(year, 12, 31))
 }
 
-/** "2–8 Nov", or "28 Oct – 3 Nov" across months. */
+/** "2 to 8 Nov", or "28 Oct to 3 Nov" across months. */
 fun dayRangeLabel(r: ClosedRange<LocalDate>): String =
-    if (r.start.month == r.endInclusive.month) "${r.start.dayOfMonth}–${r.endInclusive.format(dateFmt)}"
-    else "${r.start.format(dateFmt)} – ${r.endInclusive.format(dateFmt)}"
+    if (r.start.month == r.endInclusive.month) "${r.start.dayOfMonth} to ${r.endInclusive.format(dateFmt)}"
+    else "${r.start.format(dateFmt)} to ${r.endInclusive.format(dateFmt)}"

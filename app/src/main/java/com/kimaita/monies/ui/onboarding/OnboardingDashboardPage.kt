@@ -38,7 +38,7 @@ internal fun DashboardPage() {
         OnbHeadline("See where it goes", fontSize = 27.sp)
         Spacer(Modifier.height(8.dp))
         OnbBody(
-            "Highlights and reports — kept offline, exportable any way you like.",
+            "Highlights and reports stay on your device and can be exported.",
             fontSize = 14.sp
         )
         Spacer(Modifier.height(14.dp))

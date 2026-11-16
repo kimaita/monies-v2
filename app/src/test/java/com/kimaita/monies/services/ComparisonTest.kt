@@ -28,7 +28,7 @@ class ComparisonTest {
         assertFalse(h.enough)
         assertEquals(30, h.needDays)
         assertEquals(18, h.haveDays)
-        assertEquals("Needs 30 days before this period. You have 18.", historyNote(h))
+        assertEquals("Needs 30 days of history before this period. You have 18.", historyNote(h))
         assertTrue(historyFor(TimeFilter.MONTH, nov14, LocalDate.of(2025, 3, 1))!!.enough)
         assertNull(historyFor(TimeFilter.ALL, nov14, LocalDate.of(2025, 3, 1)))
     }

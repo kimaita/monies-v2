@@ -57,7 +57,7 @@ fun UnrecognisedScreen(navController: NavController, viewModel: SettingsViewMode
         },
     ) { pad ->
         if (messages.isEmpty()) Text(
-            "Nothing here.",
+            "No unrecognised messages.",
             modifier = Modifier.padding(pad).padding(16.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         ) else LazyColumn(Modifier.padding(pad)) {

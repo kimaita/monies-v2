@@ -318,8 +318,8 @@ fun ProgressPanel(s: ExportState.InProgress, onCancel: () -> Unit) {
 
         Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
             Text(
-                s.total?.let { "${s.processed} of $it" }?.plus(" • runs in background")
-                    ?: "Working… you can leave this screen",
+                s.total?.let { "${s.processed} of $it" }?.plus(". Runs in the background.")
+                    ?: "Working. You can leave this screen.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

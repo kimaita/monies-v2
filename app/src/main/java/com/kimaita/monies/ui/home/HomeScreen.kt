@@ -244,7 +244,7 @@ fun Transactions(
         )
         Icon(
             painter = painterResource(R.drawable.outline_arrow_forward_24),
-            contentDescription = "View All",
+            contentDescription = "View all",
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

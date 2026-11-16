@@ -51,10 +51,10 @@ fun historyFor(tf: TimeFilter, today: LocalDate, firstDay: LocalDate?): History?
     return History(firstDay != null && !firstDay.isAfter(prev.first), need, have)
 }
 
-/** "Needs 30 days before this period. You have 18." in days up to a month, else months. */
+/** "Needs 30 days of history before this period. You have 18." in days up to a month, else months. */
 fun historyNote(h: History): String =
-    if (h.needDays <= 31) "Needs ${h.needDays} days before this period. You have ${h.haveDays}."
-    else "Needs ${(h.needDays / DAYS_PER_MONTH).roundToInt()} months before this period. You have " +
+    if (h.needDays <= 31) "Needs ${h.needDays} days of history before this period. You have ${h.haveDays}."
+    else "Needs ${(h.needDays / DAYS_PER_MONTH).roundToInt()} months of history before this period. You have " +
             "${(h.haveDays / DAYS_PER_MONTH).toInt()}."
 
 /** How a figure moved, for its pill: a move of [PILL_PCT]% or more is [UP] or [DOWN], less is [FLAT]. */

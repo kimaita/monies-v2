@@ -92,8 +92,8 @@ fun rangeText(start: LocalDate?, end: LocalDate?, today: LocalDate): String {
         start == null -> "Until ${end!!.text()}"
         end == null -> "From ${start.text()}"
         start == end -> start.text()
-        start.year == end.year -> "${start.text(false)} – ${end.text()}"
-        else -> "${start.text(true)} – ${end.text(true)}"
+        start.year == end.year -> "${start.text(false)} to ${end.text()}"
+        else -> "${start.text(true)} to ${end.text(true)}"
     }
 }
 

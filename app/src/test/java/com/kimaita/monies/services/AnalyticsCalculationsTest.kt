@@ -264,21 +264,21 @@ class AnalyticsCalculationsTest {
     @Test
     fun activeSummary_weekdaySlotWhenWeekdaysDominate() {
         val cells = listOf(cell(1, 2, 5), cell(3, 2, 5), cell(6, 2, 1), cell(2, 0, 2))
-        assertEquals("Most active on **weekday evenings**, 5–10 pm.", activeSummary(cells))
+        assertEquals("Most active on **weekday evenings**, 5 to 10 pm.", activeSummary(cells))
     }
 
     @Test
     fun activeSummary_weekendSlotWhenWeekendDominates() {
         val cells = listOf(cell(0, 3, 6), cell(6, 3, 6), cell(2, 3, 2))
-        assertEquals("Most active on **weekend nights**, 10 pm–5 am.", activeSummary(cells))
+        assertEquals("Most active on **weekend nights**, 10 pm to 5 am.", activeSummary(cells))
     }
 
     @Test
     fun activeSummary_evenSpreadNamesOnlyTheSlot() {
         val cells = listOf(cell(1, 1, 5), cell(0, 1, 2), cell(2, 0, 1))
-        assertEquals("Most active in the **afternoons**, 12–5 pm.", activeSummary(cells))
+        assertEquals("Most active in the **afternoons**, 12 to 5 pm.", activeSummary(cells))
         assertEquals(
-            "Most active in the **mornings**, 5 am–12 pm.",
+            "Most active in the **mornings**, 5 am to 12 pm.",
             activeSummary(listOf(cell(1, 0, 3), cell(4, 0, 2), cell(6, 0, 1), cell(0, 0, 1))),
         )
     }
@@ -813,9 +813,9 @@ class AnalyticsCalculationsTest {
     @Test
     fun weekDays_followSqliteMondayWeeks() {
         assertEquals(LocalDate.of(2026, 11, 2)..LocalDate.of(2026, 11, 8), weekDays("2026-44"))
-        assertEquals("2–8 Nov", dayRangeLabel(weekDays("2026-44")!!))
+        assertEquals("2 to 8 Nov", dayRangeLabel(weekDays("2026-44")!!))
         assertEquals(LocalDate.of(2026, 1, 1)..LocalDate.of(2026, 1, 4), weekDays("2026-00"))
-        assertEquals("26 Oct – 1 Nov", dayRangeLabel(weekDays("2026-43")!!))
+        assertEquals("26 Oct to 1 Nov", dayRangeLabel(weekDays("2026-43")!!))
         assertNull(weekDays("2026-11-14"))
     }
 }

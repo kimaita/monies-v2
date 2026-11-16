@@ -151,7 +151,7 @@ fun FilterBottomSheetContent(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text("NATURE", style = MaterialTheme.typography.labelMedium)
+            Text("DIRECTION", style = MaterialTheme.typography.labelMedium)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {

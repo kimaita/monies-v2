@@ -72,10 +72,10 @@ internal fun HeroPage(active: Boolean, parallax: () -> Float) {
         Spacer(Modifier.height(30.dp))
         Eyebrow("WELCOME TO MONIES")
         Spacer(Modifier.height(12.dp))
-        OnbHeadline("Sorted the\nmoment it lands")
+        OnbHeadline("Messages become\ntransactions")
         Spacer(Modifier.height(14.dp))
         OnbBody(
-            "Every M-PESA message becomes a clean record — automatically, no typing.",
+            "Monies reads each M-PESA message and saves it as a transaction.",
             Modifier.widthIn(max = 300.dp)
         )
     }
