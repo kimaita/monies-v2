@@ -15,12 +15,13 @@ import com.kimaita.monies.models.StatsFilter
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.models.analytics.BalancePoint
-import com.kimaita.monies.models.analytics.HeatRow
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.services.PaceSummary
+import com.kimaita.monies.services.feesByType
+import com.kimaita.monies.data.dao.dtos.TypeFees
 import com.kimaita.monies.services.weekDays
 import com.kimaita.monies.services.dayRangeLabel
 import com.kimaita.monies.services.PacePeriod
@@ -36,18 +37,13 @@ import com.kimaita.monies.services.flowSides
 import com.kimaita.monies.services.moneyWalk
 import com.kimaita.monies.services.FlowSides
 import com.kimaita.monies.services.MoneyWalk
-import com.kimaita.monies.services.WeekdayBar
 import com.kimaita.monies.services.balanceBucketFormatFor
 import com.kimaita.monies.services.bucketFormatFor
 import com.kimaita.monies.services.bucketLabel
 import com.kimaita.monies.services.daysForFilter
 import com.kimaita.monies.services.daysFrom
-import com.kimaita.monies.services.toHeatRows
-import com.kimaita.monies.services.toWeekdayBars
-import com.kimaita.monies.services.RhythmStats
 import com.kimaita.monies.services.SliceValue
 import com.kimaita.monies.services.StreakSummary
-import com.kimaita.monies.services.computeRhythm
 import com.kimaita.monies.services.categorySlices
 import com.kimaita.monies.services.computeStreaks
 import com.kimaita.monies.services.sliceFilter
@@ -57,7 +53,6 @@ import com.kimaita.monies.services.scopeLabel
 import com.kimaita.monies.services.balancePoints
 import com.kimaita.monies.services.yearStarts
 import com.kimaita.monies.ui.charts.BarBucket
-import com.kimaita.monies.ui.charts.RankedRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -76,7 +71,22 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import com.kimaita.monies.data.dao.dtos.DayPayment
+import com.kimaita.monies.data.dao.dtos.SourceAmount
+import com.kimaita.monies.data.dao.dtos.SubjectAmount
+import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.services.History
+import com.kimaita.monies.services.historyFor
+import com.kimaita.monies.services.previousRange
+import com.kimaita.monies.services.DAYS_PER_MONTH
+import com.kimaita.monies.services.MonthCalendar
+import com.kimaita.monies.services.Streak
+import com.kimaita.monies.services.calendarRange
+import com.kimaita.monies.services.dueDates
+import com.kimaita.monies.services.monthCalendar
+import com.kimaita.monies.services.streakNow
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -271,25 +281,66 @@ class AnalyticsViewModel @Inject constructor(
         repository.getIncomeVsExpense(k.stats)
     }.stateIn(viewModelScope, started, null)
 
+    /** Fees by transaction type for the filters, with how many transactions paid them. */
+    val typeFees: StateFlow<List<TypeFees>?> =
+        combine(key.flatMapLatest { repository.getTypeFees(it.stats) }, repository.getTransactionTypes()) { rows, types ->
+            feesByType(rows, types)
+        }.stateIn(viewModelScope, started, null)
+
     /** The rows the breakdown shows, and whether they are by type (chosen, or because there are no categories). */
     private class BreakdownRows(val byType: Boolean, val rows: List<CategorySpending>)
 
     private fun typeRows(k: FilterKey) = repository.getTypeSpending(k.stats, natureFilter = false).map { BreakdownRows(true, it) }
 
-    private val breakdownRows: Flow<BreakdownRows> =
+    private val breakdownRows: StateFlow<BreakdownRows?> =
         combine(key, _breakdownMode, ::Pair).flatMapLatest { (k, mode) ->
             if (mode == Breakdown.TYPE) typeRows(k)
             else repository.getCategorySpending(k.stats, natureFilter = false).flatMapLatest { cat ->
                 if (cat.isEmpty()) typeRows(k) else flowOf(BreakdownRows(false, cat))
             }
-        }
+        }.stateIn(viewModelScope, started, null)
+
+    private fun slices(b: BreakdownRows, categories: List<NamedRef<Int>>, types: List<TransactionType>) =
+        if (b.byType) typeSlices(b.rows, types) else categorySlices(b.rows, categories)
+
+    private val categoryRefs = repository.getCategories().map { list -> list.map { NamedRef(it.id, it.name) } }
 
     val breakdown: StateFlow<List<SliceValue>?> = combine(
-        breakdownRows, repository.getCategories(), repository.getTransactionTypes(),
-    ) { b, categories, types ->
-        if (b.byType) typeSlices(b.rows, types)
-        else categorySlices(b.rows, categories.map { NamedRef(it.id, it.name) })
+        breakdownRows, categoryRefs, repository.getTransactionTypes(),
+    ) { b, categories, types -> b?.let { slices(it, categories, types) } }
+        .stateIn(viewModelScope, started, null)
+
+    /** Whether the breakdown is by type, chosen or because nothing has a category. */
+    val breakdownByType: StateFlow<Boolean> = breakdownRows.map { it?.byType == true }
+        .stateIn(viewModelScope, started, false)
+
+    /** The filters' range moved back to the period before, of the same length; null for ALL. */
+    private val previousKey: Flow<StatsFilter?> = combine(_filters, today) { f, day ->
+        previousRange(f.timeFilter, day)?.let { (s, e) -> keyOf(f, day).stats.copy(start = s.toString(), end = e.toString()) }
+    }.distinctUntilChanged()
+
+    /**
+     * The breakdown's rows over the period before, grouped the same way as now (by type when now is),
+     * label to amount. Null for ALL; empty while that period has nothing.
+     */
+    val breakdownBefore: StateFlow<Map<String, Double>?> =
+        combine(breakdownRows, previousKey, ::Pair)
+            .flatMapLatest { (b, prev) ->
+                if (b == null || prev == null) flowOf(null)
+                else {
+                    val rows = if (b.byType) repository.getTypeSpending(prev, natureFilter = false).map { BreakdownRows(true, it) }
+                    else repository.getCategorySpending(prev, natureFilter = false).map { BreakdownRows(false, it) }
+                    combine(rows, categoryRefs, repository.getTransactionTypes()) { r, categories, types ->
+                        slices(r, categories, types).associate { it.label to it.value.toDouble() }
+                    }
+                }
+            }.stateIn(viewModelScope, started, null)
+
+    /** Money in and out over the period before; null for ALL. */
+    val statsBefore: StateFlow<IncExp?> = previousKey.flatMapLatest { prev ->
+        if (prev == null) flowOf(null) else repository.getIncomeVsExpense(prev)
     }.stateIn(viewModelScope, started, null)
+
 
     /** Budgeted categories with this calendar month's spending (not affected by the filters). */
     val budgets: StateFlow<List<CategoryBudget>> =
@@ -299,7 +350,7 @@ class AnalyticsViewModel @Inject constructor(
         repository.getFilterOptions().stateIn(viewModelScope, started, null)
 
     /** Top merchants, narrowed to the breakdown row that is selected, in Category and Type mode alike. */
-    val topSubjects: StateFlow<List<RankedRow>?> =
+    val topSubjects: StateFlow<List<SubjectAmount>?> =
         combine(key, breakdown, _selectedSlice) { fk, rows, slice -> Triple(fk, rows, slice) }
             .flatMapLatest { (k, rows, slice) ->
                 if (rows == null) return@flatMapLatest emptyFlow()
@@ -308,11 +359,16 @@ class AnalyticsViewModel @Inject constructor(
                     k.stats.copy(categories = categories, types = types),
                     natureFilter = false,
                     limit = 8,
-                ).map { list -> list.map { RankedRow(it.name, it.amount) } }
+                )
             }.stateIn(viewModelScope, started, null)
 
-    val incomeSources: StateFlow<List<RankedRow>?> = key.flatMapLatest { k ->
-        repository.getIncomeBySource(k.stats, 8).map { list -> list.map { RankedRow(it.name, it.amount) } }
+    /** Who paid in, biggest first, now and over the period before (null for ALL). */
+    val incomeSources: StateFlow<List<SourceAmount>?> = key.flatMapLatest { k ->
+        repository.getIncomeBySource(k.stats, 30)
+    }.stateIn(viewModelScope, started, null)
+
+    val incomeSourcesBefore: StateFlow<List<SourceAmount>?> = previousKey.flatMapLatest { prev ->
+        if (prev == null) flowOf(null) else repository.getIncomeBySource(prev, 30)
     }.stateIn(viewModelScope, started, null)
 
     val activityRaw: StateFlow<List<ActivityCell>?> =
@@ -327,13 +383,6 @@ class AnalyticsViewModel @Inject constructor(
         natureKey.flatMapLatest { (k, nature) ->
             repository.getWeekdayCounts(k.stats, nature).map { WeekdayRows(k.time, it) }
         }.stateIn(viewModelScope, started, null)
-
-    val heat: StateFlow<List<HeatRow>?> = activityRaw.map { it?.let(::toHeatRows) }
-        .stateIn(viewModelScope, started, null)
-
-    val weekdayBars: StateFlow<List<WeekdayBar>?> =
-        weekdayRaw.map { it?.let { w -> toWeekdayBars(w.counts) } }
-            .stateIn(viewModelScope, started, null)
 
     val leaderboard: StateFlow<List<SubjectCount>?> = natureKey.flatMapLatest { (k, nature) ->
         repository.getTopSubjectsByCount(k.stats, nature, 10)
@@ -385,6 +434,11 @@ class AnalyticsViewModel @Inject constructor(
         repository.selectedAccount.mapLatest { repository.getEarliestTransactionDate()?.toLocalDate() }
             .stateIn(viewModelScope, onceStarted, null)
 
+    /** Whether history reaches back over the whole period before. Null for ALL or until loaded. */
+    val history: StateFlow<History?> = combine(timeFilter, today, historyStart) { tf, day, first ->
+        historyFor(tf, day, first)
+    }.stateIn(viewModelScope, started, null)
+
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =
         combine(historyStart, today) { first, day ->
@@ -397,18 +451,6 @@ class AnalyticsViewModel @Inject constructor(
             scopeLabel(selected, lines.map { it.accountId to it.name })
         }.stateIn(viewModelScope, started, null)
 
-    val rhythm: StateFlow<RhythmStats?> =
-        combine(weekdayRaw, activityRaw, streak, dataSpanDays, today) { wk, act, st, spanDays, day ->
-            if (wk == null || act == null || st == null) return@combine null
-            computeRhythm(
-                wk.counts,
-                act,
-                totalCount = wk.counts.sumOf { it.count },
-                rangeDays = daysForFilter(wk.time, spanDays, day),
-                longestNoSpend = st.summary.longestNoSpend
-            )
-        }.stateIn(viewModelScope, started, null)
-
 
     val recurring: StateFlow<List<RecurringPayment>?> =
         repository.selectedAccount.mapLatest { repository.getRecurringPayments() }.stateIn(
@@ -416,6 +458,91 @@ class AnalyticsViewModel @Inject constructor(
             onceStarted,
             null
         )
+
+    /** The month the Activity calendar shows; null for the current one. */
+    private val _shownMonth = MutableStateFlow<YearMonth?>(null)
+    private val _selectedDay = MutableStateFlow<LocalDate?>(null)
+
+    /** Step the calendar a month back or forward, within recorded history and not past this month. */
+    fun shiftMonth(by: Long) {
+        val now = YearMonth.from(today.value)
+        val first = historyStart.value?.let(YearMonth::from) ?: now
+        val next = (_shownMonth.value ?: now).plusMonths(by)
+        if (next.isAfter(now) || next.isBefore(first)) return
+        _shownMonth.value = next.takeIf { it != now }
+        _selectedDay.value = null
+    }
+
+    fun selectDay(day: LocalDate) {
+        _selectedDay.value = day
+    }
+
+    val canGoBack: StateFlow<Boolean> =
+        combine(_shownMonth, historyStart, today) { m, first, day ->
+            first != null && (m ?: YearMonth.from(day)).isAfter(YearMonth.from(first))
+        }.stateIn(viewModelScope, started, false)
+
+    /**
+     * The Activity calendar: one day-totals query for the shown month's weeks and its biggest payment
+     * (filters aside, spending only, like the streak), with regular payments due later this month.
+     */
+    val calendar: StateFlow<MonthCalendar?> =
+        combine(_shownMonth, today) { m, day -> (m ?: YearMonth.from(day)) to day }
+            .distinctUntilChanged()
+            .flatMapLatest { (month, day) ->
+                val range = calendarRange(month)
+                val to = range.endInclusive.plusDays(1).toString()
+                combine(
+                    repository.getDailyTotals(range.start.toString(), to, natureFilter = false),
+                    repository.getLargestPayments(month.atDay(1).toString(), month.atEndOfMonth().plusDays(1).toString()),
+                    streak,
+                    recurring,
+                ) { days, largest, st, regulars ->
+                    val biggest = largest.firstOrNull { !it.isInc }?.let {
+                        Triple(LocalDate.parse(it.time.take(10)), it.amount, it.category)
+                    }
+                    val due = regulars.orEmpty().let { dueDates(it, day.plusDays(1), month.atEndOfMonth()) }
+                        .map { it.date }.toSet()
+                    monthCalendar(month, days, day, st?.let { streakNow(it.summary.intensities, day) }, due, biggest)
+                }
+            }.stateIn(viewModelScope, started, null)
+
+    /** The streak and record above the calendar, from the 13 weeks the streak query covers. */
+    val currentStreak: StateFlow<Streak?> = combine(streak, today) { st, day ->
+        st?.let { streakNow(it.summary.intensities, day) }
+    }.stateIn(viewModelScope, started, null)
+
+    /** The tapped day: today in the current month until another is picked, none in a past month. */
+    val selectedDay: StateFlow<LocalDate?> =
+        combine(_selectedDay, _shownMonth, today) { picked, month, day -> picked ?: day.takeIf { month == null } }
+            .stateIn(viewModelScope, started, null)
+
+    /** The selected day's payments out; empty for a day still to come. */
+    val dayPayments: StateFlow<List<DayPayment>?> =
+        combine(selectedDay, today) { d, day -> d?.takeIf { !it.isAfter(day) } }
+            .distinctUntilChanged()
+            .flatMapLatest { d ->
+                if (d == null) flowOf(emptyList())
+                else repository.getPaymentsOut(d.toString(), d.plusDays(1).toString())
+            }.stateIn(viewModelScope, started, null)
+
+    /** Payment counts by weekday for the filters, with the days of the range they fall in. */
+    class Weekdays(val counts: List<WeekdayCount>, val days: Int)
+
+    val weekdays: StateFlow<Weekdays?> =
+        combine(weekdayRaw, dataSpanDays, today) { w, span, day ->
+            w?.let { Weekdays(it.counts, daysForFilter(it.time, span, day)) }
+        }.stateIn(viewModelScope, started, null)
+
+    /** The nature filter alone, for wording that depends on money in or out. */
+    val nature: StateFlow<Boolean?> = _filters.map { it.natureFilter }.distinctUntilChanged()
+        .stateIn(viewModelScope, started, null)
+
+    /** What goes out in an average month at the period's rate, for the Recurring card's share. */
+    val monthlyOut: StateFlow<Double?> =
+        combine(stats, timeFilter, dataSpanDays, today) { s, tf, span, day ->
+            s?.let { it.expense * DAYS_PER_MONTH / daysForFilter(tf, span, day) }
+        }.stateIn(viewModelScope, started, null)
 
     /**
      * The period's spending by category so far, filters aside, while it is too early to project:

@@ -18,7 +18,8 @@ data class IncExp(
 data class CategorySpending(
     val name: String,
     val total: Double,
-    val totalCost: Double
+    val totalCost: Double,
+    val count: Int = 0,
 )
 
 /**
@@ -63,6 +64,12 @@ data class WalkTotals(
 /** The biggest single payment in ([isInc]) or out of a range; [time] is ISO text. */
 data class LargestPayment(val isInc: Boolean, val amount: Double, val time: String, val category: String?)
 
+/** One payment out on the calendar's tapped day; [time] is ISO text, [name] null without a subject. */
+data class DayPayment(val name: String?, val time: String, val amount: Double)
+
+/** Fees paid on one transaction type in a range, and on how many transactions. */
+data class TypeFees(val name: String, val fees: Double, val count: Int)
+
 /** Latest balance per bucket — the balance-trend line. */
 data class BalanceBucket(val bucket: String, val balance: Float)
 
@@ -70,13 +77,13 @@ data class BalanceBucket(val bucket: String, val balance: Float)
 data class LineBalanceBucket(val lineId: Int, val bucket: String?, val balance: Float)
 
 /** Subject ranked by spend (top subjects, cross-filterable). */
-data class SubjectAmount(val subjectId: Long, val name: String, val amount: Double)
+data class SubjectAmount(val subjectId: Long, val name: String, val amount: Double, val count: Int = 0)
 
 /** Subject ranked by frequency (leaderboard). */
 data class SubjectCount(val subjectId: Long, val name: String, val count: Int)
 
 /** Income grouped by source (treemap). */
-data class SourceAmount(val name: String, val amount: Double)
+data class SourceAmount(val subjectId: Long, val name: String, val amount: Double, val count: Int = 0)
 
 data class WeekdayCount(val weekday: Int, val count: Int, val total: Double)
 

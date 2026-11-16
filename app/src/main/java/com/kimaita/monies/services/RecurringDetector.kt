@@ -20,8 +20,8 @@ class RecurringDetector @Inject constructor(
 
     suspend fun detect(
         now: LocalDateTime = LocalDateTime.now(),
-        lookbackMonths: Long = 12,
-        minOccurrences: Int = 7,
+        lookbackMonths: Long = LOOKBACK_MONTHS,
+        minOccurrences: Int = MIN_PAYMENT_DAYS,
         account: Int? = null,
     ): List<RecurringPayment> = withContext(Dispatchers.IO) {
         val since = now.minusMonths(lookbackMonths).format(fmt)
@@ -37,20 +37,17 @@ class RecurringDetector @Inject constructor(
         now: LocalDateTime,
         minOccurrences: Int
     ): RecurringPayment? {
-        if (group.size < minOccurrences) return null
-        val times = group.mapNotNull {
-            runCatching {
-                LocalDateTime.parse(
-                    it.transactionTime,
-                    fmt
-                )
-            }.getOrNull()
-        }.sorted()
-        if (times.size < minOccurrences) return null
+        // One payment per day: a bill split in two, or three visits to a shop in an afternoon, is one
+        // occurrence at the day's first time, for the day's total.
+        val days = group.mapNotNull { o ->
+            runCatching { LocalDateTime.parse(o.transactionTime, fmt) }.getOrNull()?.let { it to o.amount }
+        }.groupBy { it.first.toLocalDate() }
+            .map { (_, pays) -> pays.minOf { it.first } to pays.sumOf { it.second } }
+            .sortedBy { it.first }
+        if (days.size < minOccurrences) return null
+        val times = days.map { it.first }
 
         val gaps = times.zipWithNext { a, b -> Duration.between(a, b).toMinutes() / 1440.0 }
-            .filter { it > 0 }
-        if (gaps.isEmpty()) return null
         val cadence = median(gaps)
         if (cadence <= 0) return null
 
@@ -58,7 +55,7 @@ class RecurringDetector @Inject constructor(
         val daysSinceLast = Duration.between(last, now).toMinutes() / 1440.0
         if (daysSinceLast > cadence * 2) return null
 
-        val amounts = group.map { it.amount }
+        val amounts = days.map { it.second }
         val typical = median(amounts)
         val irregular = cv(gaps) > 0.40 || cv(amounts) > 0.30
 
@@ -68,7 +65,7 @@ class RecurringDetector @Inject constructor(
             typicalAmount = typical,
             lastDate = last,
             nextEstimate = last.plusDays(cadence.roundToLong()),
-            occurrences = group.size,
+            occurrences = days.size,
             irregular = irregular,
             periodDays = nominalPeriodDays(cadence),
         )
@@ -102,6 +99,12 @@ class RecurringDetector @Inject constructor(
         return sd / mean
     }
 }
+
+/** How far back recurring payments are looked for. */
+const val LOOKBACK_MONTHS = 4L
+
+/** Days with a payment a name needs in [LOOKBACK_MONTHS] to count: a monthly bill gets four. */
+const val MIN_PAYMENT_DAYS = 4
 
 /** Days in an average month, for turning a cadence into a monthly figure. */
 const val DAYS_PER_MONTH = 30.44

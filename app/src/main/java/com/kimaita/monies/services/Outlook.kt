@@ -2,6 +2,8 @@ package com.kimaita.monies.services
 
 import com.kimaita.monies.data.dao.dtos.ActivityCell
 import com.kimaita.monies.data.dao.dtos.CategorySpending
+import com.kimaita.monies.data.dao.dtos.TypeFees
+import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.analytics.RecurringPayment
 import java.time.LocalDate
 import kotlin.math.floor
@@ -27,6 +29,14 @@ fun dueDates(recurring: List<RecurringPayment>, from: LocalDate, to: LocalDate):
         }
     }
     return out.sortedBy { it.date }
+}
+
+/** Fees by type under each type's display name, types sharing one ("Airtime") merged, biggest first. */
+fun feesByType(rows: List<TypeFees>, types: List<TransactionType>): List<TypeFees> {
+    val labelOf = types.associate { it.name to it.finalDisplayName }
+    return rows.groupBy { labelOf[it.name] ?: it.name }
+        .map { (label, g) -> TypeFees(label, g.sumOf { it.fees }, g.sumOf { it.count }) }
+        .sortedByDescending { it.fees }
 }
 
 /** What the regulars add up to in an average month. */

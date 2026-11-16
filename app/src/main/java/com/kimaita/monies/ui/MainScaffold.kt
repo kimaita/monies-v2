@@ -109,7 +109,7 @@ fun MoniesNavHost(
             )
         }
         composable("analytics") {
-            AnalyticsScreen()
+            AnalyticsScreen(onSubject = { navController.navigateSingleTop("subject/$it") })
         }
         composable("settings") { SettingsScreen(navController = navController) }
         composable("settings/unrecognised") { UnrecognisedScreen(navController = navController) }

@@ -10,7 +10,6 @@ import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.analytics.BalancePoint
-import com.kimaita.monies.models.analytics.HeatRow
 import com.kimaita.monies.models.export.NamedRef
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -23,14 +22,6 @@ data class StreakSummary(
     val longestActive: Int,
     val longestNoSpend: Int,
     val intensities: Map<LocalDate, Double>,
-)
-
-data class RhythmStats(
-    /** 0=Sun..6=Sat */
-    val busiestWeekday: Int?,
-    val mostActiveSlot: Int?,
-    val avgPerDay: Double,
-    val longestQuietDays: Int,
 )
 
 /** Active = a day with any spending. Walks the inclusive [start, end] range. */
@@ -58,21 +49,6 @@ fun computeStreaks(daily: List<DailyTotal>, start: LocalDate, end: LocalDate): S
     return StreakSummary(current, longestActive, longestNoSpend, byDay)
 }
 
-fun computeRhythm(
-    weekdays: List<WeekdayCount>,
-    activity: List<ActivityCell>,
-    totalCount: Int,
-    rangeDays: Int,
-    longestNoSpend: Int,
-): RhythmStats {
-    val busiest = weekdays.maxByOrNull { it.count }?.weekday
-    val slot = activity.groupBy { it.slot }
-        .mapValues { (_, cells) -> cells.sumOf { it.count } }
-        .maxByOrNull { it.value }?.key
-    val avg = if (rangeDays > 0) totalCount.toDouble() / rangeDays else 0.0
-    return RhythmStats(busiest, slot, avg, longestNoSpend)
-}
-
 /** The line Analytics is showing: its name, or "All accounts"; null when there is a single line and nothing to tell apart. */
 fun scopeLabel(selected: Int?, lines: List<Pair<Int, String>>): String? =
     if (lines.size < 2) null else lines.firstOrNull { it.first == selected }?.second ?: "All accounts"
@@ -83,11 +59,13 @@ data class SliceValue(
     val value: Float,
     val categoryIds: List<Int> = emptyList(),
     val typeIds: List<Int> = emptyList(),
+    /** How many payments the row adds up. */
+    val count: Int = 0,
 )
 
 fun categorySlices(rows: List<CategorySpending>, categories: List<NamedRef<Int>>): List<SliceValue> =
     rows.map { r ->
-        SliceValue(r.name, r.total.toFloat(), categoryIds = categories.filter { it.name == r.name }.map { it.id })
+        SliceValue(r.name, r.total.toFloat(), categories.filter { it.name == r.name }.map { it.id }, count = r.count)
     }.sortedByDescending { it.value }
 
 /** The types that share one display name ("Airtime"), shown as a single choice. */
@@ -113,7 +91,7 @@ fun typeSlices(rows: List<CategorySpending>, types: List<TransactionType>): List
     val idsOf = typeGroups(types).associate { it.label to it.ids }
     return rows.groupBy { labelOf[it.name] ?: it.name }
         .map { (label, group) ->
-            SliceValue(label, group.sumOf { it.total }.toFloat(), typeIds = idsOf[label].orEmpty())
+            SliceValue(label, group.sumOf { it.total }.toFloat(), typeIds = idsOf[label].orEmpty(), count = group.sumOf { it.count })
         }
         .sortedByDescending { it.value }
 }
@@ -225,8 +203,6 @@ fun sumLineBalances(rows: List<LineBalanceBucket>): List<BalanceBucket> {
     }
 }
 
-data class WeekdayBar(val label: String, val count: Int)
-
 /** The days of [daily] on or after [start]; one query over a wide window serves several shorter ones. */
 fun daysFrom(daily: List<DailyTotal>, start: LocalDate): List<DailyTotal> {
     val from = start.toString()
@@ -273,22 +249,6 @@ fun daysForFilter(tf: TimeFilter, spanDays: Int?, today: LocalDate = LocalDate.n
             .coerceAtLeast(1)
 }
 
-private val weekdayOrder = listOf(1, 2, 3, 4, 5, 6, 0)
-private val weekdayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-
-fun toHeatRows(cells: List<ActivityCell>): List<HeatRow> {
-    val map = cells.associate { (it.weekday to it.slot) to it.count }
-    return weekdayOrder.mapIndexed { i, wd ->
-        HeatRow(
-            weekdayNames[i],
-            (0..3).map { slot -> map[wd to slot] ?: 0 })
-    }
-}
-
-fun toWeekdayBars(counts: List<WeekdayCount>): List<WeekdayBar> {
-    val map = counts.associate { it.weekday to it.count }
-    return weekdayOrder.mapIndexed { i, wd -> WeekdayBar(weekdayNames[i], map[wd] ?: 0) }
-}
 
 /**
  * The days a "%Y-%W" bucket covers, as SQLite counts weeks: week 1 starts on the year's first Monday,

@@ -25,7 +25,7 @@ interface CategoryDao : BaseDao<Category> {
      */
     @Query(
         """
-            SELECT c.name, SUM(t.amount) AS total, SUM(t.cost) AS totalCost
+            SELECT c.name, SUM(t.amount) AS total, SUM(t.cost) AS totalCost, COUNT(*) AS count
             FROM transactions AS t
             JOIN categories AS c ON t.transactionCategory = c.id
             JOIN transaction_types AS tt ON t.transactionType = tt.id

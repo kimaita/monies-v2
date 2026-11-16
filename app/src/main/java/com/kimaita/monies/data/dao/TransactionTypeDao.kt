@@ -16,7 +16,7 @@ interface TransactionTypeDao : BaseDao<TransactionType> {
      */
     @Query(
         """
-            SELECT tt.name, SUM(t.amount) AS total, SUM(t.cost) AS totalCost
+            SELECT tt.name, SUM(t.amount) AS total, SUM(t.cost) AS totalCost, COUNT(*) AS count
             FROM transactions AS t
             JOIN transaction_types AS tt ON t.transactionType = tt.id
             WHERE $DATE_RANGE
