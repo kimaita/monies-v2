@@ -92,7 +92,7 @@ internal fun AutoPage(active: Boolean) {
         ) {
             PulseDot(); Text(
             "LIVE",
-            fontFamily = onbMono(),
+            fontFamily = onbLabel(),
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             letterSpacing = 1.sp,
@@ -146,7 +146,7 @@ private fun AutoRow(r: AutoRowData) {
             ) {
                 Text(
                     r.tag,
-                    fontFamily = onbMono(),
+                    fontFamily = onbLabel(),
                     fontSize = 9.5.sp,
                     letterSpacing = 0.8.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -163,7 +163,7 @@ private fun AutoRow(r: AutoRowData) {
                 )
             }
             Spacer(Modifier.height(2.dp))
-            Text(r.sub, fontFamily = onbMono(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(r.sub, fontFamily = onbLabel(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
             r.amount,

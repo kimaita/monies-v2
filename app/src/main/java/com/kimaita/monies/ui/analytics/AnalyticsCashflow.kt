@@ -131,13 +131,13 @@ private fun LedgerRow(
     changeColor: Color = Color.Unspecified, bold: Boolean = false, muted: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val mono = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp, lineHeight = 20.sp)
+    val figure = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp, lineHeight = 20.sp)
     val color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     val weight = if (bold) FontWeight.Bold else null
     Row(modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium.copy(fontSize = if (muted) 12.sp else 14.sp), color = color, fontWeight = weight)
-        LedgerFigure(change.orEmpty(), mono, if (changeColor != Color.Unspecified) changeColor else color, weight)
-        LedgerFigure(balance.orEmpty(), mono, color, weight)
+        LedgerFigure(change.orEmpty(), figure, if (changeColor != Color.Unspecified) changeColor else color, weight)
+        LedgerFigure(balance.orEmpty(), figure, color, weight)
     }
 }
 

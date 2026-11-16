@@ -30,7 +30,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun onbMono(): FontFamily? = MaterialTheme.typography.labelSmall.fontFamily
+fun onbLabel(): FontFamily? = MaterialTheme.typography.labelSmall.fontFamily
 
 @Composable
 fun onbDisplay(): FontFamily? = MaterialTheme.typography.titleLarge.fontFamily
@@ -61,7 +61,7 @@ fun Modifier.onbCard(): Modifier = this
 
 @Composable
 fun Eyebrow(text: String, color: Color = MoniesTheme.extra.outflow) =
-    Text(text, fontFamily = onbMono(), fontSize = 12.sp, letterSpacing = 1.7.sp, color = color)
+    Text(text, fontFamily = onbLabel(), fontSize = 12.sp, letterSpacing = 1.7.sp, color = color)
 
 @Composable
 fun OnbHeadline(text: String, fontSize: TextUnit = 34.sp, modifier: Modifier = Modifier) =

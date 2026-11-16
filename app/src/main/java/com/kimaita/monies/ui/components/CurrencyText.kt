@@ -16,7 +16,7 @@ import kotlin.math.absoluteValue
  * thread, inside composition.
  */
 private val kesFormat: NumberFormat =
-    NumberFormat.getCurrencyInstance(java.util.Locale("en", "KE")).apply {
+    NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("en-KE")).apply {
         currency = Currency.getInstance("KES")
     }
 

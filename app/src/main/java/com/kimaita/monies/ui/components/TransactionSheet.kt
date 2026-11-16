@@ -60,6 +60,7 @@ import com.kimaita.monies.ui.util.copyToClipboard
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.kimaita.monies.ui.theme.TabularFigures
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -171,7 +172,7 @@ fun TransactionContent(
             DetailRow("Total") { MoneyValue(transaction.total) }
         }
         DetailRow("Code") {
-            Text(transaction.code, style = MaterialTheme.typography.labelLarge.copy(fontFamily = MaterialTheme.typography.labelMedium.fontFamily))
+            Text(transaction.code, style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = TabularFigures))
             CopyIcon("Copy transaction code") { copyToClipboard(context, "Transaction ID", transaction.code) }
         }
 
@@ -257,7 +258,7 @@ private fun DetailRow(label: String, value: @Composable () -> Unit) {
 
 @Composable
 private fun MoneyValue(amount: Double) {
-    CurrencyText(amount) { Text(it, style = MaterialTheme.typography.labelLarge.copy(fontFamily = MaterialTheme.typography.labelMedium.fontFamily)) }
+    CurrencyText(amount) { Text(it, style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = TabularFigures)) }
 }
 
 @Composable

@@ -82,9 +82,36 @@ private fun splitMaskedSubjects(db: SupportSQLiteDatabase) {
 
 class DatabaseInitializer : RoomDatabase.Callback() {
 
+    /** Set when an old schema was wiped; the categories go in at [onOpen], once the tables exist again. */
+    private var seedCategoriesOnOpen = false
+
     /** Inserts the default categories before any DAO sees the database, so a first sync never misses one. */
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)
+        insertDefaultCategories(db)
+    }
+
+    /**
+     * Room calls this after dropping the tables but before creating them again, and never calls
+     * [onCreate] on this path, so the categories are inserted from [onOpen] instead.
+     */
+    override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+        super.onDestructiveMigration(db)
+        seedCategoriesOnOpen = true
+    }
+
+    /** Runs synchronously before any DAO sees the database, so a sync can never miss a new type. */
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        super.onOpen(db)
+        if (seedCategoriesOnOpen) {
+            seedCategoriesOnOpen = false
+            insertDefaultCategories(db)
+        }
+        syncDefaultTransactionTypes(db)
+        applyDefaultCategoryRules(db)
+    }
+
+    private fun insertDefaultCategories(db: SupportSQLiteDatabase) {
         for (category in getDefaultCategories()) {
             val values = ContentValues().apply {
                 put("name", category.name)
@@ -93,13 +120,6 @@ class DatabaseInitializer : RoomDatabase.Callback() {
             }
             db.insert("categories", SQLiteDatabase.CONFLICT_IGNORE, values)
         }
-    }
-
-    /** Runs synchronously before any DAO sees the database, so a sync can never miss a new type. */
-    override fun onOpen(db: SupportSQLiteDatabase) {
-        super.onOpen(db)
-        syncDefaultTransactionTypes(db)
-        applyDefaultCategoryRules(db)
     }
 
     /**
