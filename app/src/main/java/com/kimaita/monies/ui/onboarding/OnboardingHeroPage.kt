@@ -102,7 +102,7 @@ private fun SmsBubble() {
                 .background(MaterialTheme.colorScheme.primary))
             Text(
                 "M-PESA · TODAY 2:02 PM",
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontSize = 9.5.sp,
                 letterSpacing = 1.2.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -114,7 +114,7 @@ private fun SmsBubble() {
                 withStyle(SpanStyle(color = MoniesTheme.extra.outflow)) { append("WEF6X3K9LM") }
                 append(" Confirmed. Ksh1,500.00 paid to NAIVAS LIMITED. New M-PESA balance is Ksh8,420.00.")
             },
-            fontFamily = onbMono(), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = onbLabel(), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -128,7 +128,7 @@ private fun ArrowBadge(modifier: Modifier = Modifier) {
     ) {
         Text(
             "Monies reads it",
-            fontFamily = onbMono(),
+            fontFamily = onbLabel(),
             fontWeight = FontWeight.Bold,
             fontSize = 10.5.sp,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -186,7 +186,7 @@ private fun RecordCard() {
             )
             Text(
                 "Pay bill · 14:02",
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

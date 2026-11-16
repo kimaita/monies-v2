@@ -192,7 +192,7 @@ private fun OnbPermissionRow(item: PermissionRationale) {
 private fun OnbMarker(required: Boolean) {
     Text(
         if (required) "REQUIRED" else "OPTIONAL",
-        fontFamily = onbMono(),
+        fontFamily = onbLabel(),
         fontWeight = FontWeight.Bold,
         fontSize = 9.5.sp,
         letterSpacing = 0.6.sp,

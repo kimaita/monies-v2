@@ -87,7 +87,7 @@ private fun RankedPreviewRow(label: String, pct: Int, color: Color) {
             Spacer(Modifier.weight(1f))
             Text(
                 "$pct%",
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -122,7 +122,7 @@ private fun StatCard(
     Column(modifier.onbCard()) {
         Text(
             label,
-            fontFamily = onbMono(),
+            fontFamily = onbLabel(),
             fontSize = 10.sp,
             letterSpacing = 1.2.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -139,7 +139,7 @@ private fun StatCard(
         if (change != null) {
             Spacer(Modifier.height(4.dp)); Text(
                 change,
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 color = MoniesTheme.extra.negative
@@ -148,7 +148,7 @@ private fun StatCard(
         if (sub != null) {
             Spacer(Modifier.height(4.dp)); Text(
                 sub,
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -168,7 +168,7 @@ private fun CashFlowCard() {
         ) {
             Text(
                 "CASH FLOW · 6 WEEKS",
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontSize = 10.sp,
                 letterSpacing = 1.2.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -195,7 +195,7 @@ private fun FlowLegend(color: Color, label: String) {
             .size(9.dp)
             .clip(RoundedCornerShape(3.dp))
             .background(color))
-        Text(label, fontFamily = onbMono(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontFamily = onbLabel(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -251,7 +251,7 @@ private fun ExportChips() {
         listOf("CSV", "Excel", "PDF").forEach {
             Text(
                 it,
-                fontFamily = onbMono(),
+                fontFamily = onbLabel(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,

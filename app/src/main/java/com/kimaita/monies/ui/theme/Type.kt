@@ -6,15 +6,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.kimaita.monies.R
 
-private val AtkinsonNext = FontFamily(
+/** The one app font: regular and a real bold are bundled; SemiBold and ExtraBold resolve to the bold file. */
+val AtkinsonNext = FontFamily(
     Font(R.font.atkinson_next_regular, FontWeight.Normal),
     Font(R.font.atkinson_next_bold, FontWeight.Bold),
 )
 
-/** Figures and small labels. Bold is synthesised: only the regular weight is bundled. */
-val AtkinsonMono = FontFamily(
-    Font(R.font.atkinson_mono_regular, FontWeight.Normal),
-)
+/** Tabular figures, so amounts in a column line up digit for digit. */
+const val TabularFigures = "tnum"
 
 private val baseline = Typography()
 
@@ -32,6 +31,6 @@ val AppTypography = Typography(
     bodyMedium = baseline.bodyMedium.copy(fontFamily = AtkinsonNext),
     bodySmall = baseline.bodySmall.copy(fontFamily = AtkinsonNext),
     labelLarge = baseline.labelLarge.copy(fontFamily = AtkinsonNext, fontWeight = FontWeight.Bold),
-    labelMedium = baseline.labelMedium.copy(fontFamily = AtkinsonMono),
-    labelSmall = baseline.labelSmall.copy(fontFamily = AtkinsonMono),
+    labelMedium = baseline.labelMedium.copy(fontFamily = AtkinsonNext, fontFeatureSettings = TabularFigures),
+    labelSmall = baseline.labelSmall.copy(fontFamily = AtkinsonNext, fontFeatureSettings = TabularFigures),
 )
