@@ -29,6 +29,8 @@ import com.kimaita.monies.ui.export.ExportScreen
 import com.kimaita.monies.ui.home.HomeScreen
 import com.kimaita.monies.ui.settings.SettingsScreen
 import com.kimaita.monies.ui.settings.UnrecognisedScreen
+import com.kimaita.monies.ui.transactions.TRACE_AFTER_ARG
+import com.kimaita.monies.ui.transactions.TRACE_SINCE_ARG
 import com.kimaita.monies.ui.transactions.TransactionsScreen
 
 enum class TopDest(val route: String, val label: String) {
@@ -97,11 +99,22 @@ fun MoniesNavHost(
             )
         }
         composable(
-            route = "transactions?search={search}",
-            arguments = listOf(navArgument("search") {
-                type = NavType.BoolType
-                defaultValue = false
-            })
+            route = "transactions?search={search}&$TRACE_SINCE_ARG={$TRACE_SINCE_ARG}&$TRACE_AFTER_ARG={$TRACE_AFTER_ARG}",
+            arguments = listOf(
+                navArgument("search") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+                navArgument(TRACE_SINCE_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument(TRACE_AFTER_ARG) {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+            )
         ) { entry ->
             TransactionsScreen(
                 navController = navController,

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,6 +60,7 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
 import com.kimaita.monies.models.SortOrder
+import com.kimaita.monies.models.TraceStart
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.services.typeGroups
@@ -72,6 +74,14 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
+/**
+ * The Transactions list, tracing what came after [t]; null when [t] has no time. The ISO time needs
+ * no escaping: digits, '-', ':', '.' and 'T' are all plain in a query.
+ */
+fun traceRoute(t: Transaction): String? = t.transactionTime?.let {
+    "transactions?$TRACE_SINCE_ARG=${TraceStart(it, t.id).start}&$TRACE_AFTER_ARG=${t.id}"
+}
+
 @Composable
 fun TransactionsScreen(
     modifier: Modifier = Modifier,
@@ -84,6 +94,8 @@ fun TransactionsScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
     val subjectMatches by viewModel.subjectMatches.collectAsStateWithLifecycle()
+    val trace by viewModel.trace.collectAsStateWithLifecycle()
+    val hideBalances by viewModel.hideBalances.collectAsStateWithLifecycle()
 
     TransactionsScreenContent(
         modifier = modifier,
@@ -92,10 +104,13 @@ fun TransactionsScreen(
         transactionTypes = transactionTypes,
         categories = categories,
         filters = filters,
+        trace = trace,
+        hideBalances = hideBalances,
         openSearch = openSearch,
         onSetSearchQuery = viewModel::setSearchQuery,
         onSetSortOrder = viewModel::setSortOrder,
         onUpdateFilters = viewModel::updateFilters,
+        onTrace = viewModel::setTrace,
         onExport = {
             viewModel.exportResults()
             navController.popBackStack()
@@ -117,10 +132,13 @@ fun TransactionsScreenContent(
     transactionTypes: List<TransactionType>,
     categories: List<Category>,
     filters: TransactionFilters,
+    trace: TraceSummary? = null,
+    hideBalances: Boolean = false,
     openSearch: Boolean = false,
     onSetSearchQuery: (String) -> Unit,
     onSetSortOrder: (SortOrder) -> Unit,
     onUpdateFilters: (TransactionFilters) -> Unit,
+    onTrace: (TraceStart?) -> Unit = {},
     onExport: () -> Unit,
     onBack: () -> Unit = {},
     onTransactionClick: (Long) -> Unit
@@ -132,6 +150,21 @@ fun TransactionsScreenContent(
     var searchVisible by rememberSaveable { mutableStateOf(openSearch) }
 
     val focusRequester = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+
+    val since = filters.since
+    val traceFrom: (Transaction) -> Unit = remember(onTrace) {
+        { t -> t.transactionTime?.let { onTrace(TraceStart(it, t.id)) } }
+    }
+    // A new trace opens at its card; a trace restored with the screen keeps its scroll position.
+    val traceKey = since?.let { "${it.start}/${it.afterId}" }
+    var scrolledFor by rememberSaveable { mutableStateOf(traceKey) }
+    LaunchedEffect(traceKey) {
+        if (traceKey != scrolledFor) {
+            scrolledFor = traceKey
+            listState.requestScrollToItem(0)
+        }
+    }
 
     val closeSearch = {
         searchVisible = false
@@ -207,7 +240,8 @@ fun TransactionsScreenContent(
                     onRemoveFilter = onUpdateFilters
                 )
             }
-            if (hasActiveFilters || filters.searchQuery.isNotBlank()) {
+            // Export takes whole days, so it can't show a trace's rows exactly; it is not offered.
+            if (since == null && (hasActiveFilters || filters.searchQuery.isNotBlank())) {
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -223,6 +257,12 @@ fun TransactionsScreenContent(
             }
             if (hasActiveFilters) Spacer(modifier = Modifier.height(8.dp))
             val refresh = filteredTransactions.loadState.refresh
+            if (filteredTransactions.itemCount == 0 && since != null) {
+                TraceCard(
+                    since, trace, hideBalances, onStop = { onTrace(null) },
+                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
             if (filteredTransactions.itemCount == 0 && refresh !is LoadState.NotLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     if (refresh is LoadState.Error) {
@@ -241,10 +281,15 @@ fun TransactionsScreenContent(
                     )
                 }
             } else {
+                val showBalances = since != null && !hideBalances && trace?.oneLine == true
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (since != null) item(key = "trace", contentType = "trace") {
+                        TraceCard(since, trace, hideBalances, onStop = { onTrace(null) })
+                    }
                     items(subjectMatches, key = { "subject_${it.subjectId}" }) { match ->
                         SubjectMatchRow(match, onClick = { onTransactionClick(match.subjectId) })
                     }
@@ -257,6 +302,8 @@ fun TransactionsScreenContent(
                             TransactionListItem(
                                 transaction = transaction,
                                 style = TransactionItemStyle.TWO_LINE,
+                                showBalance = showBalances,
+                                onTraceFrom = traceFrom,
                                 onSubjectClick = onTransactionClick
                             )
                         }

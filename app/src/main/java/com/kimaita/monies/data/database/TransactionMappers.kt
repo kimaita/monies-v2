@@ -21,7 +21,8 @@ fun TransactionWithDetails.toDomainModel(): DomainTransaction {
         category = this.category?.toDomainModel(),
         isInc = this.type.isInc,
         message = this.transaction.message,
-        cost = this.transaction.cost
+        cost = this.transaction.cost,
+        balance = this.transaction.balance,
     )
 }
 

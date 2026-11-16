@@ -13,6 +13,19 @@ data class IncExp(
 )
 
 /**
+ * What a trace's rows add up to (transfers' amounts left out). [lines] is how many lines they come
+ * from; [line] is one of them, so the only one when [lines] is 1, and null with no rows.
+ */
+data class TraceTotals(
+    val count: Int = 0,
+    val income: Double = 0.0,
+    val expense: Double = 0.0,
+    val fees: Double = 0.0,
+    val lines: Int = 0,
+    val line: Int? = null,
+)
+
+/**
  * Data class to hold the result of the category spending query.
  */
 data class CategorySpending(

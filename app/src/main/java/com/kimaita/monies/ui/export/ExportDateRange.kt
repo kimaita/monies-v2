@@ -18,9 +18,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
 import com.kimaita.monies.R
-import java.time.Instant
+import com.kimaita.monies.ui.util.toUtcDate
+import com.kimaita.monies.ui.util.toUtcMillis
 import java.time.LocalDate
-import java.time.ZoneOffset
 
 /** A compact date chip like Home's 1M / YTD ones; [description] is what TalkBack reads. */
 @Composable
@@ -42,9 +42,6 @@ internal fun BandChip(
         label = { if (text != null) Text(text, fontSize = 12.sp) else calendar() },
     )
 }
-
-private fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-private fun Long.toUtcDate() = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

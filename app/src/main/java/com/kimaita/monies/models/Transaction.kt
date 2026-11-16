@@ -12,7 +12,9 @@ data class Transaction(
     val subject: Subject?,
     val type: TransactionType,
     val category: Category?,
-    val isInc: Boolean
+    val isInc: Boolean,
+    /** The line's balance after this transaction, as its SMS gave it; null when it gave none. */
+    val balance: Double? = null,
 ) {
     val total = amount + (cost ?: 0.0)
 }
