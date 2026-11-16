@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -30,8 +29,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +47,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kimaita.monies.R
+import com.kimaita.monies.ui.components.TabTopBar
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
@@ -82,7 +80,6 @@ fun HomeScreen(
         onToggleHideBalances = viewModel::toggleHideBalances,
         onViewAnalytics = { navController.navigateToTab("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
-        onAccountSelect = viewModel::selectAccount,
         onSubjectClick = { subjectId -> navController.navigateSingleTop("subject/$subjectId") },
         uiState = uiState,
         filter = filters,
@@ -100,7 +97,6 @@ fun HomeScreenContent(
     isSyncing: Boolean = false,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onTimeFilterChange: (TimeFilter) -> Unit,
-    onAccountSelect: (Int?) -> Unit = {},
     onViewAllTransactions: () -> Unit,
     onViewAnalytics: () -> Unit,
     onSubjectClick: (Long) -> Unit,
@@ -115,24 +111,14 @@ fun HomeScreenContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
-                TopAppBar(
-                    title = { Text("Monies", style = MaterialTheme.typography.labelMedium) },
-                    actions = {
-                        IconButton(onClick = onSearch) {
-                            Icon(
-                                painter = painterResource(R.drawable.search),
-                                contentDescription = "Search transactions"
-                            )
-                        }
-                        IconButton(onClick = onSettings) {
-                            Icon(
-                                painter = painterResource(R.drawable.settings),
-                                contentDescription = "Settings"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                )
+                TabTopBar("Monies", onSettings) {
+                    IconButton(onClick = onSearch) {
+                        Icon(
+                            painter = painterResource(R.drawable.search),
+                            contentDescription = "Search transactions"
+                        )
+                    }
+                }
                 AnimatedVisibility(visible = isSyncing) { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             }
         },
@@ -151,25 +137,6 @@ fun HomeScreenContent(
                 .padding(horizontal = 16.dp),
         ) {
             Spacer(Modifier.height(8.dp))
-
-            if (uiState.accounts.size > 1) {
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = uiState.selectedAccount == null,
-                        onClick = { onAccountSelect(null) },
-                        label = { Text("All") })
-                    uiState.accounts.forEach { a ->
-                        FilterChip(
-                            selected = uiState.selectedAccount == a.accountId,
-                            onClick = { onAccountSelect(a.accountId) },
-                            label = { Text(a.name) })
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

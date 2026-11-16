@@ -49,10 +49,6 @@ fun computeStreaks(daily: List<DailyTotal>, start: LocalDate, end: LocalDate): S
     return StreakSummary(current, longestActive, longestNoSpend, byDay)
 }
 
-/** The line Analytics is showing: its name, or "All accounts"; null when there is a single line and nothing to tell apart. */
-fun scopeLabel(selected: Int?, lines: List<Pair<Int, String>>): String? =
-    if (lines.size < 2) null else lines.firstOrNull { it.first == selected }?.second ?: "All accounts"
-
 /** A breakdown row: the label shown, its amount, and the ids tapping it narrows the entries to. */
 data class SliceValue(
     val label: String,
@@ -84,6 +80,37 @@ fun Set<Int>.toggleGroup(group: TypeGroup): Set<Int> =
 /** How many choices the selected ids make up: a group counts once however many of its ids are in. */
 fun countTypeChoices(selected: Set<Int>, groups: List<TypeGroup>): Int =
     groups.count { g -> g.ids.any { it in selected } } + selected.count { id -> groups.none { id in it.ids } }
+
+/** Which filter an active-filter chip stands for, so tapping it clears that one. */
+enum class FilterKind { DIRECTION, TYPE, CATEGORY, SUBJECT }
+
+/**
+ * One chip per filter in use, in the sheet's order: "Money out", then a single choice by name
+ * ("Airtime", "Food", "Naivas") or several as a count ("Type · 2", "Category · 3", "Subjects · 4").
+ */
+fun activeFilters(
+    nature: Boolean?,
+    typeIds: List<Int>,
+    categoryIds: List<Int>,
+    subjects: List<NamedRef<Long>>,
+    types: List<TypeGroup>,
+    categories: List<NamedRef<Int>>,
+): List<Pair<FilterKind, String>> = buildList {
+    nature?.let { add(FilterKind.DIRECTION to if (it) "Money in" else "Money out") }
+    if (typeIds.isNotEmpty()) {
+        val picked = typeIds.toSet()
+        val n = countTypeChoices(picked, types)
+        val one = types.singleOrNull { g -> g.ids.any { it in picked } }.takeIf { n == 1 }
+        add(FilterKind.TYPE to (one?.label ?: "Type · $n"))
+    }
+    if (categoryIds.isNotEmpty()) {
+        val one = categoryIds.singleOrNull()?.let { id -> categories.firstOrNull { it.id == id } }
+        add(FilterKind.CATEGORY to (one?.name ?: "Category · ${categoryIds.size}"))
+    }
+    if (subjects.isNotEmpty()) {
+        add(FilterKind.SUBJECT to (subjects.singleOrNull()?.name ?: "Subjects · ${subjects.size}"))
+    }
+}
 
 /** Rows by type, under the type's display name. Types sharing a display name ("Airtime") become one row. */
 fun typeSlices(rows: List<CategorySpending>, types: List<TransactionType>): List<SliceValue> {

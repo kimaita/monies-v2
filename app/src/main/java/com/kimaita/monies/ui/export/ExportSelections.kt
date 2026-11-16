@@ -97,6 +97,3 @@ fun rangeText(start: LocalDate?, end: LocalDate?, today: LocalDate): String {
     }
 }
 
-/** The band's name, or the dates when the range is a custom one. */
-fun ExportSelections.dateLabel(today: LocalDate): String =
-    band(today)?.label ?: rangeText(startDate, endDate, today)

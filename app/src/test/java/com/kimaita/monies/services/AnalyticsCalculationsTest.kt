@@ -73,20 +73,6 @@ class AnalyticsCalculationsTest {
         assertEquals(25.0, pace.spent, 0.0)
     }
 
-    @Test
-    fun scopeLabel_namesTheSelectedLineOrAll() {
-        val lines = listOf(1 to "M-PESA", 3 to "Airtel Money")
-        assertEquals("Airtel Money", scopeLabel(3, lines))
-        assertEquals("All accounts", scopeLabel(null, lines))
-        assertEquals("All accounts", scopeLabel(9, lines))
-    }
-
-    @Test
-    fun scopeLabel_singleLineNeedsNoLabel() {
-        assertNull(scopeLabel(null, listOf(1 to "M-PESA")))
-        assertNull(scopeLabel(null, emptyList()))
-    }
-
     private val types = listOf(
         TransactionType(id = 1, name = "send_money", isInc = false, displayName = "Send Money"),
         TransactionType(id = 2, name = "airtime.own", isInc = false, displayName = "Airtime"),
@@ -137,6 +123,33 @@ class AnalyticsCalculationsTest {
         assertEquals(1, countTypeChoices(setOf(2), groups))
         assertEquals(2, countTypeChoices(setOf(1, 2, 3), groups))
         assertEquals(2, countTypeChoices(setOf(8, 9), groups))
+    }
+
+    @Test
+    fun activeFilters_nameASingleChoiceAndCountSeveral() {
+        val groups = typeGroups(types)
+        val cats = listOf(NamedRef(7, "Food"), NamedRef(8, "Rent"))
+        val subjects = listOf(NamedRef(1L, "Naivas"), NamedRef(2L, "KPLC"))
+        assertEquals(emptyList<Pair<FilterKind, String>>(), activeFilters(null, emptyList(), emptyList(), emptyList(), groups, cats))
+        assertEquals(
+            listOf(
+                FilterKind.DIRECTION to "Money out", FilterKind.TYPE to "Airtime",
+                FilterKind.CATEGORY to "Food", FilterKind.SUBJECT to "Naivas",
+            ),
+            activeFilters(false, listOf(2, 3), listOf(7), subjects.take(1), groups, cats),
+        )
+        assertEquals(
+            listOf(FilterKind.TYPE to "Type · 2", FilterKind.CATEGORY to "Category · 2", FilterKind.SUBJECT to "Subjects · 2"),
+            activeFilters(null, listOf(1, 2, 3), listOf(7, 8), subjects, groups, cats),
+        )
+    }
+
+    @Test
+    fun activeFilters_countBeforeTheNamesLoad() {
+        assertEquals(
+            listOf(FilterKind.DIRECTION to "Money in", FilterKind.TYPE to "Type · 1", FilterKind.CATEGORY to "Category · 1"),
+            activeFilters(true, listOf(2), listOf(7), emptyList(), emptyList(), emptyList()),
+        )
     }
 
     @Test

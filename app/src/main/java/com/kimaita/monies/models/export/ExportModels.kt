@@ -21,7 +21,6 @@ data class NamedRef<ID>(val id: ID, val name: String)
 
 data class FilterOptions(
     val categories: List<NamedRef<Int>> = emptyList(),
-    val accounts: List<NamedRef<Int>> = emptyList(),
     val types: List<TypeGroup> = emptyList(),
 )
 

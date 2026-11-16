@@ -99,8 +99,8 @@ class TransactionsRepository @Inject constructor(
     private val storedAccount = MutableSharedFlow<Int?>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /**
-     * Balance of every active line, queried once for the selection, [getAccountBalances] and
-     * [getFilterOptions]. The replay cache is dropped when nobody listens so a late subscriber never
+     * Balance of every active line, queried once for the selection and [getAccountBalances].
+     * The replay cache is dropped when nobody listens so a late subscriber never
      * sees an old balance first.
      */
     private val lines = transactionsDao.getAccountBalances()
@@ -342,11 +342,10 @@ class TransactionsRepository @Inject constructor(
     }
 
     fun getFilterOptions(): Flow<FilterOptions> = combine(
-        categoryDao.getAll(), getAccountBalances(), transactionTypeDao.getAll(),
-    ) { categories, accounts, types ->
+        categoryDao.getAll(), transactionTypeDao.getAll(),
+    ) { categories, types ->
         FilterOptions(
             categories = categories.map { NamedRef(it.id, it.name) },
-            accounts = accounts.map { NamedRef(it.accountId, it.name) },
             types = typeGroups(types),
         )
     }.flowOn(Dispatchers.Default)

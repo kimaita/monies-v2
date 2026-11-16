@@ -56,9 +56,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.R
+import com.kimaita.monies.ui.components.TabTopBar
 import com.kimaita.monies.models.export.ExportFormat
 import com.kimaita.monies.models.export.ExportState
-import com.kimaita.monies.services.TypeGroup
 import java.time.LocalDate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -71,6 +71,7 @@ private val FORMAT_ORDER =
 @Composable
 fun ExportScreen(
     viewModel: ExportViewModel = hiltViewModel(),
+    onSettings: () -> Unit = {},
 ) {
     val sel by viewModel.sel.collectAsStateWithLifecycle()
     val count by viewModel.count.collectAsStateWithLifecycle()
@@ -82,7 +83,6 @@ fun ExportScreen(
     var showRangePicker by remember { mutableStateOf(false) }
 
     val today = LocalDate.now()
-    val accounts = options?.accounts.orEmpty()
     val band = sel.band(today)
 
     LaunchedEffect(Unit) { if (viewModel.applyHandoff()) filtersExpanded = true }
@@ -90,6 +90,9 @@ fun ExportScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            TabTopBar("Export", onSettings)
+        },
         bottomBar = {
             Surface(tonalElevation = 2.dp) {
                 AnimatedContent(
@@ -130,26 +133,9 @@ fun ExportScreen(
                 .padding(pad)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Column {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Export",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    scopeLine(
-                        count, sel, options?.types.orEmpty(),
-                        accounts.firstOrNull { it.id == sel.accountId }?.name, today
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
             SectionLabel("Format")
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
@@ -162,16 +148,6 @@ fun ExportScreen(
                             .weight(1f)
                             .widthIn(min = 128.dp)
                     )
-                }
-            }
-
-            if (accounts.size > 1) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Account")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DirChip("All", sel.accountId == null) { viewModel.setAccount(null) }
-                    accounts.forEach { a ->
-                        DirChip(a.name, sel.accountId == a.id) { viewModel.setAccount(a.id) }
-                    }
                 }
             }
 
@@ -294,22 +270,6 @@ private fun SectionLabel(t: String) =
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
-private fun scopeLine(
-    count: Int?,
-    sel: ExportSelections,
-    typeGroups: List<TypeGroup>,
-    accountName: String?,
-    today: LocalDate,
-): String {
-    val n = count?.let { "%,d".format(it) } ?: "…"
-    val filters = sel.activeFilterCount(typeGroups)
-    return buildString {
-        append("$n transactions")
-        accountName?.let { append(" · $it") }
-        append(" · ${sel.dateLabel(today)}")
-        if (filters > 0) append(" · $filters filter${if (filters == 1) "" else "s"}")
-    }
-}
 
 private fun openFile(context: Context, uri: Uri, mime: String) {
     val view = Intent(Intent.ACTION_VIEW).apply {

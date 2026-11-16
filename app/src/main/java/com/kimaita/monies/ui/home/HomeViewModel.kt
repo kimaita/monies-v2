@@ -53,8 +53,6 @@ data class HomeUiState(
     /** The selected account's balance, or the sum across accounts when none is selected. */
     val mpesaBalance: Double? = null,
     val accountBalances: List<AccountBalance> = emptyList(),
-    /** Every active line, for the account chips. */
-    val accounts: List<AccountBalance> = emptyList(),
     val selectedAccount: Int? = null,
     val hideBalances: Boolean = false,
     val incomeVsExpense: IncExp? = null,
@@ -96,10 +94,6 @@ class HomeViewModel @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
-
-    fun selectAccount(id: Int?) {
-        viewModelScope.launch { repository.setSelectedAccount(id) }
-    }
 
     fun toggleHideBalances() {
         val hidden = uiState.value?.hideBalances ?: return
@@ -159,7 +153,6 @@ class HomeViewModel @Inject constructor(
         HomeUiState(
             mpesaBalance = balancesOrNull?.let { shown.sumOf { b -> b.balance ?: 0.0 } },
             accountBalances = balances,
-            accounts = lines,
             selectedAccount = selected,
             hideBalances = hide,
             incomeVsExpense = period.incExp,
