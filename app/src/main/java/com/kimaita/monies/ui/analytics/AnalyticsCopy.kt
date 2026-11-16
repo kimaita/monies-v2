@@ -14,11 +14,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/*
- * The cards' sentences. A run between `**` marks is shown bold (see Say); the first such run can
- * take the card's tone, green for good news and red for bad.
- */
-
 private val dayMonth = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 private val monthYear = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
 private val monthName = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)

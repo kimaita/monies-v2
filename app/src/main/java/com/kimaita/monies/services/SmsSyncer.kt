@@ -259,7 +259,6 @@ class SmsSyncer(
             val parsedSubjects = parsed.mapNotNull { it.second }.distinctBy { it.rawName to it.number }
             val savedByKey = store.savedSubjects(parsedSubjects.map { it.rawName }.distinct())
                 .associateByTo(HashMap()) { it.rawName to it.number }
-            // Full numbers first, so a masked one finds a subject this batch has just saved.
             parsedSubjects.sortedBy { '*' in it.number }.associate { s ->
                 val key = s.rawName to s.number
                 key to (savedByKey[key]

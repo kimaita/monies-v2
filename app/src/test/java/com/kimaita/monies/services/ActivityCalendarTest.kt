@@ -113,7 +113,6 @@ class ActivityCalendarTest {
 
     @Test
     fun weekdaySentence_namesBusiestAndQuietest() {
-        // Sunday is 0, as SQLite's %w counts.
         val counts = listOf(18, 14, 20, 20, 30, 25).mapIndexed { i, n -> WeekdayCount(i + 1, n, 0.0) } +
                 WeekdayCount(0, 10, 0.0)
         assertEquals("**Fridays** are busiest, **Sundays** quietest.", weekdaySentence(counts))

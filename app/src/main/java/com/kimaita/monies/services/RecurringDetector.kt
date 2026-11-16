@@ -37,8 +37,6 @@ class RecurringDetector @Inject constructor(
         now: LocalDateTime,
         minOccurrences: Int
     ): RecurringPayment? {
-        // One payment per day: a bill split in two, or three visits to a shop in an afternoon, is one
-        // occurrence at the day's first time, for the day's total.
         val days = group.mapNotNull { o ->
             runCatching { LocalDateTime.parse(o.transactionTime, fmt) }.getOrNull()?.let { it to o.amount }
         }.groupBy { it.first.toLocalDate() }

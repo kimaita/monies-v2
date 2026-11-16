@@ -64,7 +64,6 @@ private fun splitMaskedSubjects(db: SupportSQLiteDatabase) {
             val roots = HashSet<Long>()
             db.query("SELECT number, COALESCE(mergedInto, id) FROM subjects WHERE rawName = ?", arrayOf(name))
                 .use { c -> while (c.moveToNext()) if (fitsMask(number, c.getString(0))) roots += c.getLong(1) }
-            // A root equal to this row means the user merged the full-number subject into it: keep that.
             roots.singleOrNull()?.takeIf { it != row.id }?.let { root ->
                 row.categoryId?.let {
                     db.execSQL("UPDATE subjects SET categoryId = ? WHERE id = ? AND categoryId IS NULL", arrayOf<Any>(it, root))

@@ -11,7 +11,6 @@ class TraceStartTest {
 
     @Test
     fun startIsTheTextRoomStores() {
-        // The anchor's own time must compare equal to the stored text, seconds and fractions included.
         val cases = listOf(
             "2026-11-03T16:21" to "2026-11-03T16:21:00",
             "2026-11-03T16:21:05" to "2026-11-03T16:21:05",

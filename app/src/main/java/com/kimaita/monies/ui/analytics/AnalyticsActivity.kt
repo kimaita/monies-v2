@@ -398,7 +398,6 @@ private fun DaysCard(w: AnalyticsViewModel.Weekdays?, period: String) {
             EmptyHint(LOADING)
             return@BentoCard
         }
-        // Monday first; WeekdayCount numbers Sunday 0.
         val counts = (1..7).map { i -> w.counts.firstOrNull { it.weekday == i % 7 }?.count ?: 0 }
         val total = counts.sum()
         val sentence = remember(w) { weekdaySentence(w.counts) }
