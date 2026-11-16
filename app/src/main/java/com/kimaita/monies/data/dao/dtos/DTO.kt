@@ -63,6 +63,9 @@ data class WalkTotals(
 /** The biggest single payment in ([isInc]) or out of a range; [time] is ISO text. */
 data class LargestPayment(val isInc: Boolean, val amount: Double, val time: String, val category: String?)
 
+/** One payment out on the calendar's tapped day; [time] is ISO text, [name] null without a subject. */
+data class DayPayment(val name: String?, val time: String, val amount: Double)
+
 /** Fees paid on one transaction type in a range, and on how many transactions. */
 data class TypeFees(val name: String, val fees: Double, val count: Int)
 

@@ -418,6 +418,9 @@ class TransactionsRepository @Inject constructor(
     fun getWalkTotals(startDate: String?, endDate: String?) =
         forAccount { transactionsDao.getWalkTotals(startDate, endDate, it) }
 
+    fun getPaymentsOut(startDate: String?, endDate: String?) =
+        forAccount { transactionsDao.getPaymentsOut(startDate, endDate, it) }
+
     fun getTypeFees(f: StatsFilter) = forAccount {
         transactionsDao.getTypeFees(f.start, f.end, f.subjects, f.categories, f.types, it)
     }

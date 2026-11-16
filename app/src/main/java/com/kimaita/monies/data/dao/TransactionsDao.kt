@@ -15,6 +15,7 @@ import com.kimaita.monies.data.dao.dtos.LargestPayment
 import com.kimaita.monies.data.dao.dtos.SubjectOccurrence
 import com.kimaita.monies.data.dao.dtos.WalkTotals
 import com.kimaita.monies.data.dao.dtos.TypeFees
+import com.kimaita.monies.data.dao.dtos.DayPayment
 import com.kimaita.monies.data.dao.dtos.WeekdayCount
 import com.kimaita.monies.data.database.models.Transaction
 import com.kimaita.monies.data.database.models.TransactionWithDetails
@@ -468,6 +469,19 @@ interface TransactionsDao : BaseDao<Transaction> {
 """
     )
     fun getWalkTotals(startDate: String?, endDate: String?, account: Int?): Flow<WalkTotals>
+
+    /** The payments out in the range (not transfers), latest first: the calendar's tapped day. */
+    @Query(
+        """
+    SELECT s.name AS name, t.transactionTime AS time, t.amount AS amount
+    FROM transactions t
+    JOIN transaction_types tt ON t.transactionType = tt.id
+    LEFT JOIN subjects s ON t.subject = s.id
+    WHERE tt.isInc = 0 AND tt.isTransfer = 0 AND $DATE_RANGE AND $ACCOUNT_FILTER
+    ORDER BY t.transactionTime DESC
+"""
+    )
+    fun getPaymentsOut(startDate: String?, endDate: String?, account: Int?): Flow<List<DayPayment>>
 
     /** Fees by transaction type in the range: only transactions that cost something, biggest first. */
     @Query(

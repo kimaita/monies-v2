@@ -5,10 +5,6 @@ import java.time.LocalDateTime
 
 /** [label] is the full date for the tooltip, [axisLabel] the short one under the axis. */
 data class BalancePoint(val label: String, val balance: Float, val axisLabel: String, val date: LocalDate)
-data class HeatRow(
-    val day: String,
-    val values: List<Int>
-)
 
 data class RecurringPayment(
     val name: String,

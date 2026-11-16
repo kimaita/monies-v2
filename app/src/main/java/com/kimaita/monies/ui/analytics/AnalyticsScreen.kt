@@ -28,7 +28,7 @@ private val tabOptions = AnalyticsTab.entries.map { it.title to it }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
+fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel(), onSubject: (Long) -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(AnalyticsTab.OVERVIEW) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     val listStates = AnalyticsTab.entries.associateWith { rememberLazyListState() }
@@ -76,7 +76,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     AnalyticsTab.OVERVIEW -> OverviewTab(viewModel, listStates.getValue(tab)) { tab = it }
-                    AnalyticsTab.ACTIVITY -> ActivityTab(viewModel, listStates.getValue(tab))
+                    AnalyticsTab.ACTIVITY -> ActivityTab(viewModel, listStates.getValue(tab), onSubject)
                     AnalyticsTab.SPENDING -> SpendingTab(viewModel, listStates.getValue(tab))
                     AnalyticsTab.CASHFLOW -> CashFlowTab(viewModel, listStates.getValue(tab))
                 }
