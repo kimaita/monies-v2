@@ -4,15 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monies | Your M-PESA, sorted automatically</title>
-<meta name="description" content="Monies reads your M-PESA messages and shows your balance, Fuliza, M-Shwari and spending. Free, open source, and entirely on your phone.">
+<meta name="description" content="Monies reads your M-PESA and Airtel Money messages and shows your balances, Fuliza, M-Shwari and spending. Free, open source, and entirely on your phone.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   /* Colour tokens mirror the app: ui/theme/Color.kt + ui/onboarding/OnboardingStyle.kt */
   :root {
-    --paper:#FFFDF6; --ink:#15130D; --body:#3F3A30; --muted:#7A7263;
-    --emerald:#0E8C5A; --emerald-deep:#0A5C3C; --coral:#FF6A45; --mint:#DBF3E5; --gold:#E7C78A;
+    --paper:#FFFDF6; --ink:#15130D; --body:#3F3A30; --muted:#736D5F;
+    --emerald:#0E8C5A; --emerald-deep:#0A5C3C; --coral:#E0512E; --mint:#DBF3E5; --gold:#B8862F;
     --pos:#1E7F4F; --neg:#C2453A; --card:#FFFFFF; --rule:#ECE4D4; --sms:#F4F0E6; --chip:#EFE8D8;
     --band:#F8F3E6; --bezel:#15130D; --on-emerald:#FFFFFF; --shadow:0 4px 14px rgba(21,19,13,.07);
     --phone-shadow:0 30px 60px -20px rgba(21,19,13,.35);
@@ -32,8 +32,6 @@
     --pos:#2FE08A; --neg:#FF6F57; --card:#121212; --rule:#262626; --sms:#161616; --chip:#1E1C17;
     --band:#0C0C0B; --bezel:#2A2825; --on-emerald:#06130D; --shadow:none; --phone-shadow:0 30px 60px -20px rgba(47,224,138,.18);
   }
-
-  @property --sweep { syntax:'<angle>'; inherits:false; initial-value:0deg; }
 
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;scroll-padding-top:72px}
@@ -114,8 +112,11 @@
 
   /* home screen mock (mirrors ui/home/HomeScreen.kt) */
   .home{gap:14px}
-  .home .top{display:flex;justify-content:space-between;align-items:center;padding:0 2px}
-  .home .num{font-family:'Space Mono';font-size:.68rem;color:var(--muted)}
+  /* top bar: title, the account picker, the tab's actions (mirrors ui/components/TabTopBar.kt) */
+  .tbar{display:flex;align-items:center;gap:9px;padding:0 2px}
+  .tbar .phone-title{padding:0;margin-right:auto}
+  .acct{font-size:.66rem;font-weight:600;color:var(--ink);border:1px solid var(--rule);border-radius:999px;padding:3px 8px 3px 10px;white-space:nowrap}
+  .ico{width:17px;height:17px;flex:none;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .syncbar{height:3px;border-radius:3px;background:var(--chip);overflow:hidden;transition:opacity .4s ease 2.2s}
   .syncbar b{display:block;height:100%;width:0;background:var(--emerald);transition:width 1.6s ease .3s}
   .in .syncbar b{width:100%}
@@ -126,6 +127,7 @@
   .pills{display:flex;gap:6px;overflow:hidden;margin-top:8px;-webkit-mask-image:linear-gradient(90deg,#000 80%,transparent);mask-image:linear-gradient(90deg,#000 80%,transparent)}
   .bpill{flex:none;background:var(--card);border:1px solid var(--rule);border-radius:999px;padding:5px 11px;font-size:.72rem;white-space:nowrap;color:var(--muted)}
   .bpill b{color:var(--ink);font-weight:700;margin-left:3px}
+  .bpill b.owe{color:var(--neg)}
   .io-head{display:flex;justify-content:space-between;align-items:center}
   .seg{position:relative;display:flex;background:var(--chip);border-radius:9px;padding:3px;font-size:.68rem}
   .seg span{position:relative;z-index:1;width:44px;text-align:center;padding:3px 0;color:var(--muted);transition:color .3s ease 1.3s}
@@ -149,23 +151,143 @@
   .stg{opacity:0;transform:translateY(16px) scale(.97);transition:opacity .5s ease,transform .5s cubic-bezier(.2,.8,.3,1);transition-delay:calc(var(--i,0) * 140ms + 250ms)}
   .in .stg{opacity:1;transform:none}
 
-  /* how it works */
+  /* how it works: each step plays its own scene on the phone beside it.
+     Base styles are each scene's finished frame; .play replays it from the start
+     with keyframes (fill-mode both), so reduced motion and no-JS just see the end. */
   #how{padding:128px 0}
-  .how{display:grid;gap:56px;align-items:center}
-  @media(min-width:960px){.how{grid-template-columns:1fr 1fr;gap:88px}}
-  .steps{list-style:none;counter-reset:s;display:grid;gap:26px;margin-top:40px;max-width:34rem}
-  .steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:18px;align-items:start}
-  .steps li::before{content:counter(s);width:40px;height:40px;border-radius:13px;background:var(--mint);color:var(--emerald-deep);display:grid;place-items:center;font-family:'Space Mono';font-weight:700}
-  .steps .t{display:block;font-weight:700;color:var(--ink);font-size:1.1rem;margin-bottom:2px}
-  .morph{display:flex;flex-direction:column;gap:16px;max-width:440px;margin:0 auto;width:100%}
-  .sms{background:var(--sms);border:1px solid var(--rule);border-radius:16px 16px 16px 5px;padding:16px 18px;font-size:.92rem;line-height:1.7;color:var(--body)}
-  /* each detail lights up in turn, as Monies picks it out of the message */
-  .sms mark{color:inherit;border-radius:5px;padding:1px 3px;margin:0 -1px;background:linear-gradient(var(--mint),var(--mint)) no-repeat 0 0/0% 100%;transition:background-size .45s ease,color .45s ease;transition-delay:calc(var(--d) * 280ms + 700ms)}
-  .in .sms mark{background-size:100% 100%;color:var(--emerald-deep)}
-  .morph .after{transition-delay:2.6s}
-  .morph .after.rec{transition-delay:2.9s}
-  .morph .after.parse-note{transition-delay:3.4s}
-  .parse-note{font-size:.82rem;color:var(--muted);text-align:center}
+  .how{display:grid;gap:44px}
+  @media(min-width:960px){
+    .how{grid-template-columns:1fr 1fr;grid-template-areas:"head stage" "steps stage";column-gap:88px;row-gap:36px}
+    .how-head{grid-area:head;align-self:end}
+    .how .steps{grid-area:steps;align-self:start}
+    .stage{grid-area:stage;align-self:center}
+  }
+  .steps{list-style:none;counter-reset:s;display:grid;gap:4px;max-width:34rem}
+  .steps li{counter-increment:s}
+  .step{all:unset;box-sizing:border-box;display:grid;grid-template-columns:40px 1fr;gap:18px;align-items:start;width:calc(100% + 28px);margin:0 -14px;padding:14px;border-radius:20px;cursor:pointer;transition:background .3s,box-shadow .3s}
+  .step::before{content:counter(s);width:40px;height:40px;border-radius:13px;background:var(--mint);color:var(--emerald-deep);display:grid;place-items:center;font-family:'Space Mono';font-weight:700;transition:background .3s,color .3s}
+  .step .txt{opacity:.6;transition:opacity .3s}
+  .step .t{display:block;font-weight:700;color:var(--ink);font-size:1.1rem;margin-bottom:2px}
+  .step:hover .txt{opacity:.85}
+  .step[aria-current]{background:var(--card);box-shadow:var(--shadow),0 0 0 1px var(--rule)}
+  .step[aria-current]::before{background:var(--emerald);color:var(--on-emerald)}
+  .step[aria-current] .txt{opacity:1}
+  .step:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
+  /* the bar under the current step; when it fills, the next step starts */
+  .prog{display:block;height:3px;border-radius:3px;background:var(--rule);margin-top:12px;overflow:hidden;opacity:0;transition:opacity .3s}
+  .prog b{display:block;height:100%;background:var(--emerald);transform-origin:left;transform:scaleX(0)}
+  .live .step[aria-current] .prog{opacity:1}
+  .live .step[aria-current] .prog b{animation:prog var(--dur,7s) linear both}
+  @keyframes prog{to{transform:scaleX(1)}}
+  .how.paused .prog b,.steps:has(.step:focus-visible) .prog b{animation-play-state:paused}
+  @media(hover:hover){.steps:hover .prog b{animation-play-state:paused}}
+
+  .stage{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .stage .phone{height:530px;min-height:0;overflow:hidden}
+  .stage-cap{font-size:.88rem;color:var(--muted);text-align:center}
+  .stage-cap b{color:var(--ink);font-family:'Space Mono';margin-right:6px}
+  @media(min-width:960px){.stage-cap{display:none}}
+  .scene{position:absolute;inset:30px 14px 18px;display:flex;flex-direction:column;gap:10px;opacity:0;visibility:hidden;transition:opacity .35s ease,visibility 0s linear .35s}
+  .scene.on{opacity:1;visibility:visible;transition:opacity .45s ease .1s}
+  .s-note{font-size:.74rem;color:var(--muted);text-align:center;margin-top:auto}
+  .play .s-note{animation:rise .5s ease var(--at,3.8s) both}
+  .swap{display:inline-grid}
+  .swap>*{grid-area:1/1}
+  .swap>.a{opacity:0}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}}
+  @keyframes fadeIn{from{opacity:0}}
+  @keyframes fadeOut{from{opacity:1}}
+  @keyframes pop{from{opacity:0;transform:scale(.4)}}
+
+  /* 1 · the inbox: the permission prompt, then only the money messages get picked */
+  .thread{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:14px;border:1px solid transparent}
+  .thread>div{flex:1;min-width:0}
+  .thread b{display:block;font-size:.8rem;color:var(--ink);line-height:1.3}
+  .thread p{font-size:.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+  .av{width:30px;height:30px;border-radius:50%;background:var(--chip);color:var(--muted);display:grid;place-items:center;font-weight:700;font-size:.72rem;flex:none}
+  .thread.money{background:var(--mint);border-color:color-mix(in srgb,var(--emerald) 30%,transparent)}
+  .thread.money .av{background:var(--emerald);color:var(--on-emerald)}
+  .thread:not(.money){opacity:.35;filter:grayscale(1)}
+  .seen{font-style:normal;flex:none;width:20px;height:20px;border-radius:50%;background:var(--emerald);color:var(--on-emerald);font-size:.66rem;display:grid;place-items:center}
+  .play .thread{animation:untouched .5s ease calc(var(--i) * 110ms + 2.9s) both}
+  .play .thread.money{animation-name:picked}
+  .play .thread.money .av{animation:picked-av .5s ease calc(var(--i) * 110ms + 2.9s) both}
+  .play .seen{animation:pop .45s cubic-bezier(.3,1.6,.5,1) calc(var(--i) * 110ms + 3.1s) both}
+  @keyframes untouched{from{opacity:1;filter:none}}
+  @keyframes picked{from{background-color:transparent;border-color:transparent}}
+  @keyframes picked-av{from{background-color:var(--chip);color:var(--muted)}}
+  .perm-dlg{position:absolute;inset:-30px -14px -18px;z-index:3;background:rgba(10,8,4,.45);display:flex;align-items:flex-end;padding:16px;opacity:0;pointer-events:none}
+  .sheet{width:100%;background:var(--card);border:1px solid var(--rule);border-radius:26px;padding:22px 16px 10px;text-align:center}
+  .sheet .ic{width:36px;height:36px;margin:0 auto;border-radius:50%;background:var(--mint);color:var(--emerald-deep);display:grid;place-items:center}
+  .sheet .ic svg{width:18px;height:18px;fill:currentColor}
+  .sheet p{font-size:.9rem;color:var(--ink);line-height:1.4;margin:10px 4px 16px}
+  .opt{display:block;position:relative;overflow:hidden;padding:10px;border-radius:999px;font-size:.82rem;font-weight:600;color:var(--emerald)}
+  .opt.allow{background:var(--mint);color:var(--emerald-deep);margin-bottom:4px}
+  .opt.allow::after{content:'';position:absolute;left:50%;top:50%;width:180px;height:180px;margin:-90px 0 0 -90px;border-radius:50%;background:color-mix(in srgb,var(--emerald) 40%,transparent);opacity:0}
+  .play .perm-dlg{animation:dlg 2.3s ease .5s both}
+  .play .sheet{animation:sheet 2.3s cubic-bezier(.2,.8,.3,1) .5s both}
+  .play .opt.allow::after{animation:tap .7s ease-out 1.7s both}
+  @keyframes dlg{0%{opacity:0}12%,84%{opacity:1}100%{opacity:0}}
+  @keyframes sheet{0%{transform:translateY(60px)}14%,84%{transform:none}100%{transform:translateY(30px)}}
+  @keyframes tap{from{opacity:1;transform:scale(0)}to{opacity:0;transform:scale(1)}}
+
+  /* 2 · one message read: each detail is highlighted and drops into its slot on the record */
+  .s2{justify-content:center;gap:12px}
+  .sms{position:relative;overflow:hidden;background:var(--sms);border:1px solid var(--rule);border-radius:16px 16px 16px 5px;padding:14px 15px;font-size:.8rem;line-height:1.65;color:var(--body)}
+  .sms mark{color:var(--emerald-deep);border-radius:5px;padding:1px 3px;margin:0 -1px;background:linear-gradient(var(--mint),var(--mint)) no-repeat 0 0/100% 100%}
+  .play .sms mark{animation:hl .45s ease calc(var(--d) * 380ms + 700ms) both}
+  @keyframes hl{from{background-size:0% 100%;color:var(--body)}}
+  .scan{position:absolute;left:0;right:0;top:0;height:28px;margin-top:-14px;background:linear-gradient(transparent,color-mix(in srgb,var(--emerald) 22%,transparent),transparent);opacity:0;pointer-events:none}
+  .play .scan{animation:scan 2.6s ease-in-out .5s both}
+  @keyframes scan{0%{top:0;opacity:0}10%,85%{opacity:1}100%{top:100%;opacity:0}}
+  .f{border-radius:6px}
+  .play .f{animation:fill .4s ease calc(var(--d) * 380ms + 950ms) both}
+  @keyframes fill{from{color:transparent;background-color:var(--chip)}}
+  .s2 .rec{font-size:.86rem}
+  .s2 .rec-top>*{white-space:nowrap}
+  .play .s2 .arrow{animation:fadeIn .4s ease .4s both}
+  .parse-note{font-size:.76rem;color:var(--muted);text-align:center}
+  .play .parse-note{animation:rise .5s ease 3.4s both}
+
+  /* 3 · the backlog: a counter, a filling bar and months of history scrolling in */
+  .imp{padding:12px 14px}
+  .imp-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .imp-n{font-size:.72rem;color:var(--ink);font-weight:700}
+  .pbar{height:5px;border-radius:5px;background:var(--chip);overflow:hidden;margin-top:9px}
+  .pbar b{display:block;height:100%;width:100%;background:var(--emerald);border-radius:5px}
+  .play .pbar b{animation:grow 3.4s cubic-bezier(.45,0,.4,1) .2s both}
+  @keyframes grow{from{width:0}}
+  .play .imp .swap .a{animation:fadeOut .3s ease 3.6s both}
+  .play .imp .swap .b{animation:fadeIn .3s ease 3.7s both}
+  .stage .bal{font-size:1.9rem}
+  .hist{height:236px;flex:none;overflow:hidden;-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent)}
+  .hist-col{display:flex;flex-direction:column;gap:4px}
+  .hr{flex:none;display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;font-size:.76rem;color:var(--ink);background:var(--card);border:1px solid var(--rule);border-radius:10px}
+  .hr span:first-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .hr .amt{margin-left:auto;font-size:.72rem;white-space:nowrap}
+  .mh{flex:none;height:22px;display:flex;align-items:flex-end;padding:0 4px 2px;font-family:'Space Mono';font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .play .hist-col>*{animation:rise .35s ease calc(var(--i) * 150ms + 300ms) both}
+  .play .hist-col{animation:skim 4.4s ease-in-out both}
+  @keyframes skim{0%,30%{transform:none}66%,80%{transform:translateY(calc(-100% + 236px))}100%{transform:none}}
+
+  /* 4 · a new message: the notification drops in, the row appears, the balance ticks over */
+  .heads-up{position:absolute;z-index:3;top:-16px;left:-4px;right:-4px;background:var(--card);border:1px solid var(--rule);border-radius:18px;padding:10px 12px;box-shadow:0 12px 28px -6px rgba(21,19,13,.3);opacity:0;transform:translateY(-130%)}
+  .hu-top{display:flex;align-items:center;gap:6px;font-size:.68rem;color:var(--muted)}
+  .hu-top b{color:var(--ink);font-size:.74rem}
+  .hu-ic{width:18px;height:18px;border-radius:50%;background:var(--emerald);color:var(--on-emerald);display:grid;place-items:center;font-size:.6rem;font-weight:700}
+  .heads-up p{font-size:.74rem;color:var(--body);line-height:1.45;margin-top:4px}
+  .play .heads-up{animation:hu 2.6s cubic-bezier(.2,.8,.3,1) .6s both}
+  @keyframes hu{0%{opacity:0;transform:translateY(-130%)}14%,78%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-130%)}}
+  .s4 .bal .swap>.a{transform:translateY(-.5em)}
+  .play .s4 .bal .swap>.a{animation:old-out .45s ease 2.9s both}
+  .play .s4 .bal .swap>.b{animation:new-in .45s ease 2.9s both}
+  @keyframes old-out{from{opacity:1;transform:none}}
+  @keyframes new-in{from{opacity:0;transform:translateY(.5em)}}
+  .s4 .card{padding:10px 12px}
+  .fresh{overflow:hidden;max-height:70px}
+  .play .fresh{animation:grow-row .55s cubic-bezier(.2,.8,.3,1) 2.8s both,flash 1.8s ease 3.4s both}
+  @keyframes grow-row{from{max-height:0;opacity:0;padding-top:0;padding-bottom:0;margin-top:-10px;border-width:0}}
+  @keyframes flash{from{background-color:var(--mint)}}
   .sms .from{font-family:'Space Mono';font-size:.68rem;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
   .arrow{align-self:center;color:var(--muted);font-size:1.2rem}
   @media (prefers-reduced-motion:no-preference){ .arrow span{display:inline-block;animation:nudge 1.8s ease-in-out infinite} @keyframes nudge{50%{transform:translateY(4px)}} }
@@ -193,6 +315,7 @@
   .row .sub{font-size:.72rem;color:var(--muted)}
   .row .amt{margin-left:auto;font-size:.85rem;white-space:nowrap;padding-left:6px}
   .row > div{min-width:0}
+  .row .lbl,.row .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dot{width:34px;height:34px;border-radius:11px;background:var(--mint);color:var(--emerald-deep);display:grid;place-items:center;font-size:.9rem;flex:none}
   .newbadge{font-family:'Space Mono';font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;background:var(--coral);color:#fff;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
   .toast{background:var(--ink);color:var(--paper);border-radius:14px;padding:10px 12px;font-size:.74rem;display:flex;gap:8px;align-items:center;opacity:0;transform:translateY(-14px);transition:opacity .4s ease,transform .5s cubic-bezier(.2,.8,.3,1)}
@@ -201,33 +324,51 @@
   .newrow{max-height:0;overflow:hidden;opacity:0;padding-top:0;padding-bottom:0;transition:max-height .6s ease 1.6s,opacity .6s ease 1.8s,padding .6s ease 1.6s}
   .in .newrow{max-height:90px;opacity:1;padding-top:14px;padding-bottom:14px}
 
-  /* analytics screen */
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .stat{padding:10px 12px}
-  .stat .v{font-weight:800;font-size:1.15rem;color:var(--ink);letter-spacing:-.03em}
-  .stat .s{font-size:.7rem;color:var(--neg)}
-  .donut-row{display:flex;gap:14px;align-items:center}
-  .donut{--sweep:0deg;width:84px;height:84px;border-radius:50%;flex:none;background:conic-gradient(var(--emerald) 0 42%,var(--coral) 0 70%,var(--emerald-deep) 0 88%,var(--gold) 0 100%);
-    -webkit-mask:radial-gradient(circle 26px,transparent 98%,#000 100%),conic-gradient(#000 var(--sweep),transparent 0);-webkit-mask-composite:source-in;
-    mask:radial-gradient(circle 26px,transparent 98%,#000 100%),conic-gradient(#000 var(--sweep),transparent 0);mask-composite:intersect;
-    transition:--sweep 1.4s cubic-bezier(.3,.7,.2,1) .5s}
-  .in .donut{--sweep:360deg}
-  .legend{display:grid;gap:5px;font-size:.76rem;width:100%}
-  .legend div{display:flex;align-items:center;gap:7px}
-  .legend i{width:9px;height:9px;border-radius:3px;flex:none}
-  .legend span:last-child{margin-left:auto;font-family:'Space Mono';color:var(--muted)}
-  .heat{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:8px}
-  .heat u{aspect-ratio:1;border-radius:4px;background:var(--emerald);opacity:0;transition:opacity .5s ease;transition-delay:calc(var(--i) * 60ms + 900ms)}
-  .in .heat u{opacity:var(--o)}
-  .bar{height:6px;border-radius:6px;background:var(--chip);overflow:hidden;margin-top:6px}
-  .bar b{display:block;height:100%;width:0;background:var(--emerald);border-radius:6px;transition:width 1.2s ease 1.6s}
-  .in .bar b{width:var(--w)}
+  /* trace screen (mirrors ui/transactions/Trace.kt) */
+  .trace{padding:14px 16px;border-color:color-mix(in srgb,var(--emerald) 40%,var(--rule))}
+  .tr-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .tr-stop{font-size:.7rem;font-weight:600;color:var(--emerald);white-space:nowrap}
+  .tr-n{font-weight:800;color:var(--ink);font-size:1.1rem;letter-spacing:-.02em;margin-top:4px}
+  .tr-io{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .tr-io b{display:block;font-weight:700;color:var(--ink);font-size:.92rem;font-family:var(--font)}
+  .tr-io b.amt.in{color:var(--pos)}
+  .tr-bal{margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.78rem;font-weight:600;color:var(--ink)}
+  .tr-bal span:last-child{font-family:'Space Mono';font-size:.74rem;white-space:nowrap}
+
+  /* analytics overview (mirrors ui/analytics/AnalyticsOverview.kt) */
+  .atabs{display:flex;gap:14px;font-size:.72rem;color:var(--muted);border-bottom:1px solid var(--rule);padding:0 4px;white-space:nowrap}
+  .atabs span{padding-bottom:6px}
+  .atabs .on{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px var(--emerald)}
+  .tchips{display:flex;gap:5px;padding:0 2px}
+  .tchips span{font-family:'Space Mono';font-size:.58rem;padding:3px 6px;border-radius:7px;color:var(--muted);border:1px solid var(--rule)}
+  .tchips .on{background:var(--mint);border-color:transparent;color:var(--emerald-deep);font-weight:700}
+  .pace p{font-size:.8rem;line-height:1.45;margin-top:4px}
+  .pace p b{color:var(--ink)}
+  .pace svg{display:block;width:100%;height:auto;margin-top:8px}
+  .pace .today{stroke:var(--rule);stroke-width:1}
+  .pace .prev{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:3 3;opacity:.7}
+  .pace .cur{fill:none;stroke:var(--emerald);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:100;stroke-dashoffset:100;transition:stroke-dashoffset 1.4s ease .5s}
+  .in .pace .cur{stroke-dashoffset:0}
+  .pace .proj{fill:none;stroke:var(--emerald);stroke-width:2;stroke-dasharray:4 4;opacity:0;transition:opacity .6s ease 1.9s}
+  .in .pace .proj{opacity:.8}
+  .pace-figs{display:flex;justify-content:space-between;margin-top:6px;font-size:.68rem;color:var(--muted)}
+  .pace-figs b{display:block;color:var(--ink);font-size:.92rem}
+  .pace-figs div:last-child{text-align:right}
+  .due{font-size:.72rem;color:var(--muted);margin-top:6px}
+  .due b{color:var(--ink)}
+  /* treemap: boxes sized by share, a pill on any that moved 10% or more */
+  .tmap{display:grid;grid-template-columns:1.9fr 1.15fr 1fr;grid-template-rows:54px 42px;gap:4px;margin-top:8px}
+  .tmap div{border-radius:9px;padding:6px 8px;font-size:.66rem;line-height:1.3;color:var(--body);background:color-mix(in srgb,var(--c) 22%,var(--card));box-shadow:inset 3px 0 var(--c);overflow:hidden}
+  .tmap div:first-child{grid-row:1/3}
+  .tmap b{display:block;font-size:.76rem;color:var(--ink)}
+  .mv{font-style:normal;font-weight:700;font-size:.58rem;color:var(--neg);white-space:nowrap}
 
   /* export screen */
-  .fmts{display:flex;gap:5px;margin-top:8px}
+  .fmts{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .bands .fmt{padding:5px 8px;font-size:.64rem}
   .fmt{font-family:'Space Mono';font-weight:700;font-size:.7rem;padding:7px 10px;border-radius:11px;background:var(--chip);color:var(--body);border:1.5px solid transparent;transition:background .3s,color .3s,border-color .3s}
   /* the selection moves from CSV to Excel once the screen is visible */
-  .fmt.csv{background:var(--mint);color:var(--emerald-deep);border-color:var(--emerald)}
+  .fmt.sel,.fmt.csv{background:var(--mint);color:var(--emerald-deep);border-color:var(--emerald)}
   .in .fmt.csv{background:var(--chip);color:var(--body);border-color:transparent;transition-delay:.9s}
   .in .fmt.xl{background:var(--mint);color:var(--emerald-deep);border-color:var(--emerald);transition-delay:.9s}
   .exp-btn{position:relative;overflow:hidden;border-radius:999px;background:var(--emerald);color:var(--on-emerald);font-weight:600;font-size:.85rem;text-align:center;padding:12px}
@@ -249,16 +390,16 @@
     .swipe{display:none}
   }
   @media(min-width:1040px){.types{grid-template-columns:repeat(3,1fr)}}
-  .soon{border-style:dashed;background:transparent;box-shadow:none}
 
   /* privacy + permissions */
   .priv{display:grid;gap:14px;margin-top:40px}
-  @media(min-width:760px){.priv{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:760px){.priv{grid-template-columns:repeat(2,1fr)}}
+  @media(min-width:1100px){.priv{grid-template-columns:repeat(4,1fr)}}
   .priv .card{padding:22px}
   .priv p{font-size:.95rem;margin-top:6px}
   .perm-head{margin-top:72px}
   .perm{display:grid;gap:14px;margin-top:24px}
-  @media(min-width:900px){.perm{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:900px){.perm{grid-template-columns:repeat(2,1fr)}}
   .perm .card{padding:20px}
   .perm strong{color:var(--ink);display:flex;align-items:center;flex-wrap:wrap;gap:8px}
   .perm p{font-size:.92rem;margin-top:6px}
@@ -279,21 +420,11 @@
   details p{margin-top:10px}
   details a{color:var(--emerald);font-weight:600}
 
-  /* roadmap */
-  .road{list-style:none;display:grid;gap:14px;margin-top:40px}
-  @media(min-width:900px){.road{grid-template-columns:repeat(3,1fr)}}
-  .road li{display:flex}
-  .road .card{flex:1;display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:12px;align-items:flex-start;padding:20px}
-  .road h3{font-size:1.1rem}
-  .road p{font-size:.92rem;margin-top:4px}
-  .st{font-family:'Space Mono';font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;padding:4px 11px;border-radius:999px;white-space:nowrap}
-  .st.wip{background:var(--gold);color:#15130D}
-  .st.plan{background:var(--chip);color:var(--muted)}
-  .road .plan-card{border-style:dashed}
 
   /* cta + footer */
   /* closing band: same tint as the other bands, with the home screen peeking up from the bottom edge */
   .cta-band{background:var(--band);border-radius:44px;margin:0 10px;padding:0;overflow:hidden}
+  .band + .cta-band{margin-top:24px}
   @media(min-width:1100px){.cta-band{margin:0 24px}}
   .cta-band .wrap{display:grid;gap:8px;align-items:end}
   .cta-copy{padding:88px 0 24px}
@@ -313,11 +444,10 @@
   footer .top div a{margin-left:20px;text-decoration:none} footer .top div a:hover{color:var(--ink)}
 
   @media (prefers-reduced-motion:reduce){
-    .reveal,.stg,.toast,.heat u{opacity:1;transform:none;transition:none}
-    .sms mark{background-size:100% 100%;color:var(--emerald-deep);transition:none} .ripples{display:none}
-    .heat u{opacity:var(--o)}
+    .reveal,.stg,.toast{opacity:1;transform:none;transition:none}
+    .stage *,.stage *::after{animation:none!important} .scene{transition:none} .ripples{display:none}
     .newrow{max-height:none;opacity:1;padding-top:14px;padding-bottom:14px;transition:none}
-    .donut{--sweep:360deg;transition:none} .bar b{width:var(--w);transition:none}
+    .pace .cur{stroke-dashoffset:0;transition:none} .pace .proj{opacity:.8;transition:none}
     .iobar b{width:53%;transition:none} .syncbar{display:none} .seg i,.seg span{transition:none}
     .exp-btn::after{transform:none;transition:none} .exp-done{opacity:1;transition:none}
   }
@@ -329,7 +459,7 @@
   <div class="wrap">
     <a class="brand" href="#top"><span class="mark">M</span>Monies</a>
     <div class="links">
-      <a href="#how">How it works</a><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#roadmap">Roadmap</a>
+      <a href="#how">How it works</a><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a>
     </div>
     <a class="btn" href="https://github.com/kimaita/monies-v2/releases" target="_blank" rel="noopener">Get the APK</a>
   </div>
@@ -339,7 +469,7 @@
   <div class="wrap">
     <div>
       <h1>See where your M-PESA goes.</h1>
-      <p class="lede">Monies reads your M-PESA messages and shows you your balance, your Fuliza and M-Shwari, and what came in and went out. You don't type anything or sign up, and it all stays on your phone.</p>
+      <p class="lede">Monies reads your M-PESA and Airtel Money messages and shows you your balances, your Fuliza and M-Shwari, and what came in and went out. You don't type anything or sign up, and it all stays on your phone.</p>
       <div class="cta">
         <a class="btn" href="https://github.com/kimaita/monies-v2/releases" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
@@ -353,17 +483,18 @@
     <div class="hero-visual">
       <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="ripples" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div class="phone home reveal" aria-label="The Monies home screen showing an M-PESA balance, other balances and money in and out this week">
-        <div class="top"><span class="num">0712 ••• 678</span></div>
+      <div class="phone home reveal" aria-label="The Monies home screen with M-PESA and Airtel Money lines, showing their combined balance, other balances and money in and out this week">
+        <div class="tbar"><span class="phone-title">Monies</span><span class="acct">All accounts ▾</span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></div>
         <div class="syncbar"><b></b></div>
         <div class="stg" style="--i:0">
-          <div class="k">M-PESA balance</div>
+          <div class="k">Balance</div>
           <div class="bal">Ksh <span data-count="12340">12,340</span><small>.50</small></div>
+          <div class="pills"><span class="bpill">M-PESA<b>11,090</b></span><span class="bpill">Airtel Money<b>1,250</b></span></div>
           <div class="chg">▲ +2,150 this week <span style="opacity:.6">›</span></div>
         </div>
         <div class="stg" style="--i:1">
           <div class="k">Other balances</div>
-          <div class="pills"><span class="bpill">Fuliza<b>1,500</b> available</span><span class="bpill">M-Shwari<b>4,200</b></span><span class="bpill">Lock<b>10,000</b></span><span class="bpill">More ›</span></div>
+          <div class="pills"><span class="bpill">Fuliza<b>1,500</b> available</span><span class="bpill">M-Shwari<b>4,200</b></span><span class="bpill">M-Shwari loan<b class="owe">2,000</b></span><span class="bpill">Lock<b>10,000</b></span><span class="bpill">More ›</span></div>
         </div>
         <div class="card stg" style="--i:2;padding:16px">
           <div class="io-head"><span class="k">In &amp; out</span><div class="seg"><i></i><span>Day</span><span>Week</span><span>Month</span></div></div>
@@ -386,28 +517,93 @@
 
 <section id="how" class="band">
   <div class="wrap how">
-    <div class="reveal">
+    <div class="how-head reveal">
       <h2>From text message to tidy record.</h2>
       <p class="lede">You keep using M-PESA as normal. Monies does the bookkeeping.</p>
-      <ol class="steps">
-        <li><div><span class="t">Install it and allow SMS access</span>Monies only looks at messages from M-PESA. Everything else in your inbox is left alone.</div></li>
-        <li><div><span class="t">It reads each message for you</span>From every M-PESA text, Monies picks out who you paid or who paid you, how much, the fee, the date and your balance afterwards. All of this happens on your phone.</div></li>
-        <li><div><span class="t">Your history fills in</span>It works through the M-PESA messages you already have, so your balances and spending are there from day one.</div></li>
-        <li><div><span class="t">New payments appear by themselves</span>When a new M-PESA message comes in, the transaction is added straight away.</div></li>
-      </ol>
     </div>
-    <div class="morph reveal" aria-label="An M-PESA text message with its details picked out and turned into a transaction">
-      <div class="sms stg" style="--i:0">
-        <div class="from">MPESA</div>
-        <mark style="--d:0">UE82K4XQ1P</mark> Confirmed. <mark style="--d:1">Ksh1,850.00</mark> paid to <mark style="--d:2">NAIVAS WESTLANDS</mark> on <mark style="--d:3">4/10/26 at 6:42 PM</mark>. New M-PESA balance is <mark style="--d:4">Ksh12,340.50</mark>. Transaction cost, <mark style="--d:5">Ksh0.00</mark>.
-      </div>
-      <span class="arrow stg after"><span>↓</span></span>
-      <div class="card rec stg after">
-        <div class="rec-top"><span class="rec-name">Naivas Westlands</span><span class="amt">− Ksh 1,850</span></div>
-        <div class="rec-meta">UE82K4XQ1P · 4 OCT · 6:42 PM</div>
-        <div class="tags"><span class="tag">Till</span><span class="tag">Fee 0.00</span><span class="tag">Balance 12,340.50</span></div>
-      </div>
-      <p class="parse-note stg after">Worked out on your phone. Nothing is sent anywhere.</p>
+    <ol class="steps reveal">
+      <li><button type="button" class="step" aria-current="step" style="--dur:7s"><span class="txt"><span class="t">Install it and allow SMS access</span>Monies only looks at messages from M-PESA and Airtel Money. Everything else in your inbox is left alone.<i class="prog"><b></b></i></span></button></li>
+      <li><button type="button" class="step" style="--dur:7s"><span class="txt"><span class="t">It reads each message for you</span>From each of those messages, Monies picks out who you paid or who paid you, how much, the fee, the date and your balance afterwards. All of this happens on your phone.<i class="prog"><b></b></i></span></button></li>
+      <li><button type="button" class="step" style="--dur:7s"><span class="txt"><span class="t">Your history fills in</span>It works through the M-PESA messages you already have, so your balances and spending are there from day one.<i class="prog"><b></b></i></span></button></li>
+      <li><button type="button" class="step" style="--dur:6.5s"><span class="txt"><span class="t">New payments appear by themselves</span>When a new M-PESA message comes in, the transaction is added straight away.<i class="prog"><b></b></i></span></button></li>
+    </ol>
+    <div class="stage reveal">
+      <div class="bob"><div class="phone">
+
+        <div class="scene s1 on" role="group" aria-label="An inbox where Monies is allowed to read SMS, and only the M-PESA and Airtel Money messages are picked out">
+          <div class="phone-title">Messages</div>
+          <div class="thread money" style="--i:0"><span class="av">M</span><div><b>MPESA</b><p>UE82K4XQ1P Confirmed. Ksh1,850.00 paid to NAIVAS WESTLANDS…</p></div><i class="seen">✓</i></div>
+          <div class="thread" style="--i:1"><span class="av">M</span><div><b>Mum</b><p>Umefika salama? Call me later.</p></div></div>
+          <div class="thread money" style="--i:2"><span class="av">A</span><div><b>AirtelMoney</b><p>Confirmed. You have received Ksh1,250.00 from…</p></div><i class="seen">✓</i></div>
+          <div class="thread" style="--i:3"><span class="av">K</span><div><b>Kevo</b><p>Tuko stage, uko wapi?</p></div></div>
+          <div class="thread" style="--i:4"><span class="av">#</span><div><b>Offers</b><p>Get 1GB for Ksh50, today only…</p></div></div>
+          <div class="thread money" style="--i:5"><span class="av">M</span><div><b>MPESA</b><p>UE71J2RT8M Confirmed. You have received Ksh5,000.00 from WANJIRU M…</p></div><i class="seen">✓</i></div>
+          <p class="s-note">3 money messages read. The other 3 are left alone.</p>
+          <div class="perm-dlg">
+            <div class="sheet">
+              <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 1-2z"/></svg></div>
+              <p>Allow <b>Monies</b> to send and view SMS messages?</p>
+              <span class="opt allow">Allow</span>
+              <span class="opt">Don't allow</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="scene s2" role="group" aria-label="An M-PESA text message with its details picked out and turned into a transaction">
+          <div class="sms">
+            <div class="from">MPESA</div>
+            <mark style="--d:0">UE82K4XQ1P</mark> Confirmed. <mark style="--d:1">Ksh1,850.00</mark> paid to <mark style="--d:2">NAIVAS WESTLANDS</mark> on <mark style="--d:3">4/10/26 at 6:42 PM</mark>. New M-PESA balance is <mark style="--d:4">Ksh12,340.50</mark>. Transaction cost, <mark style="--d:5">Ksh0.00</mark>.
+            <i class="scan"></i>
+          </div>
+          <span class="arrow"><span>↓</span></span>
+          <div class="card rec">
+            <div class="rec-top"><span class="rec-name f" style="--d:2">Naivas Westlands</span><span class="amt f" style="--d:1">− Ksh 1,850</span></div>
+            <div class="rec-meta"><span class="f" style="--d:0">UE82K4XQ1P</span> · <span class="f" style="--d:3">4 OCT · 6:42 PM</span></div>
+            <div class="tags"><span class="tag">Till</span><span class="tag f" style="--d:5">Fee 0.00</span><span class="tag f" style="--d:4">Balance 12,340.50</span></div>
+          </div>
+          <p class="parse-note">Worked out on your phone. Nothing is sent anywhere.</p>
+        </div>
+
+        <div class="scene s3" role="group" aria-label="Monies working through 1,284 old messages, with months of transactions filling in">
+          <div class="phone-title">Monies</div>
+          <div class="card imp">
+            <div class="imp-top"><span class="k swap"><span class="a">Reading your messages</span><span class="b">All caught up ✓</span></span><span class="mono imp-n"><span data-to="1284" data-dur="3400" data-wait="200">1,284</span> / 1,284</span></div>
+            <div class="pbar"><b></b></div>
+          </div>
+          <div><div class="k">Balance</div><div class="bal">Ksh <span data-to="12340" data-dur="3400" data-wait="200">12,340</span><small>.50</small></div></div>
+          <div class="hist"><div class="hist-col">
+            <div class="mh" style="--i:0">October</div>
+            <div class="hr" style="--i:1"><span>Naivas Westlands</span><span class="amt">− 1,850</span></div>
+            <div class="hr" style="--i:2"><span>Wanjiru M.</span><span class="amt in">+ 5,000</span></div>
+            <div class="hr" style="--i:3"><span>Safaricom Home Fibre</span><span class="amt">− 3,499</span></div>
+            <div class="mh" style="--i:4">September</div>
+            <div class="hr" style="--i:5"><span>KPLC Prepaid</span><span class="amt">− 1,000</span></div>
+            <div class="hr" style="--i:6"><span>Received from bank</span><span class="amt in">+ 20,000</span></div>
+            <div class="hr" style="--i:7"><span>Mama Mboga Kiosk</span><span class="amt">− 320</span></div>
+            <div class="mh" style="--i:8">August</div>
+            <div class="hr" style="--i:9"><span>Rent, Kileleshwa</span><span class="amt">− 25,000</span></div>
+            <div class="hr" style="--i:10"><span>M-Shwari deposit</span><span class="amt">− 2,000</span></div>
+            <div class="hr" style="--i:11"><span>Otieno J.</span><span class="amt in">+ 1,500</span></div>
+            <div class="mh" style="--i:12">July</div>
+            <div class="hr" style="--i:13"><span>Agent withdrawal</span><span class="amt">− 3,000</span></div>
+            <div class="hr" style="--i:14"><span>Airtime</span><span class="amt">− 100</span></div>
+            <div class="hr" style="--i:15"><span>Fuliza M-PESA</span><span class="amt">− 750</span></div>
+          </div></div>
+        </div>
+
+        <div class="scene s4" role="group" aria-label="A new M-PESA message arrives and the payment appears at the top of the list straight away">
+          <div class="heads-up"><div class="hu-top"><span class="hu-ic">M</span><b>MPESA</b><span>· now</span></div><p>UF31L9AB2C Confirmed. Ksh320.00 paid to MAMA MBOGA KIOSK. New M-PESA balance is Ksh12,020.50…</p></div>
+          <div class="phone-title">Monies</div>
+          <div><div class="k">Balance</div><div class="bal">Ksh <span class="swap"><span class="a">12,340</span><span class="b">12,020</span></span><small>.50</small></div></div>
+          <div class="k">Transactions</div>
+          <div class="card fresh"><div class="row"><span class="dot">↑</span><div><div class="lbl">Mama Mboga Kiosk<span class="newbadge">New</span></div><div class="sub">Till · just now</div></div><span class="amt">− 320</span></div></div>
+          <div class="card"><div class="row"><span class="dot">↑</span><div><div class="lbl">Naivas Westlands</div><div class="sub">Till · 6:42 PM</div></div><span class="amt">− 1,850</span></div></div>
+          <div class="card"><div class="row"><span class="dot">↓</span><div><div class="lbl">Wanjiru M.</div><div class="sub">Received · Yesterday</div></div><span class="amt in">+ 5,000</span></div></div>
+          <p class="s-note" style="--at:3.6s">Added the moment the message arrived.</p>
+        </div>
+
+      </div></div>
+      <p class="stage-cap" aria-hidden="true"><b>1/4</b><span>Install it and allow SMS access</span></p>
     </div>
   </div>
 </section>
@@ -418,11 +614,13 @@
     <div class="feature">
       <div class="reveal">
         <h2>Every transaction, easy to find.</h2>
-        <p class="lede">All your M-PESA history in one place, ready to search.</p>
+        <p class="lede">All your M-PESA and Airtel Money history in one place, ready to search.</p>
         <ul class="points">
-          <li>Look up a person, a business or an amount.</li>
+          <li>Look up a person, a business or an amount. People and businesses that match show up above the results.</li>
           <li>Narrow it down by type, category, date, or money in and out.</li>
-          <li>Sort transactions into categories, including ones you make yourself, and the reports follow.</li>
+          <li>Tap a transaction to see the amount with its sign, the fee, the code ready to copy and the full message.</li>
+          <li>Common businesses such as KPLC, Java House and Safaricom Home get a category on their own. Change any of them, or make your own, and the reports follow.</li>
+          <li>Tidy up names. Rename a person or business, or merge two that are really the same.</li>
         </ul>
       </div>
       <div class="visual">
@@ -430,72 +628,108 @@
           <div class="phone-title">Transactions</div>
           <div class="toast">M-PESA message received</div>
           <div class="card newrow"><div class="row"><span class="dot">↑</span><div><div class="lbl">Naivas Westlands<span class="newbadge">New</span></div><div class="sub">Till · just now</div></div><span class="amt">− 1,850</span></div></div>
-          <div class="card stg" style="--i:0"><div class="row"><span class="dot">↑</span><div><div class="lbl">Safaricom Home Fibre</div><div class="sub">Paybill · 2 Oct</div></div><span class="amt">− 3,499</span></div></div>
+          <div class="card stg" style="--i:0"><div class="row"><span class="dot">↑</span><div><div class="lbl">Safaricom Home Fibre</div><div class="sub">Paybill · Internet · 2 Oct</div></div><span class="amt">− 3,499</span></div></div>
           <div class="card stg" style="--i:1"><div class="row"><span class="dot">↓</span><div><div class="lbl">Wanjiru M.</div><div class="sub">Received · 1 Oct</div></div><span class="amt in">+ 5,000</span></div></div>
-          <div class="card stg" style="--i:2"><div class="row"><span class="dot">↑</span><div><div class="lbl">Fuliza M-PESA</div><div class="sub">Loan · 29 Sep</div></div><span class="amt">− 750</span></div></div>
+          <div class="card stg" style="--i:2"><div class="row"><span class="dot">↑</span><div><div class="lbl">KPLC Prepaid</div><div class="sub">Paybill · Electricity · 30 Sep</div></div><span class="amt">− 1,000</span></div></div>
+          <div class="card stg" style="--i:3"><div class="row"><span class="dot">↑</span><div><div class="lbl">Fuliza M-PESA</div><div class="sub">Loan · 29 Sep</div></div><span class="amt">− 750</span></div></div>
         </div></div>
       </div>
     </div>
 
     <div class="feature flip">
       <div class="reveal">
-        <h2>Spending, broken down.</h2>
-        <p class="lede">Pick a period and Monies does the maths.</p>
+        <h2>Follow your money from any point.</h2>
+        <p class="lede">Pick a moment, or a transaction, and see everything that happened after it.</p>
         <ul class="points">
-          <li>See what went on each category and each kind of payment, by day, week or month.</li>
-          <li>A heatmap shows the times of day you spend the most.</li>
-          <li>Monies spots regular payments such as subscriptions and bills, and tells you roughly when the next one is due.</li>
+          <li>Tap <b>Trace since this</b> on any transaction, or choose a day and time under Since in the filters.</li>
+          <li>A card adds it all up: how many transactions, money in and out, fees, and your balance then and now.</li>
+          <li>Each row shows the balance its message gave, so you can check it one payment at a time.</li>
+          <li>Search and the other filters still work while you trace.</li>
         </ul>
       </div>
       <div class="visual">
-        <div class="bob"><div class="phone reveal">
-          <div class="phone-title">Insights</div>
-          <div class="stats">
-            <div class="card stat stg" style="--i:0"><div class="k">This month</div><div class="v">Ksh <span data-count="31204">31,204</span></div><div class="s">▲ 12% vs last</div></div>
-            <div class="card stat stg" style="--i:1"><div class="k">Top merchant</div><div class="v">Naivas</div><div class="s" style="color:var(--muted)">Ksh 6,200</div></div>
-          </div>
-          <div class="card donut-row">
-            <div class="donut" role="img" aria-label="Spending split: groceries 42%, transport 28%, bills 18%, other 12%"></div>
-            <div class="legend">
-              <div><i style="background:var(--emerald)"></i><span>Groceries</span><span>42%</span></div>
-              <div><i style="background:var(--coral)"></i><span>Transport</span><span>28%</span></div>
-              <div><i style="background:var(--emerald-deep)"></i><span>Bills</span><span>18%</span></div>
-              <div><i style="background:var(--gold)"></i><span>Other</span><span>12%</span></div>
+        <div class="bob"><div class="phone reveal" aria-label="Transactions traced since Monday morning: 4 transactions, with money in, out, fees and the balance then and now">
+          <div class="phone-title">Transactions</div>
+          <div class="card trace stg" style="--i:0">
+            <div class="tr-top"><span class="k">Since Mon 9 Nov, 8:14 AM</span><span class="tr-stop">Stop tracing</span></div>
+            <div class="tr-n">4 transactions</div>
+            <div class="tr-io">
+              <div><span class="k">In</span><b class="amt in">+ 8,000</b></div>
+              <div><span class="k">Out</span><b>2,840</b></div>
+              <div><span class="k">Fees</span><b>23</b></div>
             </div>
+            <div class="tr-bal"><span>Balance</span><span>7,203.50 → <b data-count="12340">12,340</b>.50</span></div>
           </div>
-          <div class="card">
-            <div class="k">When you spend</div>
-            <div class="heat" aria-hidden="true">
-              <u style="--i:0;--o:.12"></u><u style="--i:1;--o:.2"></u><u style="--i:2;--o:.15"></u><u style="--i:3;--o:.3"></u><u style="--i:4;--o:.8"></u><u style="--i:5;--o:.55"></u>
-              <u style="--i:6;--o:.4"></u><u style="--i:7;--o:.35"></u><u style="--i:8;--o:.6"></u><u style="--i:9;--o:1"></u><u style="--i:10;--o:.7"></u><u style="--i:11;--o:.25"></u>
-            </div>
-          </div>
-          <div class="card">
-            <div class="row"><div class="lbl" style="font-size:.8rem">Home Fibre</div><span class="sub" style="margin-left:auto">Monthly · next 2 Nov</span></div>
-            <div class="bar"><b style="--w:78%"></b></div>
-          </div>
+          <div class="card stg" style="--i:1"><div class="row"><span class="dot">↑</span><div><div class="lbl">Otieno J.</div><div class="sub">Sent · Bal 12,340.50</div></div><span class="amt">− 1,840</span></div></div>
+          <div class="card stg" style="--i:2"><div class="row"><span class="dot">↓</span><div><div class="lbl">Bank transfer</div><div class="sub">Bank · Bal 14,203.50</div></div><span class="amt in">+ 3,000</span></div></div>
+          <div class="card stg" style="--i:3"><div class="row"><span class="dot">↑</span><div><div class="lbl">KPLC Prepaid</div><div class="sub">Paybill · Bal 11,203.50</div></div><span class="amt">− 1,000</span></div></div>
+          <div class="card stg" style="--i:4"><div class="row"><span class="dot">↓</span><div><div class="lbl">Wanjiru M.</div><div class="sub">Received · Bal 12,203.50</div></div><span class="amt in">+ 5,000</span></div></div>
         </div></div>
       </div>
     </div>
 
     <div class="feature">
       <div class="reveal">
+        <h2>Spending, broken down.</h2>
+        <p class="lede">Pick a period and Monies does the maths, across four tabs: Overview, Activity, Spending and Cash flow.</p>
+        <ul class="points">
+          <li><b>Overview:</b> what you've spent so far against the same point last time, where the month is heading, and the regular payments still due.</li>
+          <li><b>Spending:</b> categories as boxes sized by what they took, marked when they moved 10% or more. Tap one for the businesses behind it. Your monthly budgets live here too.</li>
+          <li><b>Activity:</b> a calendar of the month, shaded by spending, with your streak and the days regular payments are due.</li>
+          <li><b>Cash flow:</b> your balance with its high and low, why it moved, what you kept each week, and what each type of transaction cost in fees.</li>
+        </ul>
+      </div>
+      <div class="visual">
+        <div class="bob"><div class="phone reveal" aria-label="The Analytics overview: spending this month against last month, a projection to month end, and where the money went">
+          <div class="tbar"><span class="phone-title">Analytics</span><span class="acct">All accounts ▾</span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+          <div class="atabs"><span class="on">Overview</span><span>Activity</span><span>Spending</span><span>Cash flow</span></div>
+          <div class="tchips"><span>TODAY</span><span>1W</span><span class="on">1M</span><span>6M</span><span>YTD</span><span>ALL</span></div>
+          <div class="card pace stg" style="--i:0">
+            <div class="k">This month · day 16 of 30</div>
+            <p><b>KES 18,250</b> spent so far. You've spent <b>12% less</b> than this time last month.</p>
+            <svg viewBox="0 0 240 84" aria-hidden="true">
+              <line class="today" x1="128" y1="4" x2="128" y2="80"/>
+              <polyline class="prev" points="0,80 40,70 80,62 128,42.7 200,26 240,15"/>
+              <polyline class="proj" points="128,47 240,17"/>
+              <polyline class="cur" pathLength="100" points="0,80 40,73 80,64 128,47"/>
+            </svg>
+            <div class="pace-figs"><div>Spent<b>18,250</b></div><div>By 30 Nov<b>~34,900</b></div></div>
+            <div class="due"><b>~4,500</b> in regular payments still due</div>
+          </div>
+          <div class="card stg" style="--i:1">
+            <div class="k">Where it went · this month</div>
+            <div class="tmap" role="img" aria-label="Groceries 38%, transport 22% and up 24%, bills 18%, meals 12%, other 10%">
+              <div style="--c:var(--emerald)"><b>Groceries</b>38%</div>
+              <div style="--c:var(--coral)"><b>Transport</b>22% <i class="mv">▲ 24%</i></div>
+              <div style="--c:var(--emerald-deep)"><b>Bills</b>18%</div>
+              <div style="--c:var(--gold)"><b>Meals</b>12%</div>
+              <div style="--c:var(--muted)"><b>Other</b>10%</div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="reveal">
         <h2>Take your data with you.</h2>
         <p class="lede">Save your transactions as CSV, JSON, Excel or PDF. Big exports carry on in the background, and you'll get a notification when they're ready.</p>
         <ul class="points">
-          <li>Only need some of it? Choose a date range, money in or out, a type of payment, or one person or business first.</li>
+          <li>Pick an account at the top, then a date range: this month, last month, the last 3 months, this year, last year, all time or any dates you choose.</li>
+          <li>Only need some of it? Narrow it to money in or out, a type of payment, or one person or business.</li>
+          <li>Found what you need in a search? Send those results straight to Export, with the same filters.</li>
         </ul>
       </div>
       <div class="visual">
         <div class="bob"><div class="phone reveal">
-          <div class="phone-title">Export</div>
+          <div class="tbar"><span class="phone-title">Export</span><span class="acct">All accounts ▾</span></div>
           <div class="card stg" style="--i:0">
             <div class="k">Format</div>
             <div class="fmts"><span class="fmt csv">CSV</span><span class="fmt">JSON</span><span class="fmt xl">Excel</span><span class="fmt">PDF</span></div>
           </div>
           <div class="card stg" style="--i:1">
-            <div class="row"><span class="lbl">From</span><span class="amt" style="color:var(--body)">1 Jan 2026</span></div>
-            <div class="row" style="margin-top:8px"><span class="lbl">To</span><span class="amt" style="color:var(--body)">Any</span></div>
+            <div class="k">Date range</div>
+            <div class="fmts bands"><span class="fmt">MTD</span><span class="fmt">OCT</span><span class="fmt">3M</span><span class="fmt sel">YTD</span><span class="fmt">2025</span><span class="fmt">ALL</span><span class="fmt">Custom</span></div>
           </div>
           <div class="card stg" style="--i:2">
             <div class="row"><span class="lbl">Money in and out</span><span class="amt" style="color:var(--body)">Both</span></div>
@@ -512,16 +746,16 @@
 <section id="supported" class="band">
   <div class="wrap">
     <div class="reveal">
-      <h2>Understands your M-PESA messages.</h2>
+      <h2>Understands your M-PESA and Airtel Money messages.</h2>
       <p class="lede">Monies recognises all of these today.</p>
     </div>
     <div class="types reveal">
-      <div class="card"><h3>Pay and send</h3><p>Who you paid, the account or till, and what it cost.</p><div class="tags"><span class="tag">Paybill</span><span class="tag">Till (Buy Goods)</span><span class="tag">Send money</span><span class="tag">Pochi la Biashara</span></div></div>
-      <div class="card"><h3>Money in</h3><p>Money from people and banks, so nothing coming in gets missed or counted twice.</p><div class="tags"><span class="tag">Received from person</span><span class="tag">Received from bank</span><span class="tag">Cash deposit</span></div></div>
+      <div class="card"><h3>Pay and send</h3><p>Who you paid, the account or till, and what it cost. Reversed payments are recorded too, the right way round.</p><div class="tags"><span class="tag">Paybill</span><span class="tag">Till (Buy Goods)</span><span class="tag">Send money</span><span class="tag">Pochi la Biashara</span><span class="tag">Reversals</span></div></div>
+      <div class="card"><h3>Money in</h3><p>Money from people and banks, so nothing coming in gets missed or counted twice. When M-PESA hides part of the sender's number, Monies still matches the payment to the right person.</p><div class="tags"><span class="tag">Received from person</span><span class="tag">Received from bank</span><span class="tag">Cash deposit</span><span class="tag">Dividends</span></div></div>
       <div class="card"><h3>Cash and airtime</h3><p>Cash withdrawals and airtime, kept separate from the rest of your spending.</p><div class="tags"><span class="tag">Agent withdrawal</span><span class="tag">ATM withdrawal</span><span class="tag">Airtime</span></div></div>
-      <div class="card"><h3>M-Shwari</h3><p>Deposits, withdrawals and Lock Savings, each with its own balance.</p><div class="tags"><span class="tag">Deposit</span><span class="tag">Withdrawal</span><span class="tag">Lock Savings</span></div></div>
+      <div class="card"><h3>M-Shwari</h3><p>Savings, Lock Savings and loans. Each has its own balance, and you can see what you still owe on a loan.</p><div class="tags"><span class="tag">Deposit</span><span class="tag">Withdrawal</span><span class="tag">Lock Savings</span><span class="tag">Loan</span><span class="tag">Loan repayment</span></div></div>
       <div class="card"><h3>Fuliza</h3><p>Loans and repayments, plus how much you can still borrow and what you owe.</p><div class="tags"><span class="tag">Loan</span><span class="tag">Partial repayment</span><span class="tag">Final repayment</span></div></div>
-      <div class="card soon"><h3>Airtel Money</h3><p>Coming soon. <a href="#roadmap" style="color:var(--emerald);font-weight:600">See what's planned</a>.</p></div>
+      <div class="card"><h3>Airtel Money</h3><p>Airtel Money gets its own line and balance, next to M-PESA.</p><div class="tags"><span class="tag">Send money</span><span class="tag">Airtel Pay</span><span class="tag">Received</span><span class="tag">Withdrawal</span><span class="tag">Airtime and bundles</span></div></div>
     </div>
     <p class="swipe">Swipe for more →</p>
   </div>
@@ -534,18 +768,18 @@
       <p class="lede">Your messages are private, so Monies works entirely on your phone. We never see any of it.</p>
     </div>
     <div class="priv">
-      <div class="card reveal"><h3>Nothing is uploaded</h3><p>Monies doesn't send your messages or transactions anywhere.</p></div>
+      <div class="card reveal"><h3>Nothing is uploaded</h3><p>Monies doesn't send your messages or transactions anywhere. They're left out of your phone's cloud backup too.</p></div>
       <div class="card reveal"><h3>No sign-up</h3><p>Open the app, allow access to your messages and your history appears.</p></div>
       <div class="card reveal"><h3>Open source</h3><p>Anyone can read the code and see exactly what Monies does with your messages.</p></div>
+      <div class="card reveal"><h3>Hide your balances</h3><p>One tap turns your balances into dots, for when someone's looking over your shoulder.</p></div>
     </div>
 
     <div class="perm-head reveal">
       <h3 style="font-size:1.5rem">Permissions, and why</h3>
-      <p style="margin-top:6px">Monies asks for three things when you set it up.</p>
+      <p style="margin-top:6px">Monies asks for two things when you set it up.</p>
     </div>
     <div class="perm">
-      <div class="card reveal"><strong>Read and receive SMS <span class="pill req">Required</span></strong><p>So Monies can read your M-PESA messages. The app can't work without it.</p></div>
-      <div class="card reveal"><strong>Phone number and carrier <span class="pill opt">Optional</span></strong><p>Helps Monies tell your SIM cards apart if you have more than one number.</p></div>
+      <div class="card reveal"><strong>Read and receive SMS <span class="pill req">Required</span></strong><p>So Monies can read your M-PESA and Airtel Money messages. The app can't work without it.</p></div>
       <div class="card reveal"><strong>Notifications <span class="pill opt">Optional</span></strong><p>Lets Monies show progress while it imports your history or exports a file.</p></div>
     </div>
   </div>
@@ -559,30 +793,14 @@
     </div>
     <div>
       <details><summary>How much does Monies cost?</summary><p>Nothing. It's a free, open-source hobby project. There are no ads and no subscription.</p></details>
-      <details><summary>Do I need to enter anything myself?</summary><p>No. Everything comes from the M-PESA messages already on your phone. You can add categories if you like, but you don't have to. <a href="#how">See how it works</a>.</p></details>
-      <details><summary>Does it work with Airtel Money?</summary><p>Not yet. Monies works with M-PESA today, and Airtel Money is <a href="#roadmap">next on the list</a>.</p></details>
-      <details><summary>I have two SIM cards. Will that work?</summary><p>Monies reads M-PESA messages from both lines, but for now it shows them together. Keeping each number separate is <a href="#roadmap">in progress</a>.</p></details>
-      <details><summary>A transaction is missing. What do I do?</summary><p>M-PESA changes how its messages are worded now and then, so a new format can slip through. Tell us on <a href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">GitHub</a> and paste in the message, with your personal details removed. We'll add it in a later update.</p></details>
+      <details><summary>Do I need to enter anything myself?</summary><p>No. Everything comes from the M-PESA messages already on your phone. Common businesses such as KPLC and Java House get a category on their own. You can add or change categories if you like, but you don't have to. <a href="#how">See how it works</a>.</p></details>
+      <details><summary>Does it work with Airtel Money?</summary><p>Yes. Monies reads Airtel Money messages too and shows them as their own line, so you can look at Airtel Money on its own or together with M-PESA.</p></details>
+      <details><summary>I have two SIM cards. Will that work?</summary><p>Yes. Each line has its own balance and history. Pick one from the account menu at the top of Home, Analytics or Export, or pick All accounts to see them added together. If one number shows up as two lines, you can merge them in Settings.</p></details>
+      <details><summary>A transaction is missing. What do I do?</summary><p>M-PESA and Airtel change how their messages are worded now and then, so a new format can slip through. Monies lists the messages it couldn't read in Settings, under Unrecognised messages. Copy one, remove your personal details, and post it on <a href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">GitHub</a>. We'll add it in a later update.</p></details>
+      <details><summary>What happens if I reinstall or change phones?</summary><p>Monies reads the M-PESA messages on the phone again, so your transactions come back as long as the messages are still there. Your own categories, budgets, renamed names and merges don't come back, because nothing is backed up or uploaded.</p></details>
       <details><summary>Will there be an iPhone version?</summary><p>No. iPhones don't let apps read your text messages, and that's how Monies gets its data.</p></details>
       <details><summary>How can I help?</summary><p>Monies is open source. You can report a bug, suggest a feature or contribute code on <a href="https://github.com/kimaita/monies-v2" target="_blank" rel="noopener">GitHub</a>.</p></details>
     </div>
-  </div>
-</section>
-
-<section id="roadmap">
-  <div class="wrap">
-    <div class="reveal">
-      <h2>What's coming</h2>
-      <p class="lede">Monies is a side project, so there are no release dates. This is what's planned.</p>
-    </div>
-
-    <ul class="road">
-      <li class="reveal"><div class="card"><div><h3>Dual SIM support</h3><p>Use M-PESA on two lines? Monies will keep each number's transactions and balance separate.</p></div><span class="st wip">In progress</span></div></li>
-      <li class="reveal"><div class="card plan-card"><div><h3>Airtel Money</h3><p>Track Airtel Money alongside M-PESA, in the same reports. If you use it, sharing a few sample messages will help get it built sooner.</p></div><span class="st plan">Next</span></div></li>
-      <li class="reveal"><div class="card plan-card"><div><h3>Report a missed message</h3><p>If Monies doesn't pick up a transaction, you'll be able to see it in the app and send it in with one tap.</p></div><span class="st plan">Later</span></div></li>
-    </ul>
-
-    <p style="margin-top:32px"><a class="mono" style="color:var(--emerald);font-size:.88rem" href="https://github.com/kimaita/monies-v2/issues" target="_blank" rel="noopener">Suggest a feature on GitHub →</a></p>
   </div>
 </section>
 
@@ -604,15 +822,15 @@
       <div class="glow"><i></i><i></i><i></i></div>
       <div class="ripples"><span></span><span></span><span></span></div>
       <div class="phone home reveal">
-        <div class="top"><span class="num">0712 ••• 678</span></div>
+        <div class="tbar"><span class="phone-title">Monies</span><span class="acct">All accounts ▾</span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></div>
         <div class="stg" style="--i:0">
-          <div class="k">M-PESA balance</div>
+          <div class="k">Balance</div>
           <div class="bal">Ksh <span data-count="12340">12,340</span><small>.50</small></div>
           <div class="chg">▲ +2,150 this week <span style="opacity:.6">›</span></div>
         </div>
         <div class="stg" style="--i:1">
           <div class="k">Other balances</div>
-          <div class="pills"><span class="bpill">Fuliza<b>1,500</b> available</span><span class="bpill">M-Shwari<b>4,200</b></span><span class="bpill">Lock<b>10,000</b></span></div>
+          <div class="pills"><span class="bpill">Fuliza<b>1,500</b> available</span><span class="bpill">M-Shwari<b>4,200</b></span><span class="bpill">M-Shwari loan<b class="owe">2,000</b></span><span class="bpill">Lock<b>10,000</b></span></div>
         </div>
         <div class="card stg" style="--i:2;padding:16px">
           <div class="io">
@@ -664,6 +882,71 @@
       });
     }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
     els.forEach(function (e) { io.observe(e); });
+  })();
+
+  // How it works: each step plays its scene on the phone. The current step's progress bar
+  // is a CSS animation; when it ends, the next step starts. Hovering the steps pauses it.
+  (function () {
+    var how = document.querySelector('.how');
+    if (!how) return;
+    var btns = [].slice.call(how.querySelectorAll('.step'));
+    var scenes = [].slice.call(how.querySelectorAll('.scene'));
+    var cap = how.querySelector('.stage-cap');
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var cur = 0, started = false;
+
+    function count(el) {
+      var to = +el.getAttribute('data-to'), dur = +el.getAttribute('data-dur'), wait = +el.getAttribute('data-wait');
+      var run = (el._run = (el._run || 0) + 1), t0 = null;
+      el.textContent = '0';
+      requestAnimationFrame(function tick(t) {
+        if (el._run !== run) return;
+        if (t0 === null) t0 = t + wait;
+        var p = Math.max(0, Math.min((t - t0) / dur, 1));
+        el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString('en-US');
+        if (p < 1) requestAnimationFrame(tick);
+      });
+    }
+
+    function go(i) {
+      cur = (i + scenes.length) % scenes.length;
+      btns.forEach(function (b, j) {
+        if (j === cur) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+      });
+      var bar = btns[cur].querySelector('.prog b');
+      bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+      scenes.forEach(function (s, j) {
+        clearTimeout(s._t);
+        if (j === cur) {
+          s.classList.add('on');
+          s.classList.remove('play'); void s.offsetWidth; s.classList.add('play');
+          if (!reduce) s.querySelectorAll('[data-to]').forEach(count);
+        } else if (s.classList.contains('on')) {
+          s.classList.remove('on');
+          // drop .play once it has faded out, so it doesn't snap to its end frame mid-fade
+          s._t = setTimeout(function () { s.classList.remove('play'); }, 450);
+        }
+      });
+      cap.firstChild.textContent = (cur + 1) + '/' + scenes.length;
+      cap.lastChild.textContent = btns[cur].querySelector('.t').textContent;
+    }
+
+    btns.forEach(function (b, j) {
+      b.addEventListener('click', function () { go(j); });
+      b.querySelector('.prog b').addEventListener('animationend', function () { go(cur + 1); });
+    });
+
+    if (reduce || !('IntersectionObserver' in window)) { go(0); return; }
+    new IntersectionObserver(function (entries) {
+      var on = entries[0].isIntersecting;
+      how.classList.toggle('paused', !on);
+      if (on && !started) { started = true; how.classList.add('live'); go(0); }
+    }, { rootMargin: '-30% 0px -30% 0px' }).observe(how);
+
+    // "See how it works" starts the walkthrough from the top
+    document.querySelectorAll('a[href="#how"]').forEach(function (a) {
+      a.addEventListener('click', function () { if (started) setTimeout(function () { go(0); }, 500); });
+    });
   })();
 </script>
 </body>
