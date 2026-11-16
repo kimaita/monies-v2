@@ -21,6 +21,8 @@ import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.services.PaceSummary
 import com.kimaita.monies.services.feesByType
+import com.kimaita.monies.services.FilterKind
+import com.kimaita.monies.services.activeFilters
 import com.kimaita.monies.data.dao.dtos.TypeFees
 import com.kimaita.monies.services.weekDays
 import com.kimaita.monies.services.dayRangeLabel
@@ -49,7 +51,6 @@ import com.kimaita.monies.services.computeStreaks
 import com.kimaita.monies.services.sliceFilter
 import com.kimaita.monies.services.toggleSlice
 import com.kimaita.monies.services.typeSlices
-import com.kimaita.monies.services.scopeLabel
 import com.kimaita.monies.services.balancePoints
 import com.kimaita.monies.services.yearStarts
 import com.kimaita.monies.ui.charts.BarBucket
@@ -155,6 +156,18 @@ class AnalyticsViewModel @Inject constructor(
 
     fun selectSlice(label: String?) {
         _selectedSlice.value = toggleSlice(_selectedSlice.value, label)
+    }
+
+    fun clearFilter(kind: FilterKind) {
+        when (kind) {
+            FilterKind.DIRECTION -> setNature(null)
+            FilterKind.TYPE -> setTypeFilters(emptyList())
+            FilterKind.CATEGORY -> setCategoryFilters(emptyList())
+            FilterKind.SUBJECT -> {
+                _selectedSubjects.value = emptyList()
+                setSubjectFilters(emptyList())
+            }
+        }
     }
 
     fun clearFilters() {
@@ -446,12 +459,6 @@ class AnalyticsViewModel @Inject constructor(
         }.stateIn(viewModelScope, onceStarted, null)
 
     /** Which line these numbers are for: its name, or "All accounts"; null when there is only one line. */
-    val scopeLabel: StateFlow<String?> =
-        combine(repository.selectedAccount, repository.getAccountBalances()) { selected, lines ->
-            scopeLabel(selected, lines.map { it.accountId to it.name })
-        }.stateIn(viewModelScope, started, null)
-
-
     val recurring: StateFlow<List<RecurringPayment>?> =
         repository.selectedAccount.mapLatest { repository.getRecurringPayments() }.stateIn(
             viewModelScope,
@@ -591,6 +598,15 @@ class AnalyticsViewModel @Inject constructor(
 
     private val _selectedSubjects = MutableStateFlow<List<NamedRef<Long>>>(emptyList())
     val selectedSubjects: StateFlow<List<NamedRef<Long>>> = _selectedSubjects.asStateFlow()
+
+    /** The filters in use, one chip each; declared after [_selectedSubjects], which it reads. */
+    val activeFilters: StateFlow<List<Pair<FilterKind, String>>> =
+        combine(_filters, filterOptions, _selectedSubjects) { f, opts, subjects ->
+            activeFilters(
+                f.natureFilter, f.typeFilters, f.categoryFilters, subjects,
+                opts?.types.orEmpty(), opts?.categories.orEmpty(),
+            )
+        }.stateIn(viewModelScope, started, emptyList())
 
     fun addSubject(ref: NamedRef<Long>) {
         if (_selectedSubjects.value.none { it.id == ref.id }) {

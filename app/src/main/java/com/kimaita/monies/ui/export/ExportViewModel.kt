@@ -72,7 +72,6 @@ class ExportViewModel @Inject constructor(
     fun setRange(start: LocalDate?, end: LocalDate?) =
         _sel.update { it.copy(startDate = start, endDate = end) }
     fun setNature(n: Boolean?) = _sel.update { it.copy(nature = n) }
-    fun setAccount(id: Int?) = _sel.update { it.copy(accountId = id) }
     fun toggleCategory(id: Int) = _sel.update { it.copy(categoryIds = it.categoryIds.toggle(id)) }
     fun toggleType(group: TypeGroup) = _sel.update { it.copy(typeIds = it.typeIds.toggleGroup(group)) }
     fun addSubject(ref: NamedRef<Long>) = _sel.update {

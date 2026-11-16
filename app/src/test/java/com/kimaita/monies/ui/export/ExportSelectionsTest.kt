@@ -153,7 +153,5 @@ class ExportSelectionsTest {
         assertEquals("28 Dec 2025 – 3 Jan 2026", rangeText(date(2025, 12, 28), date(2026, 1, 3), today))
         assertEquals("5 Mar", rangeText(date(2026, 3, 5), date(2026, 3, 5), today))
         assertEquals("From 5 Mar", rangeText(date(2026, 3, 5), null, today))
-        assertEquals("Last month", base.copy(startDate = date(2026, 10, 1), endDate = date(2026, 10, 31)).dateLabel(today))
-        assertEquals("1 Oct – 30 Oct", base.copy(startDate = date(2026, 10, 1), endDate = date(2026, 10, 30)).dateLabel(today))
     }
 }

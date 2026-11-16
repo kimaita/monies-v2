@@ -109,7 +109,10 @@ fun MoniesNavHost(
             )
         }
         composable("analytics") {
-            AnalyticsScreen(onSubject = { navController.navigateSingleTop("subject/$it") })
+            AnalyticsScreen(
+                onSubject = { navController.navigateSingleTop("subject/$it") },
+                onSettings = { navController.navigateSingleTop("settings") },
+            )
         }
         composable("settings") { SettingsScreen(navController = navController) }
         composable("settings/unrecognised") { UnrecognisedScreen(navController = navController) }
@@ -119,7 +122,7 @@ fun MoniesNavHost(
         ) {
             SubjectScreen(navController = navController)
         }
-        composable("export") { ExportScreen() }
+        composable("export") { ExportScreen(onSettings = { navController.navigateSingleTop("settings") }) }
     }
 }
 
