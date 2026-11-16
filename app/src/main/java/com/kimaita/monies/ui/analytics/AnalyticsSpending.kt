@@ -222,7 +222,7 @@ private fun TotalCard(
         }
         if (parts.isEmpty()) {
             Spacer(Modifier.height(8.dp))
-            Say(if (out) "Nothing went out in this period." else "Nothing came in in this period.")
+            Say(if (out) "Nothing went out during this period." else "Nothing came in during this period.")
             return@BentoCard
         }
         Spacer(Modifier.height(12.dp))

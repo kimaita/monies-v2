@@ -156,7 +156,6 @@ fun TransactionsScreenContent(
     val traceFrom: (Transaction) -> Unit = remember(onTrace) {
         { t -> t.transactionTime?.let { onTrace(TraceStart(it, t.id)) } }
     }
-    // A new trace opens at its card; a trace restored with the screen keeps its scroll position.
     val traceKey = since?.let { "${it.start}/${it.afterId}" }
     var scrolledFor by rememberSaveable { mutableStateOf(traceKey) }
     LaunchedEffect(traceKey) {
@@ -240,7 +239,6 @@ fun TransactionsScreenContent(
                     onRemoveFilter = onUpdateFilters
                 )
             }
-            // Export takes whole days, so it can't show a trace's rows exactly; it is not offered.
             if (since == null && (hasActiveFilters || filters.searchQuery.isNotBlank())) {
                 Row(
                     Modifier

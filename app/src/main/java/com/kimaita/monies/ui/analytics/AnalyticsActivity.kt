@@ -385,7 +385,7 @@ private fun CadencePill(text: String) {
 private fun NotEnough() {
     Say("Not enough payments to show a pattern.")
     Spacer(Modifier.height(4.dp))
-    Note("Needs 5 or more. Try a longer period.")
+    Note("Needs 5 or more payments. Try a longer period.")
 }
 
 @Composable
@@ -398,7 +398,6 @@ private fun DaysCard(w: AnalyticsViewModel.Weekdays?, period: String) {
             EmptyHint(LOADING)
             return@BentoCard
         }
-        // Monday first; WeekdayCount numbers Sunday 0.
         val counts = (1..7).map { i -> w.counts.firstOrNull { it.weekday == i % 7 }?.count ?: 0 }
         val total = counts.sum()
         val sentence = remember(w) { weekdaySentence(w.counts) }
@@ -616,7 +615,7 @@ private fun RecurringCard(recurring: List<RecurringPayment>?, monthlyOut: Double
                 Spacer(Modifier.height(8.dp))
                 Say("Nothing regular yet.")
                 Spacer(Modifier.height(4.dp))
-                Note("Shows up after payments on 4+ days in 4 months to one name, like rent.")
+                Note("Needs payments to one name on 4 or more days in 4 months, like rent.")
             }
             else -> {
                 Spacer(Modifier.height(4.dp))

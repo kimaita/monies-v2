@@ -100,10 +100,10 @@ internal fun AutoPage(active: Boolean) {
         )
         }
         Spacer(Modifier.height(12.dp))
-        OnbHeadline("Nothing\nto type")
+        OnbHeadline("Always up\nto date")
         Spacer(Modifier.height(14.dp))
         OnbBody(
-            "Transactions, balances, Fuliza and M-Shwari stay current as messages arrive.",
+            "Transactions, balances, Fuliza and M-Shwari update as new messages arrive.",
             Modifier.widthIn(max = 300.dp)
         )
         Spacer(Modifier.height(24.dp))

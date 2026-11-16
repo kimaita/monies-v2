@@ -22,7 +22,7 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** One bar slot: [up] rises from the baseline, [down] hangs below it. [year] marks where a year begins; [days] are the dates it covers, when that helps ("2–8 Nov"). */
+/** One bar slot: [up] rises from the baseline, [down] hangs below it. [year] marks where a year begins; [days] are the dates it covers, when that helps ("2 to 8 Nov"). */
 data class BarBucket(val label: String, val up: Float, val down: Float = 0f, val year: String? = null, val days: String? = null)
 
 /** Axis labels and figures drawn on charts. */

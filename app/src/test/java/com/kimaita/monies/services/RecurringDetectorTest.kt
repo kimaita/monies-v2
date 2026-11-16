@@ -39,7 +39,6 @@ class RecurringDetectorTest {
 
     @Test
     fun mergesPaymentsOnTheSameDay() {
-        // Weekly, but on two of the days the bill was paid in two parts an hour apart.
         val rows = listOf(
             "2025-07-08T09:00:00" to 600.0,
             "2025-07-15T09:00:00" to 400.0, "2025-07-15T10:00:00" to 200.0,
@@ -61,7 +60,6 @@ class RecurringDetectorTest {
 
     @Test
     fun dropsANameWithFewerThanFourPaymentDays() {
-        // Five payments, but on three days only.
         val rows = listOf(
             "2025-06-10T09:00:00", "2025-06-10T12:00:00", "2025-07-10T09:00:00",
             "2025-08-10T09:00:00", "2025-08-10T18:00:00",

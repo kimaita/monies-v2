@@ -118,7 +118,7 @@ fun SubjectScreen(
                 onDismissRequest = { dialog = SubjectDialog.None },
                 title = { Text("Merge into ${t.name}?") },
                 text = {
-                    Text("All transactions of ${subject?.name.orEmpty()} move to ${t.name}, and new messages from it will land there too.")
+                    Text("All transactions of ${subject?.name.orEmpty()} move to ${t.name}, and new messages from it will go there too.")
                 },
                 confirmButton = {
                     TextButton(onClick = {

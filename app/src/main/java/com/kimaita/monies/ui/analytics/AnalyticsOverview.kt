@@ -313,7 +313,7 @@ private fun ActiveCard(cells: List<ActivityCell>?, period: String, onLink: () ->
         if (summary == null) {
             Say("Not enough payments to show a pattern.")
             Spacer(Modifier.height(4.dp))
-            Note("Needs 5 or more. Try a longer period.")
+            Note("Needs 5 or more payments. Try a longer period.")
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 repeat(4) {

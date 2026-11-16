@@ -43,11 +43,11 @@ fun permissionRationales(): List<PermissionRationale> = remember {
     listOf(
         PermissionRationale(
             R.drawable.ic_sms, "Read & receive SMS",
-            "To retrieve your M-PESA messages for processing.", isRequired = true,
+            "To read your M-PESA messages and record them.", isRequired = true,
         ),
         PermissionRationale(
             R.drawable.ic_notifications, "Notifications",
-            "To show progress for longer running tasks.", isRequired = false,
+            "To show progress on longer tasks.", isRequired = false,
         ),
     )
 }
@@ -133,7 +133,7 @@ internal fun PermissionsPage(active: Boolean) {
         OnbHeadline("A few permissions", fontSize = 28.sp)
         Spacer(Modifier.height(10.dp))
         OnbBody(
-            "Monies runs entirely on your device. Here's why it asks.",
+            "Monies runs entirely on your device. This is what each permission is for.",
             Modifier.widthIn(max = 320.dp),
             fontSize = 14.sp
         )

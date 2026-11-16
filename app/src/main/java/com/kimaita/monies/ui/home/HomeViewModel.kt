@@ -81,8 +81,10 @@ class HomeViewModel @Inject constructor(
     private val _timeFilter = MutableStateFlow<TimeFilter>(TimeFilter.DAY)
     val filters: StateFlow<TimeFilter> = _timeFilter.asStateFlow()
 
-    // The sync on every open usually finds nothing new in ~200 ms; showing the bar only once a sync
-    // has run for 500 ms keeps that check from flashing it. Hiding is immediate.
+    /**
+     * The sync on every open usually finds nothing new in ~200 ms; showing the bar only once a sync
+     * has run for 500 ms keeps that check from flashing it. Hiding is immediate.
+     */
     @OptIn(FlowPreview::class)
     val isSyncing: StateFlow<Boolean> =
         smsSyncer.isSyncing

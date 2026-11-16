@@ -264,7 +264,7 @@ fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel = 
         AlertDialog(
             onDismissRequest = { deletingCategory = null },
             title = { Text("Delete ${c.name}?") },
-            text = { Text("Transactions and people using it become uncategorised.") },
+            text = { Text("Transactions and people in this category become uncategorised.") },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteCategory(c.id); deletingCategory = null }) { Text("Delete") }
             },
@@ -277,8 +277,8 @@ fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel = 
         title = { Text("Re-import messages?") },
         text = {
             Text(
-                "All transactions and unrecognised messages are deleted and read again from your inbox. " +
-                    "Accounts, people, names and categories are kept; categories set on single transactions are lost."
+                "This deletes all transactions and unrecognised messages, then reads them again from your inbox. " +
+                    "Accounts, people, names and categories are kept. Categories you set on single transactions are lost."
             )
         },
         confirmButton = {

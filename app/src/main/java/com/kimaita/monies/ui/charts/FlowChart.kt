@@ -35,17 +35,19 @@ import com.kimaita.monies.ui.util.formatAmount
 @Immutable
 data class FlowBox(val name: String, val amount: Double, val color: Color)
 
-/* Geometry in dp, from the design's 326-wide card. */
+/** Geometry in dp, from the design's 326-wide card. */
 private const val MID_TOP = 28f
 private const val MID_H = 124f
 private const val BAR_MIN = 4f
-/* A slot is at least this tall, so with the gap two neighbouring labels' centres are 26 (left, two
-   lines) and 13 (right, one line) apart. */
+/**
+ * A slot is at least this tall, so with the gap two neighbouring labels' centres are 26 (left, two
+ * lines) and 13 (right, one line) apart.
+ */
 private const val LEFT_SLOT = 8f
 private const val LEFT_GAP = 18f
 private const val RIGHT_SLOT = 5f
 private const val RIGHT_GAP = 8f
-/* Half a label's height: two lines on the left, one on the right. */
+/** Half a label's height: two lines on the left, one on the right. */
 private const val LEFT_LABEL_HALF = 13f
 private const val RIGHT_LABEL_HALF = 7f
 private const val LEFT_BAR_X = 92f / 326f

@@ -107,13 +107,12 @@ class ActivityCalendarTest {
             noSpendSentence(listOf(d(1), d(2), d(23))),
         )
         assertEquals("137 payments, about 4.6 a day.", paymentsPerDaySentence(137, 30))
-        assertEquals("Most happen in the **evening, 5–10 pm**.", timeOfDaySentence(listOf(24, 44, 57, 12)))
+        assertEquals("Most happen in the **evening, 5 to 10 pm**.", timeOfDaySentence(listOf(24, 44, 57, 12)))
         assertNull(timeOfDaySentence(listOf(1, 1, 1, 1)))
     }
 
     @Test
     fun weekdaySentence_namesBusiestAndQuietest() {
-        // Sunday is 0, as SQLite's %w counts.
         val counts = listOf(18, 14, 20, 20, 30, 25).mapIndexed { i, n -> WeekdayCount(i + 1, n, 0.0) } +
                 WeekdayCount(0, 10, 0.0)
         assertEquals("**Fridays** are busiest, **Sundays** quietest.", weekdaySentence(counts))

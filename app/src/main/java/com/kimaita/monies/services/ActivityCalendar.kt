@@ -175,11 +175,11 @@ fun weekdaySentence(counts: List<WeekdayCount>): String? {
 }
 
 private val slotPhrases = listOf(
-    "in the **morning, 5 am–12 pm**", "in the **afternoon, 12–5 pm**",
-    "in the **evening, 5–10 pm**", "at **night, 10 pm–5 am**",
+    "in the **morning, 5 am to 12 pm**", "in the **afternoon, 12 to 5 pm**",
+    "in the **evening, 5 to 10 pm**", "at **night, 10 pm to 5 am**",
 )
 
-/** "Most happen in the **evening, 5–10 pm**." from payment counts per slot (0 morning .. 3 night). */
+/** "Most happen in the **evening, 5 to 10 pm**." from payment counts per slot (0 morning .. 3 night). */
 fun timeOfDaySentence(slotCounts: List<Int>): String? {
     if (slotCounts.sum() < 5) return null
     return "Most happen ${slotPhrases[slotCounts.indices.maxBy { slotCounts[it] }]}."

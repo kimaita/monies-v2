@@ -264,21 +264,21 @@ class AnalyticsCalculationsTest {
     @Test
     fun activeSummary_weekdaySlotWhenWeekdaysDominate() {
         val cells = listOf(cell(1, 2, 5), cell(3, 2, 5), cell(6, 2, 1), cell(2, 0, 2))
-        assertEquals("Most active on **weekday evenings**, 5–10 pm.", activeSummary(cells))
+        assertEquals("Most active on **weekday evenings**, 5 to 10 pm.", activeSummary(cells))
     }
 
     @Test
     fun activeSummary_weekendSlotWhenWeekendDominates() {
         val cells = listOf(cell(0, 3, 6), cell(6, 3, 6), cell(2, 3, 2))
-        assertEquals("Most active on **weekend nights**, 10 pm–5 am.", activeSummary(cells))
+        assertEquals("Most active on **weekend nights**, 10 pm to 5 am.", activeSummary(cells))
     }
 
     @Test
     fun activeSummary_evenSpreadNamesOnlyTheSlot() {
         val cells = listOf(cell(1, 1, 5), cell(0, 1, 2), cell(2, 0, 1))
-        assertEquals("Most active in the **afternoons**, 12–5 pm.", activeSummary(cells))
+        assertEquals("Most active in the **afternoons**, 12 to 5 pm.", activeSummary(cells))
         assertEquals(
-            "Most active in the **mornings**, 5 am–12 pm.",
+            "Most active in the **mornings**, 5 am to 12 pm.",
             activeSummary(listOf(cell(1, 0, 3), cell(4, 0, 2), cell(6, 0, 1), cell(0, 0, 1))),
         )
     }
@@ -380,7 +380,6 @@ class AnalyticsCalculationsTest {
         assertEquals(days, daysFrom(days, LocalDate.of(2026, 3, 1)))
     }
 
-    // The boards' sample: 14 Oct opening 30,040; 62,400 in, 58,190 out, 412 fees, 3,000 to M-Shwari.
     private val sample = WalkTotals(income = 62_400.0, expense = 58_190.0, fees = 412.0, mshwariOut = 3_000.0)
     private val sampleSources = listOf(
         "Acme Ltd" to 45_000.0, "Otieno K." to 8_000.0, "Bank transfer" to 6_000.0,
@@ -399,7 +398,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun moneyWalk_fulizaFeeCountsWithTheBorrowing() {
-        // 1,100 paid from a 100 balance with 1,000 of Fuliza (fee 10), then 2,000 in and 1,010 repaid.
         val t = WalkTotals(income = 2_000.0, expense = 1_100.0, fees = 10.0, fulizaIn = 1_000.0, fulizaOut = 1_010.0, fulizaFees = 10.0)
         val w = moneyWalk(t, 100.0, 990.0)
         assertEquals(0.0, w.fuliza, 1e-9)
@@ -541,7 +539,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun projectPeriodEnd_monthIsTypicalDayTimesDaysLeftPlusRegularsDue() {
-        // Rent on the 1st, then 600 a day; the 14th (today) is not over and not in the median.
         val month = days(LocalDate.of(2026, 11, 1), 18_000.0, *DoubleArray(12) { 600.0 }, 200.0)
         val p = pacePeriod(TimeFilter.MONTH, nov14)!!
         val spent = computePace(month, p, nov14).spent
@@ -566,7 +563,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun projectPeriodEnd_weekRunsToSunday() {
-        // Sat 14 Nov: Mon–Fri finished (median 200), Sunday left.
         val week = days(LocalDate.of(2026, 11, 9), 100.0, 300.0, 200.0, 0.0, 400.0, 50.0)
         val p = pacePeriod(TimeFilter.WEEK, nov14)!!
         assertEquals(1_050.0 + 600.0 + 200.0, projectPeriodEnd(week, p, nov14, 1_050.0, 600.0)!!, 1e-9)
@@ -610,7 +606,6 @@ class AnalyticsCalculationsTest {
 
     @Test
     fun computePace_weekComparesTheSameWeekday() {
-        // Last week 100 a day, this week (to Saturday) 50 a day.
         val daily = days(LocalDate.of(2026, 11, 2), *DoubleArray(7) { 100.0 }) +
                 days(LocalDate.of(2026, 11, 9), *DoubleArray(6) { 50.0 })
         val pace = computePace(daily, pacePeriod(TimeFilter.WEEK, nov14)!!, nov14)
@@ -659,7 +654,6 @@ class AnalyticsCalculationsTest {
         val mon = LocalDate.of(2026, 11, 16)
         assertEquals(600.0, stillDue(sampleRegulars, pacePeriod(TimeFilter.DAY, mon)!!, mon), 1e-9)
         assertEquals(1_750.0 + 2_999.0, stillDue(sampleRegulars, pacePeriod(TimeFilter.WEEK, mon)!!, mon), 1e-9)
-        // To 31 Dec: Wanjiku 7 times, power 4, Wi-Fi 2, rent and gym once each.
         val year = 7 * 600.0 + 4 * 1_750.0 + 2 * 2_999.0 + 18_000.0 + 2_500.0
         assertEquals(year, stillDue(sampleRegulars, pacePeriod(TimeFilter.YTD, nov14)!!, nov14), 1e-9)
         assertEquals(0.0, stillDue(sampleRegulars, pacePeriod(TimeFilter.SIX_MONTHS, nov14)!!, nov14), 0.0)
@@ -819,9 +813,9 @@ class AnalyticsCalculationsTest {
     @Test
     fun weekDays_followSqliteMondayWeeks() {
         assertEquals(LocalDate.of(2026, 11, 2)..LocalDate.of(2026, 11, 8), weekDays("2026-44"))
-        assertEquals("2–8 Nov", dayRangeLabel(weekDays("2026-44")!!))
+        assertEquals("2 to 8 Nov", dayRangeLabel(weekDays("2026-44")!!))
         assertEquals(LocalDate.of(2026, 1, 1)..LocalDate.of(2026, 1, 4), weekDays("2026-00"))
-        assertEquals("26 Oct – 1 Nov", dayRangeLabel(weekDays("2026-43")!!))
+        assertEquals("26 Oct to 1 Nov", dayRangeLabel(weekDays("2026-43")!!))
         assertNull(weekDays("2026-11-14"))
     }
 }

@@ -14,11 +14,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/*
- * The cards' sentences. A run between `**` marks is shown bold (see Say); the first such run can
- * take the card's tone, green for good news and red for bad.
- */
-
 private val dayMonth = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 private val monthYear = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
 private val monthName = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)
@@ -32,7 +27,7 @@ fun periodLabel(tf: TimeFilter, firstDay: LocalDate? = null): String = when (tf)
     TimeFilter.SIX_MONTHS -> "last 6 months"
     TimeFilter.YTD -> "this year"
     TimeFilter.ALL -> firstDay?.let { "all time, since ${it.format(monthYear)}" } ?: "all time"
-    is TimeFilter.CustomRange -> "${tf.startDate.format(dayMonth)} – ${tf.endDate.format(dayMonth)}"
+    is TimeFilter.CustomRange -> "${tf.startDate.format(dayMonth)} to ${tf.endDate.format(dayMonth)}"
 }
 
 /** The period inside a sentence: "Nothing in or out in the last 30 days." */
@@ -43,7 +38,7 @@ fun inPeriod(tf: TimeFilter): String = when (tf) {
     TimeFilter.SIX_MONTHS -> "in the last 6 months"
     TimeFilter.YTD -> "this year"
     TimeFilter.ALL -> "so far"
-    is TimeFilter.CustomRange -> "in these dates"
+    is TimeFilter.CustomRange -> "in this period"
 }
 
 /** "since 14 Oct", or "today" for the one-day period. */
@@ -62,7 +57,7 @@ fun paceLabel(p: PacePeriod?, today: LocalDate, historyStart: LocalDate?): Strin
     PaceKind.MONTH -> "This month · day ${today.dayOfMonth} of ${today.lengthOfMonth()}"
     PaceKind.YEAR -> "This year · day ${today.dayOfYear} of ${today.lengthOfYear()}"
     PaceKind.HALF_YEAR -> "Last 6 months"
-    PaceKind.RANGE -> "${p.start.format(dayMonth)} – ${p.end.format(dayMonth)}"
+    PaceKind.RANGE -> "${p.start.format(dayMonth)} to ${p.end.format(dayMonth)}"
 }
 
 /** The share of a calendar period gone by, for the card's track; null for the others. */
@@ -88,7 +83,7 @@ fun paceSentence(p: PacePeriod, changePct: Double?, spent: Double, mostly: Strin
         changePct == null || pct == null -> "**KES ${formatAmount(spent)}** " + when (p.kind) {
             PaceKind.DAY -> "spent so far today."
             PaceKind.HALF_YEAR -> "spent in the last 6 months."
-            PaceKind.RANGE -> "spent in these dates."
+            PaceKind.RANGE -> "spent in this period."
             else -> "spent so far."
         }
         pct == 0 -> "You've spent **about the same** as ${against(p.kind)}."

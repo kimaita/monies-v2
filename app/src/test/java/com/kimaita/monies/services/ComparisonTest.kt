@@ -24,12 +24,11 @@ class ComparisonTest {
 
     @Test
     fun historyFor_countsTheDaysBeforeThePeriod() {
-        // 1M starts 14 Oct; history from 26 Sep gives 18 of the 30 days before.
         val h = historyFor(TimeFilter.MONTH, nov14, LocalDate.of(2026, 9, 26))!!
         assertFalse(h.enough)
         assertEquals(30, h.needDays)
         assertEquals(18, h.haveDays)
-        assertEquals("Needs 30 days before this period. You have 18.", historyNote(h))
+        assertEquals("Needs 30 days of history before this period. You have 18.", historyNote(h))
         assertTrue(historyFor(TimeFilter.MONTH, nov14, LocalDate.of(2025, 3, 1))!!.enough)
         assertNull(historyFor(TimeFilter.ALL, nov14, LocalDate.of(2025, 3, 1)))
     }
@@ -52,7 +51,6 @@ class ComparisonTest {
         val now = mapOf("Rent" to 18_000.0, "Food" to 14_600.0, "Transport" to 7_900.0, "Shopping" to 5_100.0, "Family" to 4_300.0, "Airtime" to 2_090.0)
         val before = mapOf("Rent" to 18_000.0, "Food" to 12_400.0, "Transport" to 8_400.0, "Shopping" to 2_800.0, "Family" to 5_600.0, "Airtime" to 1_800.0)
         val big = changes(now, before).filter { it.second.big }.map { it.first }
-        // Airtime moved 16% but only 290: not big. Transport moved 500 but only 6%: not big.
         assertEquals(listOf("Shopping", "Food", "Family"), big)
     }
 
@@ -82,13 +80,11 @@ class ComparisonTest {
             assertTrue(t.x >= -0.01f && t.y >= -0.01f && t.x + t.w <= 326.01f && t.y + t.h <= 210.01f)
         }
         assertEquals(326.0 * 210, tiles.sumOf { (it.w * it.h).toDouble() }, 1.0)
-        // No two tiles overlap.
         for (a in tiles) for (b in tiles) if (a.index < b.index) {
             val ox = minOf(a.x + a.w, b.x + b.w) - maxOf(a.x, b.x)
             val oy = minOf(a.y + a.h, b.y + b.h) - maxOf(a.y, b.y)
             assertTrue(ox <= 0.01f || oy <= 0.01f)
         }
-        // The biggest tile is not a sliver.
         val big = tiles.first { it.index == 0 }
         assertTrue(maxOf(big.w / big.h, big.h / big.w) < 3)
     }
