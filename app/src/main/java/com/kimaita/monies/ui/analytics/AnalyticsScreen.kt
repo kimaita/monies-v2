@@ -77,7 +77,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel(), onSubject: 
                 when (tab) {
                     AnalyticsTab.OVERVIEW -> OverviewTab(viewModel, listStates.getValue(tab)) { tab = it }
                     AnalyticsTab.ACTIVITY -> ActivityTab(viewModel, listStates.getValue(tab), onSubject)
-                    AnalyticsTab.SPENDING -> SpendingTab(viewModel, listStates.getValue(tab))
+                    AnalyticsTab.SPENDING -> SpendingTab(viewModel, listStates.getValue(tab), onSubject)
                     AnalyticsTab.CASHFLOW -> CashFlowTab(viewModel, listStates.getValue(tab))
                 }
             }

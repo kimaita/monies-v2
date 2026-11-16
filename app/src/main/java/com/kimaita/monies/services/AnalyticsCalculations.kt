@@ -59,11 +59,13 @@ data class SliceValue(
     val value: Float,
     val categoryIds: List<Int> = emptyList(),
     val typeIds: List<Int> = emptyList(),
+    /** How many payments the row adds up. */
+    val count: Int = 0,
 )
 
 fun categorySlices(rows: List<CategorySpending>, categories: List<NamedRef<Int>>): List<SliceValue> =
     rows.map { r ->
-        SliceValue(r.name, r.total.toFloat(), categoryIds = categories.filter { it.name == r.name }.map { it.id })
+        SliceValue(r.name, r.total.toFloat(), categories.filter { it.name == r.name }.map { it.id }, count = r.count)
     }.sortedByDescending { it.value }
 
 /** The types that share one display name ("Airtime"), shown as a single choice. */
@@ -89,7 +91,7 @@ fun typeSlices(rows: List<CategorySpending>, types: List<TransactionType>): List
     val idsOf = typeGroups(types).associate { it.label to it.ids }
     return rows.groupBy { labelOf[it.name] ?: it.name }
         .map { (label, group) ->
-            SliceValue(label, group.sumOf { it.total }.toFloat(), typeIds = idsOf[label].orEmpty())
+            SliceValue(label, group.sumOf { it.total }.toFloat(), typeIds = idsOf[label].orEmpty(), count = group.sumOf { it.count })
         }
         .sortedByDescending { it.value }
 }

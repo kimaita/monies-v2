@@ -124,7 +124,7 @@ interface SubjectDao : BaseDao<Subject> {
      */
     @Query(
         """
-    SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount
+    SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount, COUNT(*) AS count
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id
@@ -178,7 +178,7 @@ interface SubjectDao : BaseDao<Subject> {
 
     @Query(
         """
-    SELECT s.name AS name, SUM(t.amount) AS amount
+    SELECT s.id AS subjectId, s.name AS name, SUM(t.amount) AS amount, COUNT(*) AS count
     FROM transactions t
     JOIN subjects s ON t.subject = s.id
     JOIN transaction_types tt ON t.transactionType = tt.id

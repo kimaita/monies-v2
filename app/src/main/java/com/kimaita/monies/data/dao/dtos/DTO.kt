@@ -18,7 +18,8 @@ data class IncExp(
 data class CategorySpending(
     val name: String,
     val total: Double,
-    val totalCost: Double
+    val totalCost: Double,
+    val count: Int = 0,
 )
 
 /**
@@ -76,13 +77,13 @@ data class BalanceBucket(val bucket: String, val balance: Float)
 data class LineBalanceBucket(val lineId: Int, val bucket: String?, val balance: Float)
 
 /** Subject ranked by spend (top subjects, cross-filterable). */
-data class SubjectAmount(val subjectId: Long, val name: String, val amount: Double)
+data class SubjectAmount(val subjectId: Long, val name: String, val amount: Double, val count: Int = 0)
 
 /** Subject ranked by frequency (leaderboard). */
 data class SubjectCount(val subjectId: Long, val name: String, val count: Int)
 
 /** Income grouped by source (treemap). */
-data class SourceAmount(val name: String, val amount: Double)
+data class SourceAmount(val subjectId: Long, val name: String, val amount: Double, val count: Int = 0)
 
 data class WeekdayCount(val weekday: Int, val count: Int, val total: Double)
 

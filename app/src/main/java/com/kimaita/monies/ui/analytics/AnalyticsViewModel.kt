@@ -53,7 +53,6 @@ import com.kimaita.monies.services.scopeLabel
 import com.kimaita.monies.services.balancePoints
 import com.kimaita.monies.services.yearStarts
 import com.kimaita.monies.ui.charts.BarBucket
-import com.kimaita.monies.ui.charts.RankedRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -73,6 +72,12 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import com.kimaita.monies.data.dao.dtos.DayPayment
+import com.kimaita.monies.data.dao.dtos.SourceAmount
+import com.kimaita.monies.data.dao.dtos.SubjectAmount
+import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.services.History
+import com.kimaita.monies.services.historyFor
+import com.kimaita.monies.services.previousRange
 import com.kimaita.monies.services.DAYS_PER_MONTH
 import com.kimaita.monies.services.MonthCalendar
 import com.kimaita.monies.services.Streak
@@ -287,20 +292,55 @@ class AnalyticsViewModel @Inject constructor(
 
     private fun typeRows(k: FilterKey) = repository.getTypeSpending(k.stats, natureFilter = false).map { BreakdownRows(true, it) }
 
-    private val breakdownRows: Flow<BreakdownRows> =
+    private val breakdownRows: StateFlow<BreakdownRows?> =
         combine(key, _breakdownMode, ::Pair).flatMapLatest { (k, mode) ->
             if (mode == Breakdown.TYPE) typeRows(k)
             else repository.getCategorySpending(k.stats, natureFilter = false).flatMapLatest { cat ->
                 if (cat.isEmpty()) typeRows(k) else flowOf(BreakdownRows(false, cat))
             }
-        }
+        }.stateIn(viewModelScope, started, null)
+
+    private fun slices(b: BreakdownRows, categories: List<NamedRef<Int>>, types: List<TransactionType>) =
+        if (b.byType) typeSlices(b.rows, types) else categorySlices(b.rows, categories)
+
+    private val categoryRefs = repository.getCategories().map { list -> list.map { NamedRef(it.id, it.name) } }
 
     val breakdown: StateFlow<List<SliceValue>?> = combine(
-        breakdownRows, repository.getCategories(), repository.getTransactionTypes(),
-    ) { b, categories, types ->
-        if (b.byType) typeSlices(b.rows, types)
-        else categorySlices(b.rows, categories.map { NamedRef(it.id, it.name) })
+        breakdownRows, categoryRefs, repository.getTransactionTypes(),
+    ) { b, categories, types -> b?.let { slices(it, categories, types) } }
+        .stateIn(viewModelScope, started, null)
+
+    /** Whether the breakdown is by type, chosen or because nothing has a category. */
+    val breakdownByType: StateFlow<Boolean> = breakdownRows.map { it?.byType == true }
+        .stateIn(viewModelScope, started, false)
+
+    /** The filters' range moved back to the period before, of the same length; null for ALL. */
+    private val previousKey: Flow<StatsFilter?> = combine(_filters, today) { f, day ->
+        previousRange(f.timeFilter, day)?.let { (s, e) -> keyOf(f, day).stats.copy(start = s.toString(), end = e.toString()) }
+    }.distinctUntilChanged()
+
+    /**
+     * The breakdown's rows over the period before, grouped the same way as now (by type when now is),
+     * label to amount. Null for ALL; empty while that period has nothing.
+     */
+    val breakdownBefore: StateFlow<Map<String, Double>?> =
+        combine(breakdownRows, previousKey, ::Pair)
+            .flatMapLatest { (b, prev) ->
+                if (b == null || prev == null) flowOf(null)
+                else {
+                    val rows = if (b.byType) repository.getTypeSpending(prev, natureFilter = false).map { BreakdownRows(true, it) }
+                    else repository.getCategorySpending(prev, natureFilter = false).map { BreakdownRows(false, it) }
+                    combine(rows, categoryRefs, repository.getTransactionTypes()) { r, categories, types ->
+                        slices(r, categories, types).associate { it.label to it.value.toDouble() }
+                    }
+                }
+            }.stateIn(viewModelScope, started, null)
+
+    /** Money in and out over the period before; null for ALL. */
+    val statsBefore: StateFlow<IncExp?> = previousKey.flatMapLatest { prev ->
+        if (prev == null) flowOf(null) else repository.getIncomeVsExpense(prev)
     }.stateIn(viewModelScope, started, null)
+
 
     /** Budgeted categories with this calendar month's spending (not affected by the filters). */
     val budgets: StateFlow<List<CategoryBudget>> =
@@ -310,7 +350,7 @@ class AnalyticsViewModel @Inject constructor(
         repository.getFilterOptions().stateIn(viewModelScope, started, null)
 
     /** Top merchants, narrowed to the breakdown row that is selected, in Category and Type mode alike. */
-    val topSubjects: StateFlow<List<RankedRow>?> =
+    val topSubjects: StateFlow<List<SubjectAmount>?> =
         combine(key, breakdown, _selectedSlice) { fk, rows, slice -> Triple(fk, rows, slice) }
             .flatMapLatest { (k, rows, slice) ->
                 if (rows == null) return@flatMapLatest emptyFlow()
@@ -319,11 +359,16 @@ class AnalyticsViewModel @Inject constructor(
                     k.stats.copy(categories = categories, types = types),
                     natureFilter = false,
                     limit = 8,
-                ).map { list -> list.map { RankedRow(it.name, it.amount) } }
+                )
             }.stateIn(viewModelScope, started, null)
 
-    val incomeSources: StateFlow<List<RankedRow>?> = key.flatMapLatest { k ->
-        repository.getIncomeBySource(k.stats, 8).map { list -> list.map { RankedRow(it.name, it.amount) } }
+    /** Who paid in, biggest first, now and over the period before (null for ALL). */
+    val incomeSources: StateFlow<List<SourceAmount>?> = key.flatMapLatest { k ->
+        repository.getIncomeBySource(k.stats, 30)
+    }.stateIn(viewModelScope, started, null)
+
+    val incomeSourcesBefore: StateFlow<List<SourceAmount>?> = previousKey.flatMapLatest { prev ->
+        if (prev == null) flowOf(null) else repository.getIncomeBySource(prev, 30)
     }.stateIn(viewModelScope, started, null)
 
     val activityRaw: StateFlow<List<ActivityCell>?> =
@@ -388,6 +433,11 @@ class AnalyticsViewModel @Inject constructor(
     val historyStart: StateFlow<LocalDate?> =
         repository.selectedAccount.mapLatest { repository.getEarliestTransactionDate()?.toLocalDate() }
             .stateIn(viewModelScope, onceStarted, null)
+
+    /** Whether history reaches back over the whole period before. Null for ALL or until loaded. */
+    val history: StateFlow<History?> = combine(timeFilter, today, historyStart) { tf, day, first ->
+        historyFor(tf, day, first)
+    }.stateIn(viewModelScope, started, null)
 
     /** Real span of recorded history, for the ALL filter. Null until loaded. */
     private val dataSpanDays: StateFlow<Int?> =
