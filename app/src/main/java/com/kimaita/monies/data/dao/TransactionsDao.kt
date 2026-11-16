@@ -13,6 +13,7 @@ import com.kimaita.monies.data.dao.dtos.LineBalanceBucket
 import com.kimaita.monies.data.dao.dtos.IncExp
 import com.kimaita.monies.data.dao.dtos.LargestPayment
 import com.kimaita.monies.data.dao.dtos.SubjectOccurrence
+import com.kimaita.monies.data.dao.dtos.TraceTotals
 import com.kimaita.monies.data.dao.dtos.WalkTotals
 import com.kimaita.monies.data.dao.dtos.TypeFees
 import com.kimaita.monies.data.dao.dtos.DayPayment
@@ -76,9 +77,12 @@ private const val TRANSACTIONS_SELECT = "SELECT t.* FROM transactions t "
 /**
  * List params use COALESCE(:p, NULL) IS NULL, not :p IS NULL: Room expands a list into one ? per
  * element, so `(?,? IS NULL` is a SQLite row value and fails with "row value misused" for 2+ ids.
+ * A trace that starts after a transaction passes its time as :startDate and its id as :traceAfter: of
+ * the rows at that very time, only those with a higher id count, as the list orders them.
  */
 private const val TRANSACTIONS_FILTER = """
         WHERE $DATE_RANGE
+        AND (:traceAfter IS NULL OR t.transactionTime > :startDate OR t.id > :traceAfter)
         AND (:subjectId IS NULL OR t.subject = :subjectId)
         AND $CATEGORIES_IN
         AND $TYPES_IN
@@ -111,6 +115,7 @@ interface TransactionsDao : BaseDao<Transaction> {
     fun getTransactionsNewest(
         startDate: String?,
         endDate: String?,
+        traceAfter: Long?,
         subjectId: Long?,
         categoryId: List<Int>?,
         transactionType: List<Int>?,
@@ -126,6 +131,7 @@ interface TransactionsDao : BaseDao<Transaction> {
     fun getTransactionsOldest(
         startDate: String?,
         endDate: String?,
+        traceAfter: Long?,
         subjectId: Long?,
         categoryId: List<Int>?,
         transactionType: List<Int>?,
@@ -141,6 +147,7 @@ interface TransactionsDao : BaseDao<Transaction> {
     fun getTransactionsLargest(
         startDate: String?,
         endDate: String?,
+        traceAfter: Long?,
         subjectId: Long?,
         categoryId: List<Int>?,
         transactionType: List<Int>?,
@@ -156,6 +163,7 @@ interface TransactionsDao : BaseDao<Transaction> {
     fun getTransactionsSmallest(
         startDate: String?,
         endDate: String?,
+        traceAfter: Long?,
         subjectId: Long?,
         categoryId: List<Int>?,
         transactionType: List<Int>?,
@@ -165,6 +173,59 @@ interface TransactionsDao : BaseDao<Transaction> {
         amountQuery: String?,
         subjectLike: String?
     ): PagingSource<Int, TransactionWithDetails>
+
+    /**
+     * The totals of the rows the list shows for the same filters: money in and out (not
+     * transfers), every fee, how many lines the rows come from, and one of those lines.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) AS count,
+            SUM(CASE WHEN tt.isTransfer = 0 AND tt.isInc = 1 THEN t.amount ELSE 0 END) AS income,
+            SUM(CASE WHEN tt.isTransfer = 0 AND tt.isInc = 0 THEN t.amount ELSE 0 END) AS expense,
+            SUM(COALESCE(t.cost, 0)) AS fees,
+            COUNT(DISTINCT COALESCE(a.mergedInto, a.id)) AS lines,
+            MIN(COALESCE(a.mergedInto, a.id)) AS line
+        FROM transactions t
+        JOIN transaction_types tt ON tt.id = t.transactionType
+        JOIN accounts a ON a.id = t.accountId
+    """ + TRANSACTIONS_FILTER + SEARCH_FILTER
+    )
+    fun getTraceTotals(
+        startDate: String?,
+        endDate: String?,
+        traceAfter: Long?,
+        subjectId: Long?,
+        categoryId: List<Int>?,
+        transactionType: List<Int>?,
+        account: Int?,
+        natureFilter: Boolean?,
+        fts: String?,
+        amountQuery: String?,
+        subjectLike: String?
+    ): Flow<TraceTotals>
+
+    /**
+     * The balance at a trace's start, added up as Home adds lines: each active line's last balance
+     * before :startDate, or up to and including transaction :traceAfter when the trace starts after
+     * it; with :account, that line's only. A null :startDate gives the balance now. Null when no
+     * line has a balance by then.
+     */
+    @Query(
+        """
+    WITH $LINE_LEDGER
+    SELECT SUM(balance) FROM (
+        SELECT line, balance, MAX(time) AS time FROM (
+            SELECT line, time, balance, MAX(id) AS id FROM ledger
+            WHERE (:account IS NULL OR line = :account)
+              AND (:startDate IS NULL OR time < :startDate
+                   OR :traceAfter IS NOT NULL AND time = :startDate AND id <= :traceAfter)
+            GROUP BY line, time
+        ) GROUP BY line
+    )
+"""
+    )
+    fun getBalanceAt(startDate: String?, traceAfter: Long?, account: Int?): Flow<Double?>
 
 
     @androidx.room.Transaction

@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.style.TextOverflow
 import com.kimaita.monies.ui.theme.MoniesTheme
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.kimaita.monies.models.applyToAllOfSubject
@@ -31,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,6 +68,7 @@ fun TransactionBottomSheet(
     transaction: Transaction,
     onDismissRequest: () -> Unit,
     onSubjectClick: () -> Unit,
+    onTraceFrom: (() -> Unit)? = null,
     viewModel: TransactionSheetViewModel = hiltViewModel(),
 ) {
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -107,7 +110,8 @@ fun TransactionBottomSheet(
                 val all = applyToAllOfSubject(mode, subject != null)
                 if (all == null) pending = picked else assign(picked, all)
             },
-            onSubjectClick = onSubjectClick
+            onSubjectClick = onSubjectClick,
+            onTraceFrom = onTraceFrom,
         )
     }
 }
@@ -120,6 +124,7 @@ fun TransactionContent(
     categories: List<Category>,
     onCategoryChange: (Category) -> Unit,
     onSubjectClick: () -> Unit,
+    onTraceFrom: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val subject = transaction.subject
@@ -200,6 +205,16 @@ fun TransactionContent(
         }
 
         SmsCard(transaction.message) { copyToClipboard(context, "Message", transaction.message) }
+
+        if (onTraceFrom != null && transaction.transactionTime != null) {
+            OutlinedButton(
+                onClick = onTraceFrom,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) { Text("Trace since this") }
+        }
     }
 }
 

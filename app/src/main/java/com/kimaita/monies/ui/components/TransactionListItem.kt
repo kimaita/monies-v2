@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow.Companion.Ellipsis
 import androidx.compose.ui.unit.dp
 import com.kimaita.monies.models.Transaction
+import com.kimaita.monies.ui.util.formatAmount
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -52,6 +53,10 @@ fun TransactionListItem(
     modifier: Modifier = Modifier,
     transaction: Transaction,
     style: TransactionItemStyle = TransactionItemStyle.SINGLE_LINE,
+    /** Shows the balance the SMS gave after this transaction, under the date. */
+    showBalance: Boolean = false,
+    /** Offered in the sheet as "Trace since this" when set. */
+    onTraceFrom: ((Transaction) -> Unit)? = null,
     onSubjectClick: (Long) -> Unit,
 ) {
     val subject = transaction.subject
@@ -66,6 +71,12 @@ fun TransactionListItem(
             onSubjectClick = {
                 showSheet = false
                 subject?.id?.let { onSubjectClick(it) }
+            },
+            onTraceFrom = onTraceFrom?.let { trace ->
+                {
+                    showSheet = false
+                    trace(transaction)
+                }
             })
     }
 
@@ -122,11 +133,21 @@ fun TransactionListItem(
                 )
             }
         }
-        Text(
-            text = formatRelativeDate(transaction.transactionTime),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = formatRelativeDate(transaction.transactionTime),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val balance = transaction.balance
+            if (showBalance && balance != null) {
+                Text(
+                    text = "Bal ${formatAmount(balance)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

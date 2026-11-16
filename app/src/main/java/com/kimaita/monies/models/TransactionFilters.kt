@@ -28,8 +28,29 @@ data class TransactionFilters(
     val typeFilters: List<Int> = emptyList(),
     val categoryFilters: List<Int> = emptyList(),
     val subjectFilters: List<Long> = emptyList(),
+    /** Set while tracing: only transactions from this point on. */
+    val since: TraceStart? = null,
+)
 
-    )
+/**
+ * Where a trace starts: at [time], or just after the transaction [afterId] made at [time]. M-PESA
+ * gives times to the minute, so rows sharing that minute count only when their id is higher: the
+ * rows the list shows above that transaction.
+ */
+data class TraceStart(val time: LocalDateTime, val afterId: Long? = null) {
+    /** [time] as the database stores it, so the anchor's own minute compares equal. */
+    val start: String get() = time.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+}
+
+/** A trace start from navigation arguments; null when [since] is absent or not a date-time. */
+fun traceStartOf(since: String?, afterId: Long?): TraceStart? {
+    val time = since?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() } ?: return null
+    return TraceStart(time, afterId?.takeIf { it >= 0 })
+}
+
+/** The list's bounds: a trace's start, open-ended, takes the place of the time filter. */
+fun TransactionFilters.listDates(today: LocalDate = LocalDate.now()): Pair<String?, String?> =
+    since?.let { it.start to null } ?: getDatesForFilter(timeFilter, today)
 
 fun getDatesForFilter(filter: TimeFilter, today: LocalDate = LocalDate.now()): Pair<String?, String?> {
     val formatter = DateTimeFormatter.ISO_LOCAL_DATE

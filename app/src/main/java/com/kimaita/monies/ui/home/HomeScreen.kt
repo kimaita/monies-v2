@@ -51,6 +51,7 @@ import com.kimaita.monies.ui.components.TabTopBar
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.ui.components.CurrencyText
+import com.kimaita.monies.ui.transactions.traceRoute
 import com.kimaita.monies.ui.components.TransactionItemStyle
 import com.kimaita.monies.ui.components.TransactionListItem
 import com.kimaita.monies.ui.navigateSingleTop
@@ -81,6 +82,7 @@ fun HomeScreen(
         onViewAnalytics = { navController.navigateToTab("analytics") },
         onTimeFilterChange = viewModel::setTimeFilter,
         onSubjectClick = { subjectId -> navController.navigateSingleTop("subject/$subjectId") },
+        onTraceFrom = { t -> traceRoute(t)?.let { navController.navigateSingleTop(it) } },
         uiState = uiState,
         filter = filters,
         isSyncing = isSyncing,
@@ -100,6 +102,7 @@ fun HomeScreenContent(
     onViewAllTransactions: () -> Unit,
     onViewAnalytics: () -> Unit,
     onSubjectClick: (Long) -> Unit,
+    onTraceFrom: (Transaction) -> Unit = {},
     onSearch: () -> Unit = {},
     onSettings: () -> Unit = {},
     onToggleHideBalances: () -> Unit = {},
@@ -214,6 +217,7 @@ fun HomeScreenContent(
                 transactions = uiState.recentTransactions,
                 onViewAllClick = onViewAllTransactions,
                 onSubjectClick = onSubjectClick,
+                onTraceFrom = onTraceFrom,
             )
             Spacer(Modifier.height(24.dp))
         }
@@ -223,6 +227,7 @@ fun HomeScreenContent(
 @Composable
 fun Transactions(
     transactions: List<Transaction>?, onViewAllClick: () -> Unit, onSubjectClick: (Long) -> Unit,
+    onTraceFrom: (Transaction) -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -267,6 +272,7 @@ fun Transactions(
                 TransactionListItem(
                     transaction = transaction,
                     style = TransactionItemStyle.TWO_LINE,
+                    onTraceFrom = onTraceFrom,
                     onSubjectClick = onSubjectClick
                 )
             }

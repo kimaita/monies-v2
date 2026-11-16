@@ -15,12 +15,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,12 +35,14 @@ import androidx.compose.ui.unit.dp
 import com.kimaita.monies.R
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.TransactionType
+import com.kimaita.monies.models.TraceStart
 import com.kimaita.monies.models.TransactionFilters
 import com.kimaita.monies.services.TypeGroup
 import com.kimaita.monies.services.isSelected
 import com.kimaita.monies.services.toggleGroup
 import com.kimaita.monies.services.typeGroups
 import com.kimaita.monies.ui.theme.AppTheme
+import com.kimaita.monies.ui.util.formatDayTime
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -95,6 +104,17 @@ fun FilterBottomSheetContent(
 ) {
 
     val scrollState = rememberScrollState()
+    var pickingStart by remember { mutableStateOf(false) }
+
+    if (pickingStart) {
+        TraceStartDialog(
+            initial = filters.since?.time,
+            onDismiss = { pickingStart = false },
+            onPick = {
+                pickingStart = false
+                onFilterChange(filters.copy(since = TraceStart(it)))
+            })
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -105,6 +125,32 @@ fun FilterBottomSheetContent(
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
+            Text("SINCE", style = MaterialTheme.typography.labelMedium)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                val since = filters.since
+                FilterChip(
+                    selected = since != null,
+                    onClick = { pickingStart = true },
+                    leadingIcon = {
+                        Icon(painterResource(R.drawable.date_range), null, Modifier.size(FilterChipDefaults.IconSize))
+                    },
+                    label = {
+                        Text(
+                            when {
+                                since == null -> "Any time"
+                                since.afterId != null -> "Just after ${formatDayTime(since.time)}"
+                                else -> formatDayTime(since.time)
+                            }
+                        )
+                    })
+                if (since != null) {
+                    TextButton(onClick = { onFilterChange(filters.copy(since = null)) }) { Text("Clear") }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text("NATURE", style = MaterialTheme.typography.labelMedium)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

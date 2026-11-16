@@ -53,6 +53,8 @@ import com.kimaita.monies.models.TransactionType
 import com.kimaita.monies.ui.components.SortMenu
 import com.kimaita.monies.ui.components.TextDialog
 import com.kimaita.monies.ui.components.TransactionListItem
+import com.kimaita.monies.ui.navigateSingleTop
+import com.kimaita.monies.ui.transactions.traceRoute
 import com.kimaita.monies.ui.theme.AppTheme
 import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDateTime
@@ -149,6 +151,7 @@ fun SubjectScreen(
         onSortOrderChange = { newOrder -> viewModel.setSortOrder(newOrder) },
         onRenameClick = { dialog = SubjectDialog.Rename },
         onMergeClick = { viewModel.setSubjectQuery(""); dialog = SubjectDialog.Pick },
+        onTraceFrom = { t -> traceRoute(t)?.let { navController.navigateSingleTop(it) } },
     )
 
 }
@@ -173,6 +176,7 @@ fun SubjectScreenContent(
     onSortOrderChange: (SortOrder) -> Unit,
     onRenameClick: () -> Unit = {},
     onMergeClick: () -> Unit = {},
+    onTraceFrom: (Transaction) -> Unit = {},
 ) {
 
     val isPerson = incomingCount > 0 && outgoingCount > 0
@@ -223,6 +227,7 @@ fun SubjectScreenContent(
                     TransactionListItem(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         transaction = transaction,
+                        onTraceFrom = onTraceFrom,
                         onSubjectClick = {})
                     if (index < transactions.itemCount - 1) {
                         HorizontalDivider(

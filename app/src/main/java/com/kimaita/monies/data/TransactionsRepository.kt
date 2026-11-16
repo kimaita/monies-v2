@@ -25,6 +25,7 @@ import com.kimaita.monies.data.dao.dtos.SubjectCount
 import com.kimaita.monies.data.dao.dtos.lineNames
 import com.kimaita.monies.data.database.models.UserAccount
 import com.kimaita.monies.data.dao.dtos.SubjectStats
+import com.kimaita.monies.data.dao.dtos.TraceTotals
 import com.kimaita.monies.data.database.models.Category
 import com.kimaita.monies.data.database.models.Setting
 import com.kimaita.monies.data.database.models.Subject
@@ -38,6 +39,7 @@ import com.kimaita.monies.models.StatsFilter
 import com.kimaita.monies.models.ThemeMode
 import com.kimaita.monies.models.Transaction
 import com.kimaita.monies.models.TransactionFilters
+import com.kimaita.monies.models.TraceStart
 import com.kimaita.monies.models.export.ExportFilters
 import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
@@ -147,6 +149,7 @@ class TransactionsRepository @Inject constructor(
             .map { list -> list.map { it.toDomainModel() } }
             .flowOn(Dispatchers.Default)
 
+    /** With a trace in the filters, [startDate] is its start, as [com.kimaita.monies.models.listDates] gives. */
     fun getTransactions(
         transactionFilters: TransactionFilters?,
         startDate: String?,
@@ -167,6 +170,7 @@ class TransactionsRepository @Inject constructor(
                     query(
                         startDate,
                         endDate,
+                        transactionFilters?.since?.afterId,
                         transactionFilters?.subjectFilter,
                         transactionFilters?.categoryFilters?.takeIf { it.isNotEmpty() },
                         transactionFilters?.typeFilters?.takeIf { it.isNotEmpty() },
@@ -179,6 +183,39 @@ class TransactionsRepository @Inject constructor(
                 }).flow
         }.map { list -> list.map { it.toDomainModel() } }.flowOn(Dispatchers.Default)
     }
+
+    /** The totals of the rows [getTransactions] lists for the same arguments. */
+    fun getTraceTotals(f: TransactionFilters, startDate: String?, endDate: String?): Flow<TraceTotals> {
+        val search = searchTermsOf(f.searchQuery)
+        return forAccount { selected ->
+            transactionsDao.getTraceTotals(
+                startDate,
+                endDate,
+                f.since?.afterId,
+                f.subjectFilter,
+                f.categoryFilters.takeIf { it.isNotEmpty() },
+                f.typeFilters.takeIf { it.isNotEmpty() },
+                f.accountFilter ?: selected,
+                f.natureFilter,
+                search.fts,
+                search.amount,
+                search.subjectLike
+            )
+        }
+    }
+
+    /**
+     * The balance at [start] and now: [line]'s, else the selected line's, else every active line's
+     * added up as Home shows it. Either is null when no balance is recorded by then.
+     */
+    fun getTraceBalances(start: TraceStart, line: Int?): Flow<Pair<Double?, Double?>> =
+        forAccount { selected ->
+            val account = line ?: selected
+            combine(
+                transactionsDao.getBalanceAt(start.start, start.afterId, account),
+                transactionsDao.getBalanceAt(null, null, account),
+            ) { then, now -> then to now }
+        }
 
 
     /** Subjects whose display name matches [query], for the rows above the search results. */
