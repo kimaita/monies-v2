@@ -418,6 +418,10 @@ class TransactionsRepository @Inject constructor(
     fun getWalkTotals(startDate: String?, endDate: String?) =
         forAccount { transactionsDao.getWalkTotals(startDate, endDate, it) }
 
+    fun getTypeFees(f: StatsFilter) = forAccount {
+        transactionsDao.getTypeFees(f.start, f.end, f.subjects, f.categories, f.types, it)
+    }
+
     fun getLargestPayments(startDate: String?, endDate: String?) =
         forAccount { transactionsDao.getLargestPayments(startDate, endDate, it) }
 

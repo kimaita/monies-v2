@@ -18,6 +18,7 @@ import com.kimaita.monies.ui.analytics.*
 import com.kimaita.monies.models.analytics.RecurringPayment
 import com.kimaita.monies.data.dao.dtos.LargestPayment
 import com.kimaita.monies.data.dao.dtos.WalkTotals
+import com.kimaita.monies.data.dao.dtos.TypeFees
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -482,6 +483,28 @@ class AnalyticsCalculationsTest {
         val rent = regular("Rent", 18_000.0, LocalDate.of(2026, 1, 31), DAYS_PER_MONTH)
         val due = dueDates(listOf(rent), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31))
         assertEquals(listOf(LocalDate.of(2026, 1, 31), LocalDate.of(2026, 2, 28), LocalDate.of(2026, 3, 28)), due.map { it.date })
+    }
+
+    @Test
+    fun feesByType_mergesTypesSharingADisplayNameAndSortsByFees() {
+        val types = listOf(
+            TransactionType(id = 1, name = "send_money", isInc = false, displayName = "Send Money"),
+            TransactionType(id = 2, name = "withdraw", isInc = false),
+            TransactionType(id = 3, name = "paybill.a", isInc = false, displayName = "Pay Bill"),
+            TransactionType(id = 4, name = "paybill.b", isInc = false, displayName = "Pay Bill"),
+        )
+        val rows = listOf(
+            TypeFees("send_money", 120.0, 8),
+            TypeFees("withdraw", 87.0, 3),
+            TypeFees("paybill.a", 60.0, 2),
+            TypeFees("paybill.b", 90.0, 4),
+            TypeFees("gone_type", 5.0, 1),
+        )
+        val out = feesByType(rows, types)
+        assertEquals(listOf("Pay Bill", "Send Money", "Withdraw", "gone_type"), out.map { it.name })
+        assertEquals(150.0, out[0].fees, 0.0)
+        assertEquals(6, out[0].count)
+        assertEquals(362.0, out.sumOf { it.fees }, 0.0)
     }
 
     @Test

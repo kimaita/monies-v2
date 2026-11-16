@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kimaita.monies.R
 import com.kimaita.monies.data.dao.dtos.IncExp
+import com.kimaita.monies.data.dao.dtos.TypeFees
 import com.kimaita.monies.models.TimeFilter
 import com.kimaita.monies.services.LedgerKind
 import com.kimaita.monies.services.ledger
@@ -45,13 +46,14 @@ internal fun CashFlowTab(vm: AnalyticsViewModel, listState: LazyListState) {
     val stats by vm.stats.collectAsStateWithLifecycle()
     val time by vm.timeFilter.collectAsStateWithLifecycle()
     val historyStart by vm.historyStart.collectAsStateWithLifecycle()
+    val typeFees by vm.typeFees.collectAsStateWithLifecycle()
     val period = periodLabel(time, historyStart)
 
     TabList(listState) {
         item(key = "balance") { BalanceWalkCard(money, period) }
         item(key = "inout") { InVsOutCard(cashFlow, stats, time, period, money) }
         item(key = "kept") { KeptCard(cashFlow, time) }
-        item(key = "fees") { FeesRow(costs, stats, period) }
+        item(key = "fees") { FeesRow(costs, stats, period, typeFees) }
     }
 }
 
@@ -290,7 +292,7 @@ private fun KeptCard(buckets: List<BarBucket>?, time: TimeFilter) {
 }
 
 @Composable
-private fun FeesRow(costs: List<BarBucket>?, stats: IncExp?, period: String) {
+private fun FeesRow(costs: List<BarBucket>?, stats: IncExp?, period: String, byType: List<TypeFees>?) {
     val gold = MoniesTheme.extra.gold
     BentoCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -316,6 +318,39 @@ private fun FeesRow(costs: List<BarBucket>?, stats: IncExp?, period: String) {
                             .height((44 * it.up / max).coerceAtLeast(2f).dp)
                             .background(gold, RoundedCornerShape(3.dp))
                     )
+                }
+            }
+        }
+        val types = byType.orEmpty()
+        if (types.isNotEmpty()) {
+            val total = types.sumOf { it.fees }
+            HorizontalDivider(Modifier.padding(top = 12.dp, bottom = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Say(
+                "Most of it on **${types[0].name}**: KES ${formatAmount(types[0].fees)} of ${formatAmount(total)}.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            types.forEach { t ->
+                Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(t.name, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Note("${t.count} ${if (t.count == 1) "transaction" else "transactions"} · ~${formatAmount(t.fees / t.count)} each")
+                        }
+                        Text(formatAmount(t.fees), fontWeight = FontWeight.Bold)
+                    }
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(3.dp))
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth((t.fees / types[0].fees).toFloat().coerceIn(0.02f, 1f))
+                                .fillMaxHeight()
+                                .background(gold, RoundedCornerShape(3.dp))
+                        )
+                    }
                 }
             }
         }

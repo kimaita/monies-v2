@@ -21,6 +21,8 @@ import com.kimaita.monies.models.export.FilterOptions
 import com.kimaita.monies.models.export.NamedRef
 import com.kimaita.monies.models.getDatesForFilter
 import com.kimaita.monies.services.PaceSummary
+import com.kimaita.monies.services.feesByType
+import com.kimaita.monies.data.dao.dtos.TypeFees
 import com.kimaita.monies.services.weekDays
 import com.kimaita.monies.services.dayRangeLabel
 import com.kimaita.monies.services.PacePeriod
@@ -270,6 +272,12 @@ class AnalyticsViewModel @Inject constructor(
     val stats: StateFlow<IncExp?> = key.flatMapLatest { k ->
         repository.getIncomeVsExpense(k.stats)
     }.stateIn(viewModelScope, started, null)
+
+    /** Fees by transaction type for the filters, with how many transactions paid them. */
+    val typeFees: StateFlow<List<TypeFees>?> =
+        combine(key.flatMapLatest { repository.getTypeFees(it.stats) }, repository.getTransactionTypes()) { rows, types ->
+            feesByType(rows, types)
+        }.stateIn(viewModelScope, started, null)
 
     /** The rows the breakdown shows, and whether they are by type (chosen, or because there are no categories). */
     private class BreakdownRows(val byType: Boolean, val rows: List<CategorySpending>)
